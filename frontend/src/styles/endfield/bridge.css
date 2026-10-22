@@ -192,11 +192,7 @@ select:-webkit-autofill {
   color: var(--ef-panel) !important;
 }
 
-/* 支付渠道按钮：@apply 里写死了品牌色，P0 阶段统一压成墨/信号 */
-.btn-stripe, .btn-airwallex, .btn-alipay, .btn-wechat {
-  background-image: none !important;
-  box-shadow: none !important;
-}
+/* 支付渠道按钮的品牌色见本节末尾（.btn-stripe/.btn-airwallex/.btn-alipay/.btn-wxpay）。 */
 /* ── 13. @apply 展开的几何兜底 ───────────────────────────────────
    style.css 里 261 条 @apply 在编译期就把 border-radius / box-shadow
    内联进组件样式，Tailwind 的 borderRadius 配置管不到已展开的值。
@@ -282,4 +278,81 @@ select:-webkit-autofill {
 .btn-wxpay {
   background-color: var(--ef-chip) !important;
   color: var(--ef-ink) !important;
+}
+
+/* ── 14. 横向分布条 (.ef-dist) ──────────────────────────────────
+   饼/环图在 skill 里没有对应物，且靠颜色区分条目，压成灰后不可读。
+   这里改成横向占比条：长度编码取代颜色编码，刻度思路照抄 .ef-progress。
+   这是 bridge 层的组合件，不是 skill 原件里的类。 */
+.ef-dist {
+  display: grid;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--ef-rule);
+}
+.ef-dist > li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.15rem 0.75rem;
+  align-items: baseline;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid var(--ef-rule);
+}
+.ef-dist-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--ef-font-mono);
+  font-size: var(--ef-t-field);
+  color: var(--ef-ink);
+}
+.ef-dist-pct {
+  font-family: var(--ef-font-ui);
+  font-size: var(--ef-t-field);
+  font-stretch: var(--ef-wide);
+  font-variant-numeric: tabular-nums;
+  color: var(--ef-ink);
+  font-weight: 600;
+}
+/* 轨道：整行跨列，刻度填充由 --p 驱动 */
+.ef-dist-track {
+  --cells: 32;
+  grid-column: 1 / -1;
+  height: 8px;
+  background:
+    linear-gradient(90deg, var(--ef-ink) calc(var(--p, 0) * 100%), transparent 0),
+    var(--ef-chip);
+  -webkit-mask: repeating-linear-gradient(90deg, #000 0 calc(100% / var(--cells) - 1px), transparent 0 calc(100% / var(--cells)));
+  mask: repeating-linear-gradient(90deg, #000 0 calc(100% / var(--cells) - 1px), transparent 0 calc(100% / var(--cells)));
+}
+.ef-dist-val {
+  grid-row: 1;
+  grid-column: 2;
+  display: none;
+}
+
+@media (min-width: 640px) {
+  .ef-dist > li {
+    grid-template-columns: minmax(0, 1.2fr) auto minmax(6rem, 2fr) auto;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .ef-dist-track {
+    grid-column: 3;
+    grid-row: 1;
+  }
+  .ef-dist-val {
+    display: block;
+    grid-column: 4;
+    font-family: var(--ef-font-ui);
+    font-size: var(--ef-t-field);
+    font-stretch: var(--ef-wide);
+    font-variant-numeric: tabular-nums;
+    color: var(--ef-ink-2);
+    text-align: right;
+    white-space: nowrap;
+  }
 }
