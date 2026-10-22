@@ -427,6 +427,7 @@ import { buildGatewayUrl } from '@/api/client'
 import { formatDateLocalInput } from '@/utils/format'
 import { sanitizeUrl } from '@/utils/url'
 import { isEfDark, setEfTheme } from '@/utils/theme'
+import { efChartPalette, efSeriesColor } from '@/utils/chartTheme'
 
 const { t, locale } = useI18n()
 const appStore = useAppStore()
@@ -528,17 +529,19 @@ function setDailyUsageDays(days: 7 | 30 | 90) {
 // ==================== Ring Animation ====================
 
 const CIRCUMFERENCE = 2 * Math.PI * 68
-const RING_GRADIENTS = [
-  { from: '#14b8a6', to: '#5eead4' },
-  { from: '#6366F1', to: '#A5B4FC' },
-  { from: '#10B981', to: '#6EE7B7' },
-  { from: '#F59E0B', to: '#FCD34D' },
-]
+/**
+ * 四个环原本用青/靛/绿/橙四色区分。这些环各自独立标注了标题与百分比，
+ * 颜色不承载任何信息，只是装饰 —— 因此统一走墨阶，明暗主题都能自动反转。
+ */
+const RING_GRADIENTS = Array.from({ length: 4 }, (_, i) => {
+  const base = efSeriesColor(i)
+  return { from: base, to: base }
+})
 
 const ringAnimated = ref(false)
 const displayPcts = ref<number[]>([])
 
-const ringTrackColor = computed(() => isDark.value ? '#222222' : '#F0F0EE')
+const ringTrackColor = computed(() => efChartPalette().chip)
 
 interface RingItem {
   title: string
@@ -946,8 +949,8 @@ onUnmounted(() => {
   transition: box-shadow 0.2s ease, border-color 0.2s ease;
 }
 .input-ring:focus {
-  box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.2);
-  border-color: #14b8a6;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ef-signal) 25%, transparent);
+  border-color: var(--ef-ink);
   outline: none;
 }
 
@@ -964,13 +967,23 @@ onUnmounted(() => {
   100% { background-position: 200% 0; }
 }
 .skeleton {
-  background: linear-gradient(90deg, #e5e7eb 25%, #f3f4f6 50%, #e5e7eb 75%);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--ef-ink) 8%, transparent) 25%,
+    color-mix(in srgb, var(--ef-ink) 4%, transparent) 50%,
+    color-mix(in srgb, var(--ef-ink) 8%, transparent) 75%
+  );
   background-size: 200% 100%;
   animation: shimmer-kv 1.8s ease-in-out infinite;
   border-radius: 8px;
 }
 :global(.dark) .skeleton {
-  background: linear-gradient(90deg, #334155 25%, #1e293b 50%, #334155 75%);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--ef-ink) 8%, transparent) 25%,
+    color-mix(in srgb, var(--ef-ink) 4%, transparent) 50%,
+    color-mix(in srgb, var(--ef-ink) 8%, transparent) 75%
+  );
   background-size: 200% 100%;
 }
 

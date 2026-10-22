@@ -99,14 +99,17 @@
     <div v-if="activeView === 'model_distribution' && loading" class="flex h-48 items-center justify-center">
       <LoadingSpinner />
     </div>
-    <div
-      v-else-if="activeView === 'model_distribution' && displayModelStats.length > 0 && chartData"
-      class="flex flex-col items-center gap-4 sm:flex-row sm:gap-6"
-    >
-      <div class="h-48 w-48 shrink-0">
-        <Doughnut :data="chartData" :options="doughnutOptions" />
-      </div>
-      <div class="max-h-48 w-full min-w-0 flex-1 overflow-auto">
+    <div v-else-if="activeView === 'model_distribution' && displayModelStats.length > 0" class="flex flex-col gap-4">
+      <!-- 横向占比条（.ef-progress 契约）。长度编码取代颜色编码。 -->
+      <ol class="ef-dist">
+        <li v-for="m in displayModelStats" :key="'bar-' + m.model">
+          <span class="ef-dist-name" :title="m.model">{{ m.model }}</span>
+          <span class="ef-dist-pct">{{ percentOfModel(m) }}</span>
+          <span class="ef-dist-track" :style="{ '--p': shareOfModel(m) }"></span>
+          <span class="ef-dist-val">{{ modelValueLabel(m) }}</span>
+        </li>
+      </ol>
+      <div class="max-h-48 w-full min-w-0 overflow-auto">
         <table class="w-full text-xs">
           <thead>
             <tr class="text-gray-500 dark:text-gray-400">
@@ -182,11 +185,18 @@
     >
       {{ t('admin.dashboard.failedToLoad') }}
     </div>
-    <div v-else-if="rankingDisplayItems.length > 0 && rankingChartData" class="flex flex-col items-center gap-4 sm:flex-row sm:gap-6">
-      <div class="h-48 w-48 shrink-0">
-        <Doughnut :data="rankingChartData" :options="rankingDoughnutOptions" />
-      </div>
-      <div class="max-h-48 w-full min-w-0 flex-1 overflow-auto">
+    <div v-else-if="rankingDisplayItems.length > 0" class="flex flex-col gap-4">
+      <ol class="ef-dist">
+        <li v-for="(item, idx) in rankingDisplayItems" :key="'rbar-' + idx">
+          <span class="ef-dist-name" :title="getRankingUserLabel(item)">
+            {{ item.isOther ? t('admin.dashboard.spendingRankingOther') : getRankingUserLabel(item) }}
+          </span>
+          <span class="ef-dist-pct">{{ percentOfRanking(item) }}</span>
+          <span class="ef-dist-track" :style="{ '--p': shareOfRanking(item) }"></span>
+          <span class="ef-dist-val">${{ formatCost(item.actual_cost) }}</span>
+        </li>
+      </ol>
+      <div class="max-h-48 w-full min-w-0 overflow-auto">
         <table class="w-full text-xs">
           <thead>
             <tr class="text-gray-500 dark:text-gray-400">
@@ -245,14 +255,10 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js'
-import { Doughnut } from 'vue-chartjs'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import UserBreakdownSubTable from './UserBreakdownSubTable.vue'
 import type { ModelStat, UserSpendingRankingItem, UserBreakdownItem } from '@/types'
 import { getUserBreakdown } from '@/api/admin/dashboard'
-
-ChartJS.register(ArcElement, Tooltip, Legend)
 
 const { t } = useI18n()
 
@@ -339,21 +345,6 @@ const showAccountCost = computed(() => props.showAccountCost)
 const distributionColspan = computed(() => showAccountCost.value ? 6 : 5)
 const activeView = ref<'model_distribution' | 'spending_ranking'>('model_distribution')
 
-const chartColors = [
-  '#3b82f6',
-  '#10b981',
-  '#f59e0b',
-  '#ef4444',
-  '#8b5cf6',
-  '#ec4899',
-  '#14b8a6',
-  '#f97316',
-  '#6366f1',
-  '#84cc16',
-  '#06b6d4',
-  '#a855f7'
-]
-
 const displayModelStats = computed(() => {
   const sourceStats = props.source === 'upstream'
     ? props.upstreamModelStats
@@ -366,45 +357,29 @@ const displayModelStats = computed(() => {
   return [...sourceStats].sort((a, b) => toFiniteNumber(b[metricKey]) - toFiniteNumber(a[metricKey]))
 })
 
-const chartData = computed(() => {
-  if (!displayModelStats.value.length) return null
+/** 当前度量下的模型原始值 */
+const modelMetricValue = (m: ModelStat): number =>
+  toFiniteNumber(props.metric === 'actual_cost' ? m.actual_cost : m.total_tokens)
 
-  return {
-    labels: displayModelStats.value.map((m) => m.model),
-    datasets: [
-      {
-        data: displayModelStats.value.map((m) => toFiniteNumber(props.metric === 'actual_cost' ? m.actual_cost : m.total_tokens)),
-        backgroundColor: chartColors.slice(0, displayModelStats.value.length),
-        borderWidth: 0
-      }
-    ]
-  }
-})
+/** 占最大值的比例，驱动 --p */
+const shareOfModel = (m: ModelStat): number => {
+  const max = Math.max(...displayModelStats.value.map(modelMetricValue), 0)
+  if (max <= 0) return 0
+  return modelMetricValue(m) / max
+}
 
-const rankingChartData = computed(() => {
-  if (!props.rankingItems?.length) return null
+/** 占整体总量的百分比文本 */
+const percentOfModel = (m: ModelStat): string => {
+  const total = displayModelStats.value.reduce((a, b) => a + modelMetricValue(b), 0)
+  if (total <= 0) return '0%'
+  return `${((modelMetricValue(m) / total) * 100).toFixed(1)}%`
+}
 
-  const labels = props.rankingItems.map((item, index) => `#${index + 1} ${getRankingUserLabel(item)}`)
-  const data = props.rankingItems.map((item) => toFiniteNumber(item.actual_cost))
-  const backgroundColor = chartColors.slice(0, props.rankingItems.length)
-
-  if (otherRankingItem.value) {
-    labels.push(t('admin.dashboard.spendingRankingOther'))
-    data.push(otherRankingItem.value.actual_cost)
-    backgroundColor.push('#94a3b8')
-  }
-
-  return {
-    labels,
-    datasets: [
-      {
-        data,
-        backgroundColor,
-        borderWidth: 0
-      }
-    ]
-  }
-})
+/** 条尾数值文本 */
+const modelValueLabel = (m: ModelStat): string => {
+  const v = modelMetricValue(m)
+  return props.metric === 'actual_cost' ? `${formatCost(v)}` : formatTokens(v)
+}
 
 const otherRankingItem = computed<RankingDisplayItem | null>(() => {
   if (!props.rankingItems?.length) return null
@@ -437,48 +412,20 @@ const rankingDisplayItems = computed<RankingDisplayItem[]>(() => {
     : [...props.rankingItems]
 })
 
-const doughnutOptions = computed(() => ({
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: {
-      display: false
-    },
-    tooltip: {
-      callbacks: {
-        label: (context: any) => {
-          const value = context.raw as number
-          const total = context.dataset.data.reduce((a: number, b: number) => a + b, 0)
-          const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : '0.0'
-          const formattedValue = props.metric === 'actual_cost'
-            ? `$${formatCost(value)}`
-            : formatTokens(value)
-          return `${context.label}: ${formattedValue} (${percentage}%)`
-        }
-      }
-    }
-  }
-}))
+/** 排行条目用 actual_cost */
+const rankingValue = (item: RankingDisplayItem): number => toFiniteNumber(item.actual_cost)
 
-const rankingDoughnutOptions = computed(() => ({
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: {
-      display: false
-    },
-    tooltip: {
-      callbacks: {
-        label: (context: any) => {
-          const value = context.raw as number
-          const total = context.dataset.data.reduce((a: number, b: number) => a + b, 0)
-          const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : '0.0'
-          return `${context.label}: $${formatCost(value)} (${percentage}%)`
-        }
-      }
-    }
-  }
-}))
+const shareOfRanking = (item: RankingDisplayItem): number => {
+  const max = Math.max(...rankingDisplayItems.value.map(rankingValue), 0)
+  if (max <= 0) return 0
+  return rankingValue(item) / max
+}
+
+const percentOfRanking = (item: RankingDisplayItem): string => {
+  const total = rankingDisplayItems.value.reduce((a, b) => a + rankingValue(b), 0)
+  if (total <= 0) return '0%'
+  return `${((rankingValue(item) / total) * 100).toFixed(1)}%`
+}
 
 const formatTokens = (value: number): string => {
   if (value >= 1_000_000_000) {

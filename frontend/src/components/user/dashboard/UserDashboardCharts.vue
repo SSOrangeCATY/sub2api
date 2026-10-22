@@ -27,33 +27,43 @@
           <LoadingSpinner size="md" />
         </div>
         <h3 class="mb-4 text-sm font-semibold text-gray-900 dark:text-white">{{ t('dashboard.modelDistribution') }}</h3>
-        <div class="flex flex-col items-center gap-4 sm:flex-row sm:gap-6">
-          <div class="h-48 w-48 shrink-0">
-            <Doughnut v-if="modelData" :data="modelData" :options="doughnutOptions" />
-            <div v-else class="flex h-full items-center justify-center text-sm text-gray-500 dark:text-gray-400">{{ t('dashboard.noDataAvailable') }}</div>
-          </div>
-          <div class="max-h-48 w-full min-w-0 flex-1 overflow-auto">
-            <table class="w-full text-xs">
-              <thead>
-                <tr class="text-gray-500 dark:text-gray-400">
-                  <th class="pb-2 text-left">{{ t('dashboard.model') }}</th>
-                  <th class="pb-2 text-right">{{ t('dashboard.requests') }}</th>
-                  <th class="pb-2 text-right">{{ t('dashboard.tokens') }}</th>
-                  <th class="pb-2 text-right">{{ t('dashboard.actual') }}</th>
-                  <th class="pb-2 text-right">{{ t('dashboard.standard') }}</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="model in models" :key="model.model" class="border-t border-gray-100 dark:border-dark-700">
-                  <td class="max-w-[100px] truncate py-1.5 font-medium text-gray-900 dark:text-white" :title="model.model">{{ model.model }}</td>
-                  <td class="py-1.5 text-right text-gray-600 dark:text-gray-400">{{ formatNumber(model.requests) }}</td>
-                  <td class="py-1.5 text-right text-gray-600 dark:text-gray-400">{{ formatTokens(model.total_tokens) }}</td>
-                  <td class="py-1.5 text-right text-green-600 dark:text-green-400">${{ formatCost(model.actual_cost) }}</td>
-                  <td class="py-1.5 text-right text-gray-400 dark:text-gray-500">${{ formatCost(model.cost) }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+        <!-- 横向占比条（.ef-progress 契约）。长度编码取代颜色编码。 -->
+        <ol v-if="modelBars.length" class="ef-dist">
+          <li v-for="m in modelBars" :key="'bar-' + m.model">
+            <span class="ef-dist-name" :title="m.model">{{ m.model }}</span>
+            <span class="ef-dist-pct">{{ m.pct }}</span>
+            <span class="ef-dist-track" :style="{ '--p': m.share }"></span>
+            <span class="ef-dist-val">{{ m.label }}</span>
+          </li>
+        </ol>
+        <div v-else class="flex h-32 items-center justify-center text-sm text-gray-500 dark:text-gray-400">{{ t('dashboard.noDataAvailable') }}</div>
+        <div v-if="modelBars.length" class="mt-4 max-h-48 w-full min-w-0 overflow-auto">
+          <table class="w-full text-xs">
+            <thead>
+              <tr class="text-gray-500 dark:text-gray-400">
+                <th class="pb-2 text-left">{{ t('dashboard.model') }}</th>
+                <th class="pb-2 text-right">{{ t('dashboard.requests') }}</th>
+                <th class="pb-2 text-right">{{ t('dashboard.tokens') }}</th>
+                <th class="pb-2 text-right">{{ t('dashboard.actual') }}</th>
+                <th class="pb-2 text-right">{{ t('dashboard.standard') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="model in models"
+                :key="model.model"
+                class="border-t border-gray-100 dark:border-dark-700"
+              >
+                <td class="max-w-[100px] truncate py-1.5 font-medium text-gray-900 dark:text-white" :title="model.model">
+                  {{ model.model }}
+                </td>
+                <td class="py-1.5 text-right text-gray-600 dark:text-gray-400">{{ formatNumber(model.requests) }}</td>
+                <td class="py-1.5 text-right text-gray-600 dark:text-gray-400">{{ formatTokens(model.total_tokens) }}</td>
+                <td class="py-1.5 text-right text-green-600 dark:text-green-400">${{ formatCost(model.actual_cost) }}</td>
+                <td class="py-1.5 text-right text-gray-400 dark:text-gray-500">${{ formatCost(model.cost) }}</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -69,35 +79,28 @@ import { useI18n } from 'vue-i18n'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import DateRangePicker from '@/components/common/DateRangePicker.vue'
 import Select from '@/components/common/Select.vue'
-import { Doughnut } from 'vue-chartjs'
 import TokenUsageTrend from '@/components/charts/TokenUsageTrend.vue'
 import type { TrendDataPoint, ModelStat } from '@/types'
 import { formatCostFixed as formatCost, formatNumberLocaleString as formatNumber, formatTokensK as formatTokens } from '@/utils/format'
-import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, ArcElement, Title, Tooltip, Legend, Filler } from 'chart.js'
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, ArcElement, Title, Tooltip, Legend, Filler)
+import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler } from 'chart.js'
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler)
 
 const props = defineProps<{ loading: boolean, startDate: string, endDate: string, granularity: string, trend: TrendDataPoint[], models: ModelStat[] }>()
 defineEmits(['update:startDate', 'update:endDate', 'update:granularity', 'dateRangeChange', 'granularityChange', 'refresh'])
 const { t } = useI18n()
 
-const modelData = computed(() => !props.models?.length ? null : {
-  labels: props.models.map((m: ModelStat) => m.model),
-  datasets: [{
-    data: props.models.map((m: ModelStat) => m.total_tokens),
-    backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16']
-  }]
+/** 模型分布横条：按 token 量排序，--p 用占最大值的比例 */
+const modelBars = computed(() => {
+  const list = props.models ?? []
+  if (!list.length) return []
+  const sorted = [...list].sort((a: ModelStat, b: ModelStat) => (b.total_tokens || 0) - (a.total_tokens || 0))
+  const max = Math.max(...sorted.map((m: ModelStat) => m.total_tokens || 0), 0)
+  const total = sorted.reduce((a: number, b: ModelStat) => a + (b.total_tokens || 0), 0)
+  return sorted.map((m: ModelStat) => ({
+    model: m.model,
+    share: max > 0 ? (m.total_tokens || 0) / max : 0,
+    pct: total > 0 ? `${(((m.total_tokens || 0) / total) * 100).toFixed(1)}%` : '0%',
+    label: formatTokens(m.total_tokens || 0)
+  }))
 })
-
-const doughnutOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: { display: false },
-    tooltip: {
-      callbacks: {
-        label: (context: any) => `${context.label}: ${formatTokens(context.parsed)} tokens`
-      }
-    }
-  }
-}
 </script>

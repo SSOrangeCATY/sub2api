@@ -1,15 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Chart as ChartJS, BarElement, CategoryScale, Legend, LinearScale, Tooltip } from 'chart.js'
-import { Bar } from 'vue-chartjs'
 import type { OpsLatencyHistogramResponse } from '@/api/admin/ops'
 import type { ChartState } from '../types'
 import HelpTooltip from '@/components/common/HelpTooltip.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
-import { efChartPalette } from '@/utils/chartTheme'
-
-ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend)
 
 interface Props {
   latencyData: OpsLatencyHistogramResponse | null
@@ -19,12 +14,6 @@ interface Props {
 const props = defineProps<Props>()
 const { t } = useI18n()
 
-const colors = computed(() => ({
-  blue: '#3b82f6',
-  grid: efChartPalette().rule,
-  text: efChartPalette().ink2
-}))
-
 const hasData = computed(() => (props.latencyData?.total_requests ?? 0) > 0)
 
 const state = computed<ChartState>(() => {
@@ -33,67 +22,48 @@ const state = computed<ChartState>(() => {
   return 'empty'
 })
 
-const chartData = computed(() => {
-  if (!props.latencyData || !hasData.value) return null
-  const c = colors.value
-  return {
-    labels: props.latencyData.buckets.map((b) => b.range),
-    datasets: [
-      {
-        label: t('admin.ops.requests'),
-        data: props.latencyData.buckets.map((b) => b.count),
-        backgroundColor: c.blue,
-        borderRadius: 4,
-        barPercentage: 0.6
-      }
-    ]
-  }
-})
-
-const options = computed(() => {
-  const c = colors.value
-  return {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: { display: false }
-    },
-    scales: {
-      x: {
-        grid: { display: false },
-        ticks: { color: c.text, font: { size: 10 } }
-      },
-      y: {
-        beginAtZero: true,
-        grid: { color: c.grid, borderDash: [4, 4] },
-        ticks: { color: c.text, font: { size: 10 } }
-      }
-    }
-  }
+/**
+ * 延迟直方图：唯一一个真正的柱状图，改用 skill 的 .ef-bars —— 纯 DOM/CSS，
+ * 没有 canvas，也不再有 chart.js 依赖。--v（0–1）是每根柱的高度，
+ * <span> 是柱下方的桶区间标签（.ef-bars 契约：必须是 <ol>）。
+ */
+const bars = computed(() => {
+  const buckets = props.latencyData?.buckets ?? []
+  const counts = buckets.map((b) => b.count)
+  const max = Math.max(...counts, 0)
+  return buckets.map((b) => ({
+    range: b.range,
+    count: b.count,
+    v: max > 0 ? b.count / max : 0
+  }));
 })
 </script>
 
 <template>
-  <div class="flex h-full flex-col rounded-3xl bg-white p-6 shadow-sm ring-1 ring-gray-900/5 dark:bg-dark-800 dark:ring-dark-700">
-    <div class="mb-4 flex items-center justify-between">
-      <h3 class="flex items-center gap-2 text-sm font-bold text-gray-900 dark:text-white">
-        <svg class="h-4 w-4 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-          />
-        </svg>
-        {{ t('admin.ops.latencyHistogram') }}
-        <HelpTooltip :content="t('admin.ops.tooltips.latencyHistogram')" />
-      </h3>
-    </div>
+  <div class="ef-panel cut-tr flex h-full flex-col">
+    <h2 class="flex items-center gap-2">
+      <span>{{ t('admin.ops.latencyHistogram') }}</span>
+      <HelpTooltip :content="t('admin.ops.tooltips.latencyHistogram')" />
+    </h2>
 
     <div class="min-h-0 flex-1">
-      <Bar v-if="state === 'ready' && chartData" :data="chartData" :options="options" />
+      <template v-if="state === 'ready' && bars.length">
+        <ol class="ef-bars" :aria-label="t('admin.ops.latencyHistogram')">
+          <li
+            v-for="(bar, i) in bars"
+            :key="i"
+            :style="{ '--v': bar.v }"
+            :title="bar.range + ': ' + bar.count"
+          >
+            <span>{{ bar.range }}</span>
+          </li>
+        </ol>
+        <p class="ef-field mt-6 text-center">
+          {{ t('admin.ops.requests') }} · {{ props.latencyData?.total_requests ?? 0 }}
+        </p>
+      </template>
       <div v-else class="flex h-full items-center justify-center">
-        <div v-if="state === 'loading'" class="animate-pulse text-sm text-gray-400">{{ t('common.loading') }}</div>
+        <div v-if="state === 'loading'" class="animate-pulse ef-field">{{ t('common.loading') }}</div>
         <EmptyState v-else :title="t('common.noData')" :description="t('admin.ops.charts.emptyRequest')" />
       </div>
     </div>

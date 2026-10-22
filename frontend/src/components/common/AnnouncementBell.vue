@@ -459,19 +459,19 @@ watch(
 }
 
 .overflow-y-auto::-webkit-scrollbar-thumb {
-  background: linear-gradient(to bottom, #cbd5e1, #94a3b8);
-  border-radius: 4px;
+  background: color-mix(in srgb, var(--ef-ink) 30%, transparent);
+  border-radius: 0;
 }
 
 .dark .overflow-y-auto::-webkit-scrollbar-thumb {
-  background: linear-gradient(to bottom, #4b5563, #374151);
+  background: color-mix(in srgb, var(--ef-ink) 30%, transparent);
 }
 
 .overflow-y-auto::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(to bottom, #94a3b8, #64748b);
+  background: color-mix(in srgb, var(--ef-ink) 55%, transparent);
 }
 
 .dark .overflow-y-auto::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(to bottom, #6b7280, #4b5563);
+  background: color-mix(in srgb, var(--ef-ink) 55%, transparent);
 }
 </style>

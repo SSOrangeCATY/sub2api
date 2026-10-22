@@ -35,8 +35,11 @@ import {
 import { Line } from 'vue-chartjs'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import type { TrendDataPoint } from '@/types'
-import { efChartPalette } from '@/utils/chartTheme'
+import { efChartPalette, efSemanticColors } from '@/utils/chartTheme'
 
+
+const p = efChartPalette()
+const sem = efSemanticColors()
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -58,11 +61,11 @@ const props = defineProps<{
 const chartColors = computed(() => ({
   text: efChartPalette().ink2,
   grid: efChartPalette().rule,
-  input: '#3b82f6',
-  output: '#10b981',
-  cacheCreation: '#f59e0b',
-  cacheRead: '#06b6d4',
-  cacheHitRate: '#8b5cf6'
+  input: p.ink2,
+  output: p.ink,
+  cacheCreation: sem.warn,
+  cacheRead: p.ink2,
+  cacheHitRate: p.ink2
 }))
 
 const chartData = computed(() => {

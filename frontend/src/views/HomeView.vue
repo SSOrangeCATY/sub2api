@@ -417,9 +417,20 @@ onMounted(() => {
 
 <style scoped>
 /* LocaleSwitcher 原本是浅色页头组件，放进固定深色的 .ef-cmdbar 后
-   需要把它的灰字与白底下拉面板改成命令栏的配色，否则几乎不可见。 */
+   需要把它的灰字与白底下拉面板改成命令栏的配色，否则几乎不可见。
+
+   .ef-cmdbar 在明暗两种主题下都是同一个深色（内部写死 #161616 / #ededed），
+   且没有把这几级色暴露成变量，所以这里按它的取值就地声明一组局部变量：
+   不能用 --ef-ink / --ef-panel —— 那两个在深色主题下会翻转，命令栏不会。 */
+.ef-cmdbar-i18n {
+  --cmd-bg: #161616;
+  --cmd-fg: #ededed;
+  --cmd-fg-2: #b8b8b8;
+  --cmd-line: #353535;
+  --cmd-panel: #232323;
+}
 .ef-cmdbar-i18n :deep(button) {
-  color: #b8b8b8;
+  color: var(--cmd-fg-2);
   border-radius: 0;
   transition: color 0.15s;
 }
@@ -431,17 +442,17 @@ onMounted(() => {
 .ef-cmdbar-i18n :deep(.absolute) {
   border-radius: 0;
   box-shadow: none;
-  border-color: #353535;
-  background: #232323;
+  border-color: var(--cmd-line);
+  background: var(--cmd-panel);
 }
 .ef-cmdbar-i18n :deep(.absolute button),
 .ef-cmdbar-i18n :deep(.absolute button:hover) {
-  color: #ededed;
+  color: var(--cmd-fg);
   background: transparent;
   border-radius: 0;
 }
 .ef-cmdbar-i18n :deep(.absolute button:hover) {
-  background: #353535;
+  background: var(--cmd-line);
 }
 
 .code-prompt {

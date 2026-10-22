@@ -76,7 +76,7 @@ import EmptyState from '@/components/common/EmptyState.vue'
 import Icon from '@/components/icons/Icon.vue'
 import type { MonitorCoverage, MonitorMetric, MonitorHealth } from '@/api/channelMonitorV2'
 import { formatMonitorMs, formatMonitorPercent } from '@/features/channel-monitor-v2/monitorFormat'
-import { efChartPalette } from '@/utils/chartTheme'
+import { efChartPalette, efSemanticColors } from '@/utils/chartTheme'
 import {
   applyWheelZoom,
   clientXRatio,
@@ -85,6 +85,9 @@ import {
   sliceByZoom,
   type ZoomState,
 } from '@/features/channel-monitor-v2/monitorZoom'
+
+const p = efChartPalette()
+const sem = efSemanticColors()
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler)
 const { t, locale } = useI18n()
@@ -128,8 +131,8 @@ const chartData = computed(() => {
       {
         label: t('channelMonitorV2.chart.errorDataset'),
         data: errorRates,
-        borderColor: '#ef4444',
-        backgroundColor: 'rgba(239, 67, 67, 0.10)',
+        borderColor: sem.danger,
+        backgroundColor: sem.dangerFill,
         yAxisID: 'yPct',
         tension: 0.4,
         cubicInterpolationMode: 'monotone' as const,
@@ -142,8 +145,8 @@ const chartData = computed(() => {
       {
         label: t('channelMonitorV2.chart.cacheDataset'),
         data: cacheRates,
-        borderColor: '#10b981',
-        backgroundColor: 'rgba(16, 185, 129, 0.08)',
+        borderColor: p.ink,
+        backgroundColor: sem.goodFill,
         yAxisID: 'yPct',
         tension: 0.4,
         cubicInterpolationMode: 'monotone' as const,
@@ -156,8 +159,8 @@ const chartData = computed(() => {
       {
         label: t('channelMonitorV2.chart.ttftDataset'),
         data: ttftP50,
-        borderColor: '#0ea5e9',
-        backgroundColor: 'rgba(14, 165, 233, 0.08)',
+        borderColor: sem.info,
+        backgroundColor: sem.infoFill,
         yAxisID: 'yTtft',
         tension: 0.4,
         cubicInterpolationMode: 'monotone' as const,
@@ -258,12 +261,12 @@ const chartOptions = computed(() => {
         position: 'right' as const,
         min: 0,
         ticks: {
-          color: '#0ea5e9',
+          color: sem.info,
           font: { size: 10 },
           callback: (v: string | number) => formatMonitorMs(Number(v)),
         },
         grid: { display: false },
-        title: { display: true, text: t('channelMonitorV2.metrics.ttftP50'), color: '#0ea5e9', font: { size: 11 } },
+        title: { display: true, text: t('channelMonitorV2.metrics.ttftP50'), color: sem.info, font: { size: 11 } },
       },
     },
   }

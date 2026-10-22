@@ -10,8 +10,11 @@ import { formatHistoryLabel, sumNumbers } from '../utils/opsFormatters'
 import HelpTooltip from '@/components/common/HelpTooltip.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import { formatNumber } from '@/utils/format'
-import { efChartPalette } from '@/utils/chartTheme'
+import { efChartPalette, efSemanticColors } from '@/utils/chartTheme'
 
+
+const p = efChartPalette()
+const sem = efSemanticColors()
 ChartJS.register(Title, Tooltip, Legend, LineElement, LinearScale, PointElement, CategoryScale, Filler)
 
 interface Props {
@@ -46,12 +49,12 @@ watch(
 
 const isDarkMode = computed(() => document.documentElement.classList.contains('dark'))
 const colors = computed(() => ({
-  blue: '#3b82f6',
-  blueAlpha: '#3b82f620',
-  green: '#10b981',
-  greenAlpha: '#10b98120',
-  grid: isDarkMode.value ? '#374151' : '#f3f4f6',
-  text: isDarkMode.value ? '#9ca3af' : '#6b7280'
+  blue: p.ink2,
+  blueAlpha: sem.infoFill,
+  green: p.ink,
+  greenAlpha: sem.goodFill,
+  grid: isDarkMode.value ? p.rule : p.rule,
+  text: isDarkMode.value ? p.ink2 : p.ink2
 }))
 
 const totalRequests = computed(() => sumNumbers(props.points.map((p) => p.request_count)))

@@ -94,3 +94,35 @@ export function efTooltipOptions() {
     displayColors: false
   }
 }
+
+/**
+ * 语义色：数据本身带正负含义时（错误率、缓存命中、延迟）用这里，
+ * 而不是随意取墨阶 —— 红必须还是红，只是换成主题声明的红。
+ * 这些值本身是数据编码，不属于装饰，因此保留色相、统一由 token 提供。
+ */
+export interface EfSemanticColors {
+  danger: string;
+  dangerFill: string;
+  good: string;
+  goodFill: string;
+  info: string;
+  infoFill: string;
+  warn: string;
+  warnFill: string;
+  muted: string;
+}
+
+export function efSemanticColors(): EfSemanticColors {
+  const p = efChartPalette();
+  return {
+    danger: p.danger,
+    dangerFill: `color-mix(in srgb, ${p.danger} 14%, transparent)`,
+    good: p.ink,
+    goodFill: `color-mix(in srgb, ${p.ink} 10%, transparent)`,
+    info: p.ink2,
+    infoFill: `color-mix(in srgb, ${p.ink2} 10%, transparent)`,
+    warn: p.signal,
+    warnFill: `color-mix(in srgb, ${p.signal} 18%, transparent)`,
+    muted: p.ink2,
+  };
+}
