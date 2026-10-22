@@ -1,0 +1,285 @@
+/* ═══════════════════════════════════════════════════════════════
+   bridge.css —— Tailwind 色阶 → endfield 令牌的兜底与修正
+   加载顺序：style.css → fonts.css → endfield.css → bridge.css
+   这里只写「色阶映射做不到」的部分，颜色本身由 tailwind.config.js 负责
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── 1. 圆点变方块 ──────────────────────────────────────────────
+   rounded-full 已被归零，但 8px 级别的圆点（状态灯、分隔点）太小，
+   归零后视觉上仍是碎点，统一压成 6px 直角块，符合 endfield 的方块语汇 */
+:where(span, i)[class*='h-1.5'][class*='w-1.5'],
+:where(span, i)[class*='h-2'][class*='w-2'] {
+  border-radius: 0;
+}
+
+/* ── 2. 骨架屏：去掉脉冲，改静态块 ───────────────────────────────
+   skill 里没有「呼吸」这种语汇，加载态用斜线纹或静态低透明块 */
+.animate-pulse {
+  animation: none !important;
+  opacity: 0.7;
+}
+
+/* ── 3. 转圈：停掉旋转 ──────────────────────────────────────────
+   真正的加载指示器由 .ef-progress（24 格）承担，见 3.7 */
+.animate-spin {
+  animation: none !important;
+}
+
+/* ── 4. 滚动条：直角、细 ───────────────────────────────────────── */
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--ef-rule);
+  border-radius: 0;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--ef-ink-2);
+}
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--ef-rule) transparent;
+}
+
+/* ── 5. 焦点可见：统一墨色描边 ───────────────────────────────────
+   endfield 的焦点是实线描边，不是彩色光晕 */
+:focus-visible {
+  outline: 2px solid var(--ef-trace);
+  outline-offset: 2px;
+}
+
+/* ── 6. 输入框自动填充：去掉浏览器蓝底 ─────────────────────────── */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+textarea:-webkit-autofill,
+select:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 1000px var(--ef-panel) inset;
+  -webkit-text-fill-color: var(--ef-ink);
+  caret-color: var(--ef-ink);
+}
+
+/* ── 7. 选中文字：信号色底 + 反白字 ───────────────────────────── */
+::selection {
+  background: var(--ef-signal);
+  color: var(--ef-on-signal);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   8. hover 语汇对齐 —— 覆盖 284 处「同令牌塌陷」
+   endfield 的 hover 是「换一块板 / 换一次填充」，不是把文字压深。
+   色阶压平后 bg-gray-200 hover:bg-gray-300 两端落到同一令牌，
+   hover 会彻底消失，所以统一换成三种语汇内反馈。
+   用属性选择器而非逐条类名：与类名无关，新增页面自动生效。
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ① 底色类 hover：不换填充，改「压一圈细墨线」——endfield 的 hairline 语汇
+   47 处塌陷。特异性 (0,2,0)，与 .hover\:bg-*:hover 同级，靠后加载胜出 */
+[class*='hover:bg-']:hover,
+.dark [class*='hover:bg-']:hover {
+  box-shadow: inset 0 0 0 1px var(--ef-ink-2);
+}
+
+/* ② 文字类 hover：不压深字色，改「信号色下划线」
+   204 处塌陷。这是 skill 里 text-decoration-color 的唯一用法 */
+[class*='hover:text-']:hover,
+.dark [class*='hover:text-']:hover {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.25em;
+  text-decoration-color: var(--ef-signal);
+}
+
+/* ③ 描边类 hover：用墨色轮廓取代色相变化
+   33 处塌陷 */
+[class*='hover:border-']:hover,
+.dark [class*='hover:border-']:hover {
+  outline: 1px solid var(--ef-ink-2);
+  outline-offset: 1px;
+}
+
+/* ── 9. 渐变兜底 ─────────────────────────────────────────────────
+   backgroundImage 里的 gradient-* 已置为 none，但 bg-gradient-to-* 是
+   Tailwind 内建工具类（76 处），走 --tw-gradient-stops，无法通过配置关掉。
+   这里把渐变整体压成单色：从第一个色标取色，去掉过渡。 */
+.bg-gradient-to-r,
+.bg-gradient-to-l,
+.bg-gradient-to-t,
+.bg-gradient-to-b,
+.bg-gradient-to-tr,
+.bg-gradient-to-tl,
+.bg-gradient-to-br,
+.bg-gradient-to-bl {
+  background-image: none !important;
+  background-color: var(--tw-gradient-from, var(--ef-chip)) !important;
+}
+
+/* ── 10. 文字描边/阴影：endfield 不用发光字 ─────────────────────── */
+.text-shadow,
+.text-glow,
+.drop-shadow,
+.drop-shadow-sm,
+.drop-shadow-md,
+.drop-shadow-lg,
+.drop-shadow-xl,
+.drop-shadow-2xl {
+  filter: none !important;
+  text-shadow: none !important;
+}
+
+/* ── 11. 玻璃拟态收口：endfield 是实心板，不是毛玻璃 ────────────── */
+.backdrop-blur,
+.backdrop-blur-sm,
+.backdrop-blur-md,
+.backdrop-blur-lg,
+.backdrop-blur-xl,
+.backdrop-blur-2xl,
+.backdrop-blur-3xl,
+.backdrop-blur-xs {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+/* ── 12. @apply 展开的语义类补偿 ─────────────────────────────────
+   .btn-primary 这类是 @apply bg-gradient-to-r from-* to-* 生成的，
+   展开后是内联 background-image，上面的 .bg-gradient-to-* 选择器够不到。
+   这里按同样的方法压平：取第一个色标做纯色填充。 */
+
+.btn-primary,
+.btn-danger,
+.btn-success,
+.btn-warning {
+  background-image: none !important;
+  box-shadow: none !important;
+}
+
+.btn-primary {
+  background-color: var(--ef-ink) !important;
+  color: var(--ef-panel) !important;
+}
+.btn-primary:hover {
+  background-color: var(--ef-signal) !important;
+  color: var(--ef-on-signal) !important;
+}
+
+.btn-danger {
+  background-color: var(--ef-danger) !important;
+  color: var(--ef-panel) !important;
+}
+.btn-danger:hover {
+  background-color: var(--ef-ink) !important;
+  color: var(--ef-panel) !important;
+}
+
+.btn-success {
+  background-color: var(--ef-ink) !important;
+  color: var(--ef-panel) !important;
+}
+.btn-success:hover {
+  background-color: var(--ef-signal) !important;
+  color: var(--ef-on-signal) !important;
+}
+
+.btn-warning {
+  background-color: var(--ef-chip) !important;
+  color: var(--ef-ink) !important;
+}
+.btn-warning:hover {
+  background-color: var(--ef-ink) !important;
+  color: var(--ef-panel) !important;
+}
+
+/* 支付渠道按钮：@apply 里写死了品牌色，P0 阶段统一压成墨/信号 */
+.btn-stripe, .btn-airwallex, .btn-alipay, .btn-wechat {
+  background-image: none !important;
+  box-shadow: none !important;
+}
+/* ── 13. @apply 展开的几何兜底 ───────────────────────────────────
+   style.css 里 261 条 @apply 在编译期就把 border-radius / box-shadow
+   内联进组件样式，Tailwind 的 borderRadius 配置管不到已展开的值。
+   这里按 style.css 的真实类名逐个归零（不是猜的）。 */
+.btn,
+.btn-sm,
+.btn-md,
+.btn-lg,
+.btn-icon,
+.input,
+.card,
+.card-hover,
+.card-glass,
+.card-header,
+.card-body,
+.card-footer,
+.stat-card,
+.stat-icon,
+.table-container,
+.badge,
+.dropdown,
+.dropdown-item,
+.modal-content,
+.dialog-container,
+.toast,
+.glass,
+.glass-card {
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+/* 这些类本身是靠 @apply bg-gradient-to-r 生成的，需还原成实心 */
+.btn-primary,
+.btn-danger,
+.btn-success,
+.btn-warning,
+.btn-stripe,
+.btn-airwallex,
+.btn-alipay,
+.btn-wxpay {
+  background-image: none !important;
+  box-shadow: none !important;
+}
+
+.btn {
+  border-radius: 0 !important;
+}
+.btn-primary {
+  background-color: var(--ef-ink) !important;
+  color: var(--ef-panel) !important;
+}
+.btn-primary:hover {
+  background-color: var(--ef-signal) !important;
+  color: var(--ef-on-signal) !important;
+}
+.btn-danger {
+  background-color: var(--ef-danger) !important;
+  color: var(--ef-panel) !important;
+}
+.btn-danger:hover {
+  background-color: var(--ef-ink) !important;
+  color: var(--ef-panel) !important;
+}
+.btn-success {
+  background-color: var(--ef-ink) !important;
+  color: var(--ef-panel) !important;
+}
+.btn-success:hover {
+  background-color: var(--ef-signal) !important;
+  color: var(--ef-on-signal) !important;
+}
+.btn-warning {
+  background-color: var(--ef-chip) !important;
+  color: var(--ef-ink) !important;
+}
+.btn-warning:hover {
+  background-color: var(--ef-ink) !important;
+  color: var(--ef-panel) !important;
+}
+.btn-stripe,
+.btn-airwallex,
+.btn-alipay,
+.btn-wxpay {
+  background-color: var(--ef-chip) !important;
+  color: var(--ef-ink) !important;
+}
