@@ -3164,6 +3164,30 @@
         </div>
       </div>
 
+      <section
+        v-if="account?.platform === 'openai' && account?.type === 'apikey'"
+        class="space-y-2 border-t border-gray-200 pt-4 dark:border-dark-600"
+        data-testid="first-output-timeout-settings"
+      >
+        <label for="account-first-output-timeout" class="input-label">
+          {{ t('admin.accounts.firstOutputTimeout') }}
+        </label>
+        <input
+          id="account-first-output-timeout"
+          v-model.number="firstOutputTimeoutSeconds"
+          data-testid="first-output-timeout-input"
+          type="number"
+          min="0"
+          max="300"
+          step="any"
+          class="input"
+          aria-describedby="account-first-output-timeout-hint"
+        />
+        <p id="account-first-output-timeout-hint" class="input-hint">
+          {{ t('admin.accounts.firstOutputTimeoutHint') }}
+        </p>
+      </section>
+
       <!-- Group Selection - 仅标准模式显示 -->
       <GroupSelector
         v-model="form.group_ids"
@@ -3676,6 +3700,14 @@ const DEFAULT_POOL_MODE_RETRY_COUNT = 3
 const MAX_POOL_MODE_RETRY_COUNT = 10
 const DEFAULT_POOL_MODE_RETRY_STATUS_CODES = [401, 403, 429]
 const GROK_CLIENT_TOOL_CACHE_EXTRA_KEY = 'grok_client_tool_cache_enabled'
+const FIRST_OUTPUT_TIMEOUT_KEY = 'openai_first_output_timeout_seconds'
+const firstOutputTimeoutSeconds = ref<number | string>(0)
+const readFirstOutputTimeout = (extra: unknown): number => {
+  const value = (extra as Record<string, unknown> | undefined)?.[FIRST_OUTPUT_TIMEOUT_KEY]
+  const seconds = Number(value)
+  return Number.isFinite(seconds) && seconds >= 1 && seconds <= 300 ? seconds : 0
+}
+
 const poolModeEnabled = ref(false)
 const explicitCacheUpstreamEnabled = ref(false)
 const explicitCacheUpstreamMaxTTL = ref<string | number>('')
@@ -4296,6 +4328,7 @@ const syncFormFromAccount = (newAccount: Account | null) => {
   form.name = newAccount.name
   form.notes = newAccount.notes || ''
   form.proxy_id = newAccount.proxy_id
+  firstOutputTimeoutSeconds.value = readFirstOutputTimeout(newAccount.extra)
   form.concurrency = newAccount.concurrency
   form.load_factor = newAccount.load_factor ?? null
   form.priority = newAccount.priority
@@ -5339,6 +5372,14 @@ const handleSubmit = async () => {
 		}
 	}
 
+  if (props.account.platform === 'openai' && props.account.type === 'apikey') {
+    const seconds = Number(firstOutputTimeoutSeconds.value)
+    if (!Number.isFinite(seconds) || (seconds !== 0 && (seconds < 1 || seconds > 300))) {
+      appStore.showError(t('admin.accounts.firstOutputTimeoutInvalid'))
+      return
+    }
+  }
+
   const updatePayload: Record<string, unknown> = { ...form }
   try {
     // 后端期望 proxy_id: 0 表示清除代理，而不是 null
@@ -6077,6 +6118,21 @@ const handleSubmit = async () => {
     }
 
     // 上游ID头名只在改动时写回 extra，避免用弹窗打开时的快照覆盖运行态键。
+    if (props.account.platform === 'openai' && props.account.type === 'apikey') {
+      const seconds = Number(firstOutputTimeoutSeconds.value)
+      if (seconds !== readFirstOutputTimeout(props.account.extra)) {
+        const currentExtra = (updatePayload.extra as Record<string, unknown>) ||
+          (props.account.extra as Record<string, unknown>) || {}
+        const newExtra = { ...currentExtra }
+        if (seconds === 0) {
+          delete newExtra[FIRST_OUTPUT_TIMEOUT_KEY]
+        } else {
+          newExtra[FIRST_OUTPUT_TIMEOUT_KEY] = seconds
+        }
+        updatePayload.extra = newExtra
+      }
+    }
+
     const nextUpstreamRequestIdHeader = upstreamRequestIdHeader.value.trim()
     if (nextUpstreamRequestIdHeader !== readUpstreamRequestIdHeader(props.account.extra)) {
       const currentExtra = (updatePayload.extra as Record<string, unknown>) || (props.account.extra as Record<string, unknown>) || {}

@@ -859,6 +859,9 @@ export default {
       poolModeHint: 'Enable when upstream is an account pool; errors won\'t mark local account status',
       poolModeInfo:
         'When enabled, upstream 429/403/401 errors will auto-retry without marking the account as rate-limited or errored. Suitable for upstream pointing to another sub2api instance.',
+      firstOutputTimeout: 'First output timeout (seconds)',
+      firstOutputTimeoutHint: '0 disables this limit; use 1–300 seconds to enable it. OpenAI API Key Chat Completions / Responses requests without meaningful output within this budget try other available accounts using the existing scheduler. The timer stops after output begins. This account setting applies to every group containing the account.',
+      firstOutputTimeoutInvalid: 'Use 0 to disable the first output timeout, or a value from 1 to 300 seconds.',
       poolModeRetryCount: 'Same-Account Retries',
       poolModeRetryCountHint:
         'Only applies in pool mode. Use 0 to disable in-place retry. Default {default}, maximum {max}.',
