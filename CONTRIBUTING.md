@@ -20,7 +20,7 @@
 python .github/maintenance/sync_upstream.py --publish
 ```
 
-命令从最新 origin/custom/main 新建 sync/upstream-日期-SHA 分支，再正常 merge 官方 upstream/main，推送后建立到 custom/main 的 PR，等待 CI 检查及审阅。绝不使用 ours/theirs 全量覆盖。若有冲突会停止，保留现场；逐项解决并提交，执行前后端检查后再以 `git push -u origin HEAD` 和 `gh pr create --base custom/main` 提交 PR。不要在冲突现场重跑脚本。去掉 --publish 可只在本地准备合并，完成后同样使用 git push / gh pr create，不要重新运行 --publish。
+命令从最新 origin/custom/main 新建 sync/upstream-日期-SHA 分支，再正常 merge 官方 upstream/main，推送后建立到 custom/main 的 PR，等待 CI 检查及审阅。绝不使用 ours/theirs 全量覆盖。若有冲突会停止，保留现场；逐项解决并提交，执行前后端检查后再以 `git push -u origin HEAD` 和 `gh pr create --repo SSOrangeCATY/sub2api --base custom/main` 提交 PR。不要在冲突现场重跑脚本。去掉 --publish 可只在本地准备合并，完成后同样使用 git push / gh pr create，不要重新运行 --publish。推送或 PR 创建失败时，留在已生成的同步分支重试失败的命令；不要重新运行创建同名分支的步骤。
 
 上游同步 PR 必须检查：账号优先级、extra 合并、OpenAI CC/Responses 首输出超时、取消行为、超时后轮转、UI 编辑表单、国际化、定制界面、数据库迁移。先把上游与本地定制合并到 custom/main 并验证，再建立 custom/main → production 的 PR。禁止上游镜像直接进入生产。
 
