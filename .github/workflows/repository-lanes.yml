@@ -31,6 +31,7 @@ jobs:
             test "$SOURCE_REPO" = "$REPO"
           fi
   frontend:
+    name: Custom frontend
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -48,6 +49,7 @@ jobs:
       - run: make test-frontend-critical
       - run: pnpm --dir frontend run build
   timeout-regression:
+    name: Timeout regression
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6

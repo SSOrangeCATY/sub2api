@@ -17,18 +17,16 @@
 在干净工作区运行：
 
 ```sh
-python .github/maintenance/sync_upstream.py
-# 验证、解决冲突后：
 python .github/maintenance/sync_upstream.py --publish
 ```
 
-首次命令从最新 origin/custom/main 新建 sync/upstream-日期-SHA 分支，再正常 merge 官方 upstream/main。绝不使用 ours/theirs 全量覆盖。若有冲突会停止，保留现场；逐项解决并提交，执行前后端检查后再以 `git push -u origin HEAD` 和 `gh pr create --base custom/main` 提交 PR。不要在冲突现场重跑脚本。`--publish` 是从干净工作区重新开始一次完整同步并推送/创建 PR；若已运行过首次命令，直接使用上面的 git push / gh pr create。
+命令从最新 origin/custom/main 新建 sync/upstream-日期-SHA 分支，再正常 merge 官方 upstream/main，推送后建立到 custom/main 的 PR，等待 CI 检查及审阅。绝不使用 ours/theirs 全量覆盖。若有冲突会停止，保留现场；逐项解决并提交，执行前后端检查后再以 `git push -u origin HEAD` 和 `gh pr create --base custom/main` 提交 PR。不要在冲突现场重跑脚本。去掉 --publish 可只在本地准备合并，完成后同样使用 git push / gh pr create，不要重新运行 --publish。
 
 上游同步 PR 必须检查：账号优先级、extra 合并、OpenAI CC/Responses 首输出超时、取消行为、超时后轮转、UI 编辑表单、国际化、定制界面、数据库迁移。先把上游与本地定制合并到 custom/main 并验证，再建立 custom/main → production 的 PR。禁止上游镜像直接进入生产。
 
 ## 检查和发布
 
-Release gate 会验证分支来源、前端类型/关键测试/构建及首输出补丁 race 单元测试。现有 CI 继续运行全量后端单元/集成和 lint；审阅生产 PR 时还要检查这些结果以及迁移和依赖变更。不能把构建通过当成业务回归通过。单人维护允许零个额外 reviewer，仍必须创建 PR 并通过必需检查。
+Release gate 会验证分支来源、前端类型/关键测试/构建及首输出补丁 race 单元测试。分支保护同时要求现有 CI 的 test、frontend、golangci-lint、shell、release-helpers 检查通过，涵盖全量后端单元/集成与 lint；审阅生产 PR 时还要检查迁移和依赖变更。不能把构建通过当成业务回归通过。单人维护允许零个额外 reviewer，仍必须创建 PR 并通过必需检查。
 
 生产 PR 合并后，从 production 的确切提交构建，不使用浮动 latest 作为部署凭据。可在 production 分支手动执行 Production image 工作流，镜像标签为 production-完整SHA，带 OCI revision。该工作流只构建镜像，不会连接服务器自动部署。部署必须：
 
