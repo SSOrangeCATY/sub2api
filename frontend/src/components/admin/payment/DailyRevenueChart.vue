@@ -34,6 +34,7 @@ import {
 import { Line } from 'vue-chartjs'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import type { DailyPaymentStats } from '@/types/payment'
+import { useChartPalette, efLineStyle, efLineLegendLabels, efTooltipOptions, efGridOptions } from '@/utils/chartTheme'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend, Filler)
 
@@ -44,12 +45,7 @@ const props = defineProps<{
   loading?: boolean
 }>()
 
-const colors = [
-  ['rgb(59, 130, 246)', 'rgba(59, 130, 246, 0.1)'],
-  ['rgb(168, 85, 247)', 'rgba(168, 85, 247, 0.1)'],
-  ['rgb(245, 158, 11)', 'rgba(245, 158, 11, 0.1)'],
-  ['rgb(239, 68, 68)', 'rgba(239, 68, 68, 0.1)'],
-]
+const p = useChartPalette()
 
 const chartData = computed(() => {
   if (!props.data || props.data.length === 0) return null
@@ -58,54 +54,49 @@ const chartData = computed(() => {
     labels: props.data.map(d => d.date),
     datasets: [
       ...currencies.map((currency, index) => {
-        const [borderColor, backgroundColor] = colors[index % colors.length]
         return {
           label: `${currency} ${t('payment.admin.revenue')}`,
           data: props.data.map(day => day.amount[currency] || 0),
-          borderColor,
-          backgroundColor,
-          fill: true,
-          tension: 0.3,
-          pointRadius: 3,
-          pointHoverRadius: 5,
+          ...efLineStyle(index, p),
         }
       }),
       {
         label: t('payment.admin.orderCount'),
         data: props.data.map(d => d.count),
-        borderColor: 'rgb(16, 185, 129)',
-        backgroundColor: 'rgba(16, 185, 129, 0.1)',
-        fill: false,
-        tension: 0.3,
-        pointRadius: 3,
-        pointHoverRadius: 5,
+        ...efLineStyle(currencies.length, p),
         yAxisID: 'y1',
       }
     ]
   }
 })
 
-const chartOptions = {
+const chartOptions = computed(() => ({
   responsive: true,
+  animation: { duration: p.motionDuration },
   maintainAspectRatio: false,
   interaction: { mode: 'index' as const, intersect: false },
   scales: {
+    x: { ticks: { color: p.ink2 }, grid: { display: false } },
     y: {
       type: 'linear' as const,
       display: true,
       position: 'left' as const,
-      title: { display: true, text: t('payment.admin.revenue') },
+      ticks: { color: p.ink2 },
+      grid: efGridOptions(),
+      title: { display: true, text: t('payment.admin.revenue'), color: p.ink2 },
     },
     y1: {
       type: 'linear' as const,
       display: true,
       position: 'right' as const,
-      title: { display: true, text: t('payment.admin.orderCount') },
+      ticks: { color: p.ink2 },
+      title: { display: true, text: t('payment.admin.orderCount'), color: p.ink2 },
       grid: { drawOnChartArea: false },
     }
   },
   plugins: {
-    legend: { position: 'top' as const },
+    legend: { position: 'top' as const, labels: efLineLegendLabels(p) },
+    tooltip: { ...efTooltipOptions(), displayColors: true },
   }
-}
+}))
 </script>

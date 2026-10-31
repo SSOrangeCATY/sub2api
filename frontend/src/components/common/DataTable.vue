@@ -234,6 +234,7 @@
             <td
               v-for="(column, colIndex) in columns"
               :key="column.key"
+              :data-field="column.key"
               :class="[
                 'whitespace-nowrap py-4 text-sm text-gray-900 dark:text-gray-100',
                 getAdaptivePaddingClass(),

@@ -5,11 +5,20 @@ export default {
   },
   // Home Page
   home: {
+    community: {
+      title: 'QQ 交流群',
+      copyGroup: '复制 QQ 群号 487375322',
+      showQr: '查看入群二维码',
+      scanToJoin: '扫码加入交流群',
+      qrAlt: 'QQ 交流群 {number} 入群二维码',
+    },
     viewOnGithub: '在 GitHub 上查看',
     viewDocs: '查看文档',
     docs: '文档',
     switchToLight: '切换到浅色模式',
     switchToDark: '切换到深色模式',
+    themeLight: '浅色',
+    themeDark: '深色',
     dashboard: '控制台',
     login: '登录',
     getStarted: '立即开始',
@@ -93,6 +102,40 @@ export default {
         }
       }
     },
+    // 展示型首页（endfield 重构，P1）
+    eyebrowIndex: '订阅转 API',
+    eyebrowCapabilities: '能力',
+    eyebrowStatus: '运行状态',
+    field: {
+      version: '版本',
+      timezone: '时区',
+      registration: '注册',
+      invitation: '邀请码',
+      subscription: '订阅'
+    },
+    value: {
+      open: '开放',
+      closed: '关闭',
+      required: '需要',
+      none: '不需要',
+      enabled: '已启用',
+      disabled: '未启用'
+    },
+    capability: {
+      access: '一键接入',
+      accessDesc: '获取一个 API 密钥，即可调用所有已接入的模型，无需分别申请。',
+      reliable: '稳定可靠',
+      reliableDesc: '请求在多个上游账号之间智能调度，单账号异常时自动切换。',
+      billing: '用多少付多少',
+      billingDesc: '按实际用量计费，可为每个密钥设置配额上限，每一笔调用都有明细。'
+    },
+    status: {
+      monitors: '渠道监控',
+      plaza: '模型广场',
+      noMonitors: '当前没有正在监控的渠道。',
+      signedOutHint: '登录后这里会显示渠道可用率与延迟。'
+    },
+    footerTagline: '订阅转 API 网关',
     providers: {
       title: '已支持的 AI 模型',
       description: '一个 API，多种选择',

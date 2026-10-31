@@ -33,11 +33,20 @@
     <div v-if="loading" class="flex h-48 items-center justify-center">
       <LoadingSpinner />
     </div>
-    <div v-else-if="displayGroupStats.length > 0 && chartData" class="flex flex-col items-center gap-4 sm:flex-row sm:gap-6">
-      <div class="h-48 w-48 shrink-0">
-        <Doughnut :data="chartData" :options="doughnutOptions" />
-      </div>
-      <div class="max-h-48 w-full min-w-0 flex-1 overflow-auto">
+    <div v-else-if="displayGroupStats.length > 0" class="flex flex-col gap-4">
+      <!-- 横向占比条（.ef-progress 契约：--p 驱动刻度填充）。
+           长度编码取代颜色编码 —— 环形图压成灰后条目无法区分。 -->
+      <ol class="ef-dist">
+        <li v-for="group in displayGroupStats" :key="'bar-' + group.group_id">
+          <span class="ef-dist-name" :title="group.group_name || String(group.group_id)">
+            {{ group.group_name || group.group_id }}
+          </span>
+          <span class="ef-dist-pct">{{ percentOf(group) }}</span>
+          <span class="ef-dist-track" :style="{ '--p': shareOf(group) }"></span>
+          <span class="ef-dist-val">{{ metricLabel(group) }}</span>
+        </li>
+      </ol>
+      <div class="max-h-48 w-full min-w-0 overflow-auto">
         <table class="w-full text-xs">
           <thead>
             <tr class="text-gray-500 dark:text-gray-400">
@@ -110,14 +119,10 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js'
-import { Doughnut } from 'vue-chartjs'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import UserBreakdownSubTable from './UserBreakdownSubTable.vue'
 import type { GroupStat, UserBreakdownItem } from '@/types'
 import { getUserBreakdown } from '@/api/admin/dashboard'
-
-ChartJS.register(ArcElement, Tooltip, Legend)
 
 const { t } = useI18n()
 
@@ -175,19 +180,6 @@ const toggleBreakdown = async (type: string, id: number | string) => {
   }
 }
 
-const chartColors = [
-  '#3b82f6',
-  '#10b981',
-  '#f59e0b',
-  '#ef4444',
-  '#8b5cf6',
-  '#ec4899',
-  '#14b8a6',
-  '#f97316',
-  '#6366f1',
-  '#84cc16'
-]
-
 const displayGroupStats = computed(() => {
   if (!props.groupStats?.length) return []
 
@@ -195,43 +187,29 @@ const displayGroupStats = computed(() => {
   return [...props.groupStats].sort((a, b) => toFiniteNumber(b[metricKey]) - toFiniteNumber(a[metricKey]))
 })
 
-const chartData = computed(() => {
-  if (!props.groupStats?.length) return null
+/** 当前度量下的原始值 */
+const metricValue = (group: GroupStat): number =>
+  toFiniteNumber(props.metric === 'actual_cost' ? group.actual_cost : group.total_tokens)
 
-  return {
-    labels: displayGroupStats.value.map((g) => g.group_name || String(g.group_id)),
-    datasets: [
-      {
-        data: displayGroupStats.value.map((g) => toFiniteNumber(props.metric === 'actual_cost' ? g.actual_cost : g.total_tokens)),
-        backgroundColor: chartColors.slice(0, displayGroupStats.value.length),
-        borderWidth: 0
-      }
-    ]
-  }
-})
+/** 占最大值的比例，驱动 --v / --p（0–1） */
+const shareOf = (group: GroupStat): number => {
+  const max = Math.max(...displayGroupStats.value.map(metricValue), 0)
+  if (max <= 0) return 0
+  return metricValue(group) / max
+}
 
-const doughnutOptions = computed(() => ({
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: {
-      display: false
-    },
-    tooltip: {
-      callbacks: {
-        label: (context: any) => {
-          const value = context.raw as number
-          const total = context.dataset.data.reduce((a: number, b: number) => a + b, 0)
-          const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : '0.0'
-          const formattedValue = props.metric === 'actual_cost'
-            ? `$${formatCost(value)}`
-            : formatTokens(value)
-          return `${context.label}: ${formattedValue} (${percentage}%)`
-        }
-      }
-    }
-  }
-}))
+/** 占整体总量的百分比文本 */
+const percentOf = (group: GroupStat): string => {
+  const total = displayGroupStats.value.reduce((a, b) => a + metricValue(b), 0)
+  if (total <= 0) return '0%'
+  return `${((metricValue(group) / total) * 100).toFixed(1)}%`
+}
+
+/** 条尾显示的数值文本 */
+const metricLabel = (group: GroupStat): string => {
+  const v = metricValue(group)
+  return props.metric === 'actual_cost' ? `${formatCost(v)}` : formatTokens(v)
+}
 
 const formatTokens = (value: number): string => {
   if (value >= 1_000_000_000) {

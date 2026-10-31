@@ -2,9 +2,10 @@
   <AppLayout>
     <div
       data-testid="profile-shell"
-      class="mx-auto max-w-[950px] space-y-6"
+      class="pt-profile-layout mx-auto max-w-[950px] space-y-6"
     >
       <ProfileInfoCard
+        class="pt-profile-info"
         :user="user"
         :linuxdo-enabled="linuxdoOAuthEnabled"
         :dingtalk-enabled="dingtalkOAuthEnabled"
@@ -17,7 +18,7 @@
 
       <div
         v-if="contactInfo"
-        class="card border-primary-200 bg-primary-50 p-6 dark:bg-primary-900/20"
+        class="pt-profile-support card border-primary-200 bg-primary-50 p-6 dark:bg-primary-900/20"
       >
         <div class="flex items-center gap-4">
           <div class="rounded-xl bg-primary-100 p-3 text-primary-600">
@@ -32,9 +33,10 @@
         </div>
       </div>
 
-      <ProfilePasswordForm />
+      <ProfilePasswordForm class="pt-profile-password" />
 
       <ProfileBalanceNotifyCard
+        class="pt-profile-notify"
         v-if="user && balanceLowNotifyEnabled"
         :enabled="user.balance_notify_enabled ?? true"
         :threshold="user.balance_notify_threshold"
@@ -43,8 +45,8 @@
         :user-email="user.email"
       />
 
-      <ProfileTotpCard />
-      <ProfilePasskeyCard :enabled="passkeyEnabled" />
+      <ProfileTotpCard class="pt-profile-totp" />
+      <ProfilePasskeyCard class="pt-profile-passkeys" :enabled="passkeyEnabled" />
     </div>
   </AppLayout>
 </template>

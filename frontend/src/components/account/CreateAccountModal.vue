@@ -2347,9 +2347,9 @@
         />
       </div>
 
-      <!-- 配额控制 (非 Anthropic apikey/bedrock，以及 Vertex service_account) -->
+      <!-- 配额控制 (非 Anthropic apikey/bedrock) -->
       <div
-        v-else-if="supportsAccountQuota(form.type)"
+        v-else-if="form.type === 'apikey' || form.type === 'bedrock'"
         class="border-t border-gray-200 pt-4 dark:border-dark-600 space-y-4"
       >
         <div class="mb-3">
@@ -4203,7 +4203,6 @@ import {
   parseDateTimeLocalInput
 } from '@/utils/format'
 import { createStableObjectKeyResolver } from '@/utils/stableObjectKey'
-import { supportsAccountQuota } from '@/utils/accountQuota'
 import { getAccountExpiryTimestamp } from '@/components/account/accountExpiry'
 import { VERTEX_LOCATION_OPTIONS } from '@/constants/account'
 import {
@@ -6283,9 +6282,9 @@ const createAccountAndFinish = async (
   if (!applyTempUnschedConfig(credentials)) {
     return
   }
-  // Inject quota limits for apikey/bedrock/service_account accounts
+  // Inject quota limits for apikey/bedrock accounts
   let finalExtra = withUpstreamRequestIdHeader(extra)
-  if (supportsAccountQuota(type)) {
+  if (type === 'apikey' || type === 'bedrock') {
     const quotaExtra: Record<string, unknown> = { ...(finalExtra || {}) }
     if (editQuotaLimit.value != null && editQuotaLimit.value > 0) {
       quotaExtra.quota_limit = editQuotaLimit.value

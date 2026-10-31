@@ -1,6 +1,11 @@
 export default {
   dashboard: {
     title: '仪表盘',
+    accountOverview: '账户概况',
+    usageAnalysis: '用量分析',
+    loadFailed: '暂时无法加载数据，请重试。',
+    refreshing: '正在更新数据',
+    updatedAt: '更新于 {time}',
     welcomeMessage: '欢迎回来！这是您账户的概览。',
     balance: '余额',
     apiKeys: 'API 密钥',

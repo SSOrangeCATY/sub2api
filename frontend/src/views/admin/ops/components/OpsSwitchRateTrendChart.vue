@@ -18,7 +18,10 @@ import type { ChartState } from '../types'
 import { formatHistoryLabel, sumNumbers } from '../utils/opsFormatters'
 import HelpTooltip from '@/components/common/HelpTooltip.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
+import { useChartPalette, efLineStyle, efLineLegendLabels } from '@/utils/chartTheme'
 
+
+const p = useChartPalette()
 ChartJS.register(Title, Tooltip, Legend, LineElement, LinearScale, PointElement, CategoryScale, Filler)
 
 interface Props {
@@ -33,10 +36,10 @@ const { t } = useI18n()
 
 const isDarkMode = computed(() => document.documentElement.classList.contains('dark'))
 const colors = computed(() => ({
-  teal: '#14b8a6',
-  tealAlpha: '#14b8a620',
-  grid: isDarkMode.value ? '#374151' : '#f3f4f6',
-  text: isDarkMode.value ? '#9ca3af' : '#6b7280'
+  teal: p.ink,
+  tealAlpha: p.chip,
+  grid: isDarkMode.value ? p.rule : p.rule,
+  text: isDarkMode.value ? p.ink2 : p.ink2
 }))
 
 const totalRequests = computed(() => sumNumbers(props.points.map((p) => p.request_count)))
@@ -48,18 +51,13 @@ const chartData = computed(() => {
     datasets: [
       {
         label: t('admin.ops.switchRate'),
+        ...efLineStyle(0, p),
         data: props.points.map((p) => {
           const requests = p.request_count ?? 0
           const switches = p.switch_count ?? 0
           if (requests <= 0) return 0
           return switches / requests
         }),
-        borderColor: colors.value.teal,
-        backgroundColor: colors.value.tealAlpha,
-        fill: true,
-        tension: 0.35,
-        pointRadius: 0,
-        pointHitRadius: 10
       }
     ]
   }
@@ -75,18 +73,19 @@ const options = computed(() => {
   const c = colors.value
   return {
     responsive: true,
+    animation: { duration: p.motionDuration },
     maintainAspectRatio: false,
     interaction: { intersect: false, mode: 'index' as const },
     plugins: {
       legend: {
         position: 'top' as const,
         align: 'end' as const,
-        labels: { color: c.text, usePointStyle: true, boxWidth: 6, font: { size: 10 } }
+        labels: efLineLegendLabels(p)
       },
       tooltip: {
-        backgroundColor: isDarkMode.value ? '#1f2937' : '#ffffff',
-        titleColor: isDarkMode.value ? '#f3f4f6' : '#111827',
-        bodyColor: isDarkMode.value ? '#d1d5db' : '#4b5563',
+        backgroundColor: p.panel,
+        titleColor: p.ink,
+        bodyColor: p.ink2,
         borderColor: c.grid,
         borderWidth: 1,
         padding: 10,

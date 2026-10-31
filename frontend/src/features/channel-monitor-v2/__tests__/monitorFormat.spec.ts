@@ -11,12 +11,35 @@ import {
   formatMonitorThroughput,
   formatMonitorTokensPerSecond,
   healthScoreClass,
+  monitorActivityClass,
   healthStateClass,
   scoreToBand,
   tokensPerSecondFromTpm,
   ttftDisplayState,
 } from '../monitorFormat'
 import type { MonitorHealth } from '@/api/channelMonitorV2'
+
+describe('monitor activity without a server rating', () => {
+  const unknown: MonitorHealth = { overall: 'unknown', error_rate: 'unknown', ttft: 'unknown', minimum_sample: 20 }
+  const empty = { request_count: 0, rpm: 0, tpm: 0, error_rate: 0, cache_rate: 0, ttft: { p50_ms: null as number | null } }
+  it('leaves an empty interval neutral', () => {
+    expect(monitorActivityClass(unknown, 'overall', empty)).toBe('health-unknown')
+  })
+  it('shows low-sample activity without inventing a health score', () => {
+    expect(monitorActivityClass(unknown, 'overall', { ...empty, request_count: 1 })).toBe('health-unrated')
+    expect(unknown.score).toBeUndefined()
+  })
+  it.each([{ rpm: 1 }, { tpm: 60 }, { error_rate: .1 }, { cache_rate: .5 }, { ttft: { p50_ms: 0 } }])('keeps privacy-redacted activity visible: %j', signal => {
+    expect(monitorActivityClass(unknown, 'overall', { ...empty, ...signal })).toBe('health-unrated')
+  })
+  it('retains zero and high server scores even with redacted counts', () => {
+    expect(monitorActivityClass({ ...unknown, score: 0 }, 'overall', empty)).toBe('health-score0')
+    expect(monitorActivityClass({ ...unknown, score: 100 }, 'overall', empty)).toBe('health-score10')
+  })
+  it('does not treat missing first-token measurements as healthy', () => {
+    expect(monitorActivityClass({ ...unknown, score: 100 }, 'ttft', { ...empty, request_count: 10 })).toBe('health-unrated')
+  })
+})
 
 describe('monitorFormat accuracy', () => {
   it('converts backend TPM (per minute) to tokens/sec for display', () => {

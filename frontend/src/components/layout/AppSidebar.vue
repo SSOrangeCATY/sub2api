@@ -14,7 +14,7 @@
         class="sidebar-logo flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl shadow-glow transition-opacity hover:opacity-80"
         @click="handleMenuItemClick(homePath)"
       >
-        <img v-if="settingsLoaded" :src="siteLogo || '/logo.svg'" alt="Logo" class="h-full w-full object-contain" />
+        <img v-if="settingsLoaded" :src="siteLogo || DEFAULT_BRAND_MARK" :alt="siteName" class="h-full w-full object-contain" />
       </router-link>
       <div class="sidebar-brand" :class="{ 'sidebar-brand-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">
         <router-link
@@ -196,9 +196,11 @@ import VersionBadge from '@/components/common/VersionBadge.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { sanitizeSvg } from '@/utils/sanitize'
 import { sanitizeUrl } from '@/utils/url'
+import { DEFAULT_BRAND_MARK } from '@/utils/branding'
 import { FeatureFlags, makeSidebarFlag } from '@/utils/featureFlags'
 import { resolveSiteBillingMode } from '@/utils/siteBillingMode'
 import { useBatchImageAccess } from '@/composables/useBatchImageAccess'
+import { isEfDark, setEfTheme } from '@/utils/theme'
 
 interface NavItem {
   path: string
@@ -865,8 +867,7 @@ function toggleSidebar() {
 
 function toggleTheme() {
   isDark.value = !isDark.value
-  document.documentElement.classList.toggle('dark', isDark.value)
-  localStorage.setItem('theme', isDark.value ? 'dark' : 'light')
+  setEfTheme(isDark.value)
 }
 
 function closeMobile() {
@@ -933,13 +934,9 @@ function handleGroupClick(item: NavItem) {
 }
 
 // Initialize theme
-const savedTheme = localStorage.getItem('theme')
-if (
-  savedTheme === 'dark' ||
-  (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)
-) {
+// main.ts 已在挂载前写好 class 与 data-theme，这里只同步本地状态
+if (isEfDark()) {
   isDark.value = true
-  document.documentElement.classList.add('dark')
 }
 
 // Fetch admin settings (for feature-gated nav items like Ops).
@@ -976,6 +973,21 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+/* @apply expands the dark and hover rules, so the current route needs an
+   explicit override. Weight and the inset outline also identify it without hue. */
+.sidebar-link-active,
+.sidebar-link-active:hover {
+  background-color: var(--ef-signal) !important;
+  color: var(--ef-on-signal) !important;
+  font-weight: 800;
+  outline: 1px solid var(--ef-on-signal);
+  outline-offset: -1px;
+}
+.sidebar-link-active:focus-visible {
+  outline: 2px dashed var(--ef-on-signal);
+  outline-offset: -4px;
+}
+
 .sidebar-logo {
   flex: 0 0 2.25rem;
   min-width: 2.25rem;

@@ -10,7 +10,10 @@ import { formatHistoryLabel, sumNumbers } from '../utils/opsFormatters'
 import HelpTooltip from '@/components/common/HelpTooltip.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import { formatNumber } from '@/utils/format'
+import { useChartPalette, efLineStyle, efLineLegendLabels } from '@/utils/chartTheme'
 
+
+const p = useChartPalette()
 ChartJS.register(Title, Tooltip, Legend, LineElement, LinearScale, PointElement, CategoryScale, Filler)
 
 interface Props {
@@ -45,12 +48,12 @@ watch(
 
 const isDarkMode = computed(() => document.documentElement.classList.contains('dark'))
 const colors = computed(() => ({
-  blue: '#3b82f6',
-  blueAlpha: '#3b82f620',
-  green: '#10b981',
-  greenAlpha: '#10b98120',
-  grid: isDarkMode.value ? '#374151' : '#f3f4f6',
-  text: isDarkMode.value ? '#9ca3af' : '#6b7280'
+  blue: p.ink2,
+  blueAlpha: p.chip,
+  green: p.ink,
+  greenAlpha: p.chip,
+  grid: isDarkMode.value ? p.rule : p.rule,
+  text: isDarkMode.value ? p.ink2 : p.ink2
 }))
 
 const totalRequests = computed(() => sumNumbers(props.points.map((p) => p.request_count)))
@@ -62,23 +65,13 @@ const chartData = computed(() => {
     datasets: [
       {
         label: 'QPS',
+        ...efLineStyle(0, p),
         data: props.points.map((p) => p.qps ?? 0),
-        borderColor: colors.value.blue,
-        backgroundColor: colors.value.blueAlpha,
-        fill: true,
-        tension: 0.4,
-        pointRadius: 0,
-        pointHitRadius: 10
       },
       {
         label: t('admin.ops.tpsK'),
+        ...efLineStyle(1, p),
         data: props.points.map((p) => (p.tps ?? 0) / 1000),
-        borderColor: colors.value.green,
-        backgroundColor: colors.value.greenAlpha,
-        fill: true,
-        tension: 0.4,
-        pointRadius: 0,
-        pointHitRadius: 10,
         yAxisID: 'y1'
       }
     ]
@@ -95,18 +88,19 @@ const options = computed(() => {
   const c = colors.value
   return {
     responsive: true,
+    animation: { duration: p.motionDuration },
     maintainAspectRatio: false,
     interaction: { intersect: false, mode: 'index' as const },
     plugins: {
       legend: {
         position: 'top' as const,
         align: 'end' as const,
-        labels: { color: c.text, usePointStyle: true, boxWidth: 6, font: { size: 10 } }
+        labels: efLineLegendLabels(p)
       },
       tooltip: {
-        backgroundColor: isDarkMode.value ? '#1f2937' : '#ffffff',
-        titleColor: isDarkMode.value ? '#f3f4f6' : '#111827',
-        bodyColor: isDarkMode.value ? '#d1d5db' : '#4b5563',
+        backgroundColor: p.panel,
+        titleColor: p.ink,
+        bodyColor: p.ink2,
         borderColor: c.grid,
         borderWidth: 1,
         padding: 10,

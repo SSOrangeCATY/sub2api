@@ -101,6 +101,17 @@ describe('custom page open button', () => {
     expect(click(button, 0).defaultPrevented).toBe(false)
   })
 
+  it('opens the redemption storefront without forwarding the site account or session', () => {
+    Object.assign(appStore.cachedPublicSettings.custom_menu_items[0], {
+      label: '兑换码购买', url: 'https://catfk.com/shop/SSOrangeCATY'
+    })
+    const wrapper = mountPage()
+    expect(wrapper.get('iframe').attributes('src')).toBe('https://catfk.com/shop/SSOrangeCATY')
+    expect(wrapper.get('iframe').attributes('title')).toBe('兑换码购买')
+    expect(wrapper.get('iframe').attributes('referrerpolicy')).toBe('no-referrer')
+    expect(wrapper.get('.custom-open-fab').attributes('href')).toBe('https://catfk.com/shop/SSOrangeCATY')
+  })
+
   it('captures the pointer across iframe content and suppresses only the click following a drag', async () => {
     const { button } = mountEmbed()
     await pointer(button, 'pointerdown', 700, 24)

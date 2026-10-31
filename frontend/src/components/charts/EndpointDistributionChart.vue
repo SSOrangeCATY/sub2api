@@ -71,11 +71,18 @@
     <div v-if="loading" class="flex h-48 items-center justify-center">
       <LoadingSpinner />
     </div>
-    <div v-else-if="displayEndpointStats.length > 0 && chartData" class="flex flex-col items-center gap-4 sm:flex-row sm:gap-6">
-      <div class="h-48 w-48 shrink-0">
-        <Doughnut :data="chartData" :options="doughnutOptions" />
-      </div>
-      <div class="max-h-48 w-full min-w-0 flex-1 overflow-auto">
+    <div v-else-if="displayEndpointStats.length > 0" class="flex flex-col gap-4">
+      <!-- 横向占比条（.ef-progress 契约：--p 驱动刻度填充）。
+           长度编码取代颜色编码 —— 环形图压成灰后条目无法区分。 -->
+      <ol class="ef-dist">
+        <li v-for="item in displayEndpointStats" :key="'bar-' + item.endpoint">
+          <span class="ef-dist-name" :title="item.endpoint">{{ item.endpoint }}</span>
+          <span class="ef-dist-pct">{{ percentOf(item) }}</span>
+          <span class="ef-dist-track" :style="{ '--p': shareOf(item) }"></span>
+          <span class="ef-dist-val">{{ metricLabel(item) }}</span>
+        </li>
+      </ol>
+      <div class="max-h-48 w-full min-w-0 overflow-auto">
         <table class="w-full text-xs">
           <thead>
             <tr class="text-gray-500 dark:text-gray-400">
@@ -135,14 +142,10 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js'
-import { Doughnut } from 'vue-chartjs'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import UserBreakdownSubTable from './UserBreakdownSubTable.vue'
 import type { EndpointStat, UserBreakdownItem } from '@/types'
 import { getUserBreakdown } from '@/api/admin/dashboard'
-
-ChartJS.register(ArcElement, Tooltip, Legend)
 
 const { t } = useI18n()
 
@@ -211,21 +214,6 @@ const toggleBreakdown = async (endpoint: string) => {
   }
 }
 
-const chartColors = [
-  '#3b82f6',
-  '#10b981',
-  '#f59e0b',
-  '#ef4444',
-  '#8b5cf6',
-  '#ec4899',
-  '#14b8a6',
-  '#f97316',
-  '#6366f1',
-  '#84cc16',
-  '#06b6d4',
-  '#a855f7'
-]
-
 const displayEndpointStats = computed(() => {
   const sourceStats = props.source === 'upstream'
     ? props.upstreamEndpointStats
@@ -238,45 +226,30 @@ const displayEndpointStats = computed(() => {
   return [...sourceStats].sort((a, b) => b[metricKey] - a[metricKey])
 })
 
-const chartData = computed(() => {
-  if (!displayEndpointStats.value?.length) return null
+/** 当前度量下的原始值 */
+const metricValue = (item: EndpointStat): number =>
+  props.metric === 'actual_cost' ? item.actual_cost : item.total_tokens
 
-  return {
-    labels: displayEndpointStats.value.map((item) => item.endpoint),
-    datasets: [
-      {
-        data: displayEndpointStats.value.map((item) =>
-          props.metric === 'actual_cost' ? item.actual_cost : item.total_tokens
-        ),
-        backgroundColor: chartColors.slice(0, displayEndpointStats.value.length),
-        borderWidth: 0
-      }
-    ]
-  }
-})
+/** 该条目占最大值的比例，驱动 --v（0–1） */
+const shareOf = (item: EndpointStat): number => {
+  const vals = displayEndpointStats.value.map(metricValue)
+  const max = Math.max(...vals, 0)
+  if (max <= 0) return 0
+  return metricValue(item) / max
+}
 
-const doughnutOptions = computed(() => ({
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: {
-      display: false
-    },
-    tooltip: {
-      callbacks: {
-        label: (context: any) => {
-          const value = context.raw as number
-          const total = context.dataset.data.reduce((a: number, b: number) => a + b, 0)
-          const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : '0.0'
-          const formattedValue = props.metric === 'actual_cost'
-            ? `$${formatCost(value)}`
-            : formatTokens(value)
-          return `${context.label}: ${formattedValue} (${percentage}%)`
-        }
-      }
-    }
-  }
-}))
+/** 占整体总量的百分比文本 */
+const percentOf = (item: EndpointStat): string => {
+  const total = displayEndpointStats.value.reduce((a, b) => a + metricValue(b), 0)
+  if (total <= 0) return '0%'
+  return `${((metricValue(item) / total) * 100).toFixed(1)}%`
+}
+
+/** 条尾显示的数值文本 */
+const metricLabel = (item: EndpointStat): string => {
+  const v = metricValue(item)
+  return props.metric === 'actual_cost' ? `${formatCost(v)}` : formatTokens(v)
+}
 
 const formatTokens = (value: number): string => {
   if (value >= 1_000_000_000) {

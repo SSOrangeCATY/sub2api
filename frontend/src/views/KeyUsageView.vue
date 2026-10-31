@@ -1,11 +1,11 @@
 <template>
-  <div class="relative flex min-h-screen flex-col bg-gray-50 dark:bg-dark-950">
+  <div class="key-usage-page pt-public-contours pt-key-lookup relative flex min-h-screen flex-col bg-gray-50 dark:bg-dark-950">
     <!-- Header (same pattern as HomeView) -->
     <header class="relative z-20 px-6 py-4">
       <nav class="mx-auto flex max-w-6xl items-center justify-between">
         <router-link to="/home" class="flex items-center gap-3">
           <div class="h-10 w-10 overflow-hidden rounded-xl shadow-md">
-            <img :src="siteLogo || '/logo.svg'" alt="Logo" class="h-full w-full object-contain" />
+            <img :src="siteLogo || DEFAULT_BRAND_MARK" :alt="siteName" class="h-full w-full object-contain" />
           </div>
           <span class="text-lg font-semibold tracking-tight text-gray-900 dark:text-white">{{ siteName }}</span>
         </router-link>
@@ -36,7 +36,8 @@
     <!-- Main Content -->
     <main class="flex-1 w-full max-w-5xl mx-auto px-6 py-12">
       <!-- Hero -->
-      <div class="text-center mb-12">
+      <div class="pt-key-hero text-center mb-12">
+        <p class="pt-workspace-eyebrow">// API KEY USAGE</p>
         <h1 class="text-3xl sm:text-4xl font-bold tracking-tight mb-3 text-gray-900 dark:text-white">
           {{ t('keyUsage.title') }}
         </h1>
@@ -77,7 +78,7 @@
           <button
             @click="queryKey"
             :disabled="isQuerying"
-            class="h-12 px-7 rounded-xl bg-primary-500 hover:bg-primary-600 text-white font-medium text-sm transition-all active:scale-[0.97] flex items-center gap-2 whitespace-nowrap disabled:opacity-60"
+            class="ef-btn go h-12 px-7 disabled:opacity-60"
           >
             <svg v-if="isQuerying" class="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
               <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" opacity="0.25"/>
@@ -101,10 +102,9 @@
               v-for="range in dateRanges"
               :key="range.key"
               @click="setDateRange(range.key)"
-              class="text-xs px-3 py-1.5 rounded-lg border transition-all"
-              :class="currentRange === range.key
-                ? 'bg-primary-500 text-white border-primary-500'
-                : 'border-gray-200 bg-white text-gray-700 dark:border-dark-700 dark:bg-dark-900 dark:text-dark-200 hover:border-primary-300 dark:hover:border-dark-600'"
+              class="ef-state px-3 py-1.5"
+              :class="currentRange === range.key ? 'is-alert' : 'is-draft'"
+              :aria-pressed="currentRange === range.key"
             >{{ range.label }}</button>
             <div v-if="currentRange === 'custom'" class="flex items-center gap-2 ml-1">
               <input
@@ -120,7 +120,7 @@
               />
               <button
                 @click="queryKey"
-                class="text-xs px-3 py-1.5 rounded-lg bg-primary-500 text-white hover:bg-primary-600"
+                class="ef-btn go small"
               >{{ t('keyUsage.apply') }}</button>
             </div>
           </div>
@@ -156,7 +156,7 @@
         <div v-else-if="resultData" class="space-y-6">
           <!-- Status Badge -->
           <div v-if="statusInfo" class="fade-up flex items-center justify-center mb-2">
-            <div class="inline-flex items-center gap-2 px-5 py-2.5 rounded-full border border-gray-200 bg-white/90 shadow-sm backdrop-blur-sm dark:border-dark-700 dark:bg-dark-900/90">
+            <div class="pt-key-status inline-flex items-center gap-2 px-5 py-2.5 border" :class="{ 'is-inactive': !statusInfo.isActive }">
               <span
                 class="w-2.5 h-2.5 rounded-full pulse-dot"
                 :class="statusInfo.isActive ? 'bg-emerald-500' : 'bg-rose-500'"
@@ -417,6 +417,7 @@
 </template>
 
 <script setup lang="ts">
+import '@/styles/endfield/public-surfaces.css'
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores'
@@ -426,6 +427,9 @@ import Icon from '@/components/icons/Icon.vue'
 import { buildGatewayUrl } from '@/api/client'
 import { formatDateLocalInput } from '@/utils/format'
 import { sanitizeUrl } from '@/utils/url'
+import { DEFAULT_BRAND_MARK } from '@/utils/branding'
+import { isEfDark, setEfTheme } from '@/utils/theme'
+import { efChartPalette, efSeriesColor } from '@/utils/chartTheme'
 
 const { t, locale } = useI18n()
 const appStore = useAppStore()
@@ -433,7 +437,7 @@ const subscriptionFeatureEnabled = computed(() => resolveFeatureFlag(appStore.ca
 
 // ==================== Site Settings (same as HomeView) ====================
 
-const siteName = computed(() => appStore.cachedPublicSettings?.site_name || appStore.siteName || 'Sub2API')
+const siteName = computed(() => appStore.cachedPublicSettings?.site_name || appStore.siteName || 'ptcrys ai')
 const siteLogo = computed(() => sanitizeUrl(appStore.cachedPublicSettings?.site_logo || appStore.siteLogo || '', { allowRelative: true, allowDataUrl: true }))
 const docUrl = computed(() => sanitizeUrl(appStore.cachedPublicSettings?.doc_url || appStore.docUrl || ''))
 const githubUrl = 'https://github.com/Wei-Shaw/sub2api'
@@ -444,8 +448,7 @@ const isDark = ref(document.documentElement.classList.contains('dark'))
 
 function toggleTheme() {
   isDark.value = !isDark.value
-  document.documentElement.classList.toggle('dark', isDark.value)
-  localStorage.setItem('theme', isDark.value ? 'dark' : 'light')
+  setEfTheme(isDark.value)
 }
 
 const currentYear = computed(() => new Date().getFullYear())
@@ -528,17 +531,19 @@ function setDailyUsageDays(days: 7 | 30 | 90) {
 // ==================== Ring Animation ====================
 
 const CIRCUMFERENCE = 2 * Math.PI * 68
-const RING_GRADIENTS = [
-  { from: '#14b8a6', to: '#5eead4' },
-  { from: '#6366F1', to: '#A5B4FC' },
-  { from: '#10B981', to: '#6EE7B7' },
-  { from: '#F59E0B', to: '#FCD34D' },
-]
+/**
+ * 四个环原本用青/靛/绿/橙四色区分。这些环各自独立标注了标题与百分比，
+ * 颜色不承载任何信息，只是装饰 —— 因此统一走墨阶，明暗主题都能自动反转。
+ */
+const RING_GRADIENTS = Array.from({ length: 4 }, (_, i) => {
+  const base = efSeriesColor(i)
+  return { from: base, to: base }
+})
 
 const ringAnimated = ref(false)
 const displayPcts = ref<number[]>([])
 
-const ringTrackColor = computed(() => isDark.value ? '#222222' : '#F0F0EE')
+const ringTrackColor = computed(() => efChartPalette().chip)
 
 interface RingItem {
   title: string
@@ -910,12 +915,9 @@ async function queryKey() {
 
 // ==================== Lifecycle ====================
 
+// main.ts 已写好 DOM，这里只同步本地状态
 function initTheme() {
-  const savedTheme = localStorage.getItem('theme')
-  if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-    isDark.value = true
-    document.documentElement.classList.add('dark')
-  }
+  isDark.value = isEfDark()
 }
 
 function formatResetTime(resetAt: string | null | undefined): string {
@@ -944,14 +946,39 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.key-usage-page .ef-btn.go {
+  --fill: var(--ef-signal);
+  color: var(--ef-on-signal);
+}
+.key-usage-page .ef-btn.go:focus-visible {
+  outline-color: var(--ef-on-signal);
+}
+.key-usage-page .ef-state.is-alert {
+  border-color: var(--ef-on-signal);
+}
+.key-usage-page button.ef-state {
+  padding: 0.375rem 0.75rem;
+  cursor: pointer;
+}
+.key-usage-page a:hover {
+  text-decoration-color: var(--ef-trace);
+}
+.key-usage-page :deep(.ef-prose a) {
+  text-decoration-color: var(--ef-trace);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.25em;
+  text-decoration-skip-ink: auto;
+}
+
 /* Input focus ring */
 .input-ring {
-  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+  transition: border-color 0.2s ease;
 }
 .input-ring:focus {
-  box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.2);
-  border-color: #14b8a6;
-  outline: none;
+  box-shadow: none;
+  border-color: var(--ef-ink);
+  outline: 2px solid var(--ef-trace);
+  outline-offset: 2px;
 }
 
 /* Ring animation */
@@ -967,13 +994,23 @@ onUnmounted(() => {
   100% { background-position: 200% 0; }
 }
 .skeleton {
-  background: linear-gradient(90deg, #e5e7eb 25%, #f3f4f6 50%, #e5e7eb 75%);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--ef-ink) 8%, transparent) 25%,
+    color-mix(in srgb, var(--ef-ink) 4%, transparent) 50%,
+    color-mix(in srgb, var(--ef-ink) 8%, transparent) 75%
+  );
   background-size: 200% 100%;
   animation: shimmer-kv 1.8s ease-in-out infinite;
   border-radius: 8px;
 }
 :global(.dark) .skeleton {
-  background: linear-gradient(90deg, #334155 25%, #1e293b 50%, #334155 75%);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--ef-ink) 8%, transparent) 25%,
+    color-mix(in srgb, var(--ef-ink) 4%, transparent) 50%,
+    color-mix(in srgb, var(--ef-ink) 8%, transparent) 75%
+  );
   background-size: 200% 100%;
 }
 

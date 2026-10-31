@@ -73,10 +73,7 @@
             <div class="max-h-[65vh] overflow-y-auto">
               <!-- Loading -->
               <div v-if="loading" class="flex items-center justify-center py-16">
-                <div class="relative">
-                  <div class="h-12 w-12 animate-spin rounded-full border-4 border-gray-200 border-t-blue-600 dark:border-dark-600 dark:border-t-blue-400"></div>
-                  <div class="absolute inset-0 h-12 w-12 animate-pulse rounded-full border-4 border-blue-400/30"></div>
-                </div>
+                <LoadingSpinner size="lg" />
               </div>
 
               <!-- Announcements List -->
@@ -322,6 +319,7 @@ import { useAnnouncementStore } from '@/stores/announcements'
 import { formatRelativeTime, formatRelativeWithDateTime } from '@/utils/format'
 import type { UserAnnouncement } from '@/types'
 import Icon from '@/components/icons/Icon.vue'
+import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import '@/styles/announcement-markdown.css'
 
 const { t } = useI18n()
@@ -459,19 +457,19 @@ watch(
 }
 
 .overflow-y-auto::-webkit-scrollbar-thumb {
-  background: linear-gradient(to bottom, #cbd5e1, #94a3b8);
-  border-radius: 4px;
+  background: color-mix(in srgb, var(--ef-ink) 30%, transparent);
+  border-radius: 0;
 }
 
 .dark .overflow-y-auto::-webkit-scrollbar-thumb {
-  background: linear-gradient(to bottom, #4b5563, #374151);
+  background: color-mix(in srgb, var(--ef-ink) 30%, transparent);
 }
 
 .overflow-y-auto::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(to bottom, #94a3b8, #64748b);
+  background: color-mix(in srgb, var(--ef-ink) 55%, transparent);
 }
 
 .dark .overflow-y-auto::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(to bottom, #6b7280, #4b5563);
+  background: color-mix(in srgb, var(--ef-ink) 55%, transparent);
 }
 </style>

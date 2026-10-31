@@ -1,5 +1,10 @@
 export default {
   dashboard: {
+    accountOverview: 'Account overview',
+    usageAnalysis: 'Usage analysis',
+    loadFailed: 'Unable to load data. Please try again.',
+    refreshing: 'Updating data',
+    updatedAt: 'Updated at {time}',
     title: 'Dashboard',
     welcomeMessage: "Welcome back! Here's an overview of your account.",
     balance: 'Balance',

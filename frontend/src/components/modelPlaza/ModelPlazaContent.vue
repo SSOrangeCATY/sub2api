@@ -1,7 +1,8 @@
 <template>
-  <div class="space-y-5">
+  <div class="pt-plaza-content space-y-5">
     <!-- 页头(独立形态下展示标题;后台形态 AppHeader 已有页面标题) -->
-    <div v-if="!embedded">
+    <div v-if="!embedded" class="pt-plaza-heading">
+      <p class="pt-workspace-eyebrow">// MODEL CATALOG</p>
       <h1 class="text-2xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-3xl">{{ t('modelPlaza.title') }}</h1>
       <p class="mt-1.5 text-sm text-gray-500 dark:text-dark-400">{{ t('modelPlaza.description') }}</p>
     </div>
@@ -24,7 +25,7 @@
 
     <!-- 加载/错误/空 -->
     <div v-if="loading" class="flex min-h-[240px] items-center justify-center">
-      <div class="h-8 w-8 animate-spin rounded-full border-2 border-primary-600/25 border-t-primary-600 dark:border-primary-400/25 dark:border-t-primary-400"></div>
+      <LoadingSpinner />
     </div>
     <div
       v-else-if="error"
@@ -63,6 +64,7 @@
 </template>
 
 <script setup lang="ts">
+import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { marked } from 'marked'

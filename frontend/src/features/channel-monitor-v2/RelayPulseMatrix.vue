@@ -1,6 +1,6 @@
 <template>
   <section
-    class="card flex min-h-[360px] flex-col overflow-visible !rounded-3xl !border-0 !p-6 shadow-sm ring-1 ring-gray-900/5 dark:!bg-dark-800 dark:ring-dark-700"
+    class="card pt-monitor-matrix flex min-h-[360px] flex-col overflow-visible !rounded-3xl !border-0 !p-6 shadow-sm ring-1 ring-gray-900/5 dark:!bg-dark-800 dark:ring-dark-700"
   >
     <div class="card-header mb-4 flex shrink-0 flex-wrap items-start justify-between gap-3 !border-0 !p-0">
       <div class="min-w-0">
@@ -57,7 +57,7 @@
             :class="showThroughput ? 'matrix-row--with-tps' : ''"
           >
             <div class="dimension-cell flex min-w-0 items-center gap-2 bg-white dark:bg-dark-800" :title="rowLabel(entry.row)">
-              <span :class="['status-dot', cellClass(entry.row.health, entry.row.metrics.request_count)]"></span>
+              <span :class="['status-dot', cellClass(entry.row.health, entry.row.metrics)]"></span>
               <strong class="truncate text-xs font-semibold text-gray-800 dark:text-gray-100">{{ rowLabel(entry.row) }}</strong>
             </div>
             <strong class="summary-value bg-white text-xs font-medium tabular-nums text-gray-600 dark:bg-dark-800 dark:text-gray-300">
@@ -87,18 +87,20 @@
                 :key="slot.start"
                 class="pulse-cell relative rounded-sm border-0 p-0 outline-offset-1"
                 :class="[
-                  slot.bucket ? cellClass(slot.bucket.health, slot.bucket.metrics.request_count) : 'health-unknown',
+                  slot.bucket ? cellClass(slot.bucket.health, slot.bucket.metrics) : 'health-unknown',
                   slot.bucket ? 'has-data' : 'is-empty',
                 ]"
                 tabindex="0"
                 role="img"
-                :title="slot.bucket ? bucketTooltip(slot.bucket) : t('channelMonitorV2.matrix.noTrafficAt', { time: formatBucketRange(slot.start) })"
-                :aria-label="slot.bucket ? bucketTooltip(slot.bucket) : t('channelMonitorV2.matrix.noTrafficAt', { time: formatBucketRange(slot.start) })"
+                :title="slot.bucket ? bucketTooltip(slot.bucket) : emptyTooltipLines(slot.start).join('\n')"
+                :aria-label="slot.bucket ? bucketTooltip(slot.bucket) : emptyTooltipLines(slot.start).join('\n')"
                 @mouseenter="showTooltip($event, slot)"
                 @mousemove="moveTooltip($event)"
                 @mouseleave="hideTooltip"
                 @focus="showTooltip($event, slot)"
                 @blur="hideTooltip"
+                @click="showTooltip($event, slot)"
+                @keydown.esc="hideTooltip"
               >
                 <span class="pulse-tooltip" role="tooltip">
                   <template v-if="slot.bucket">
@@ -114,7 +116,7 @@
                   </template>
                   <template v-else>
                     <span class="pulse-tooltip-line pulse-tooltip-title">{{ formatBucketRange(slot.start) }}</span>
-                    <span class="pulse-tooltip-line">{{ t('channelMonitorV2.matrix.noTraffic') }}</span>
+                    <span class="pulse-tooltip-line">{{ t('channelMonitorV2.matrix.unobservedLegend') }}</span>
                   </template>
                 </span>
               </span>
@@ -132,14 +134,15 @@
       <div class="mt-4 flex flex-col gap-2" :aria-label="t('channelMonitorV2.matrix.legendAria')">
         <div class="flex items-center gap-2 text-[11px] text-gray-500 dark:text-gray-400">
           <span class="shrink-0">{{ t('channelMonitorV2.matrix.bad') }}</span>
-          <div class="score-legend h-2.5 flex-1 overflow-hidden rounded-full"></div>
+          <div class="score-legend flex flex-1 gap-0.5" aria-hidden="true"><i v-for="band in 11" :key="band" :class="`health-score${band - 1}`"></i></div>
           <span class="shrink-0">{{ t('channelMonitorV2.matrix.good') }}</span>
         </div>
         <div class="flex flex-wrap gap-4 text-[11px] text-gray-500 dark:text-gray-400">
           <span class="inline-flex items-center gap-1.5"><i class="status-dot health-score10"></i>{{ t('channelMonitorV2.matrix.healthyLegend') }}</span>
           <span class="inline-flex items-center gap-1.5"><i class="status-dot health-score6"></i>{{ t('channelMonitorV2.matrix.warningLegend') }}</span>
           <span class="inline-flex items-center gap-1.5"><i class="status-dot health-score2"></i>{{ t('channelMonitorV2.matrix.criticalLegend') }}</span>
-          <span class="inline-flex items-center gap-1.5"><i class="status-dot health-unknown"></i>{{ t('channelMonitorV2.matrix.unknownLegend') }}</span>
+          <span class="inline-flex items-center gap-1.5"><i class="status-dot health-unrated"></i>{{ t('channelMonitorV2.matrix.unratedLegend') }}</span>
+          <span class="inline-flex items-center gap-1.5"><i class="status-dot health-unknown"></i>{{ t('channelMonitorV2.matrix.unobservedLegend') }}</span>
         </div>
       </div>
     </div>
@@ -147,6 +150,7 @@
     <Teleport to="body">
       <div
         v-if="floatingTooltip.visible"
+        ref="tooltipRef"
         class="matrix-floating-tooltip"
         :style="{ left: `${floatingTooltip.x}px`, top: `${floatingTooltip.y}px` }"
         role="tooltip"
@@ -166,7 +170,7 @@
 
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, nextTick, reactive, ref, watch } from 'vue'
 import type {
   LatencyMetric,
   MonitorCoverage,
@@ -186,7 +190,7 @@ import {
   formatMonitorTokensPerSecond,
   tokensPerSecondFromTpm,
   healthModeScore,
-  healthScoreClass,
+  monitorActivityClass,
 } from '@/features/channel-monitor-v2/monitorFormat'
 import {
   applyWheelZoom,
@@ -343,8 +347,8 @@ watch(
   },
 )
 
-function cellClass(health: MonitorHealth, requestCount: number): string {
-  return healthScoreClass(health, props.healthMode, requestCount)
+function cellClass(health: MonitorHealth, metrics: MonitorMetric): string {
+  return monitorActivityClass(health, props.healthMode, metrics)
 }
 
 function rowLabel(row: MonitorMatrixRow): string {
@@ -385,6 +389,7 @@ function bucketTooltipLines(bucket: MonitorMatrixBucket): string[] {
     t('channelMonitorV2.metrics.successRateValue', { value: successRate(metrics) }),
     t('channelMonitorV2.metrics.ttftValue', { value: latencyPrivacy(metrics.ttft) }),
   ]
+  if (cellClass(bucket.health, metrics) === 'health-unrated') lines.splice(2, 0, t('channelMonitorV2.matrix.unratedHint'))
   if (props.showThroughput) {
     lines.push(t('channelMonitorV2.metrics.tpsValue', { value: formatTps(metrics.tpm) }))
   }
@@ -399,12 +404,15 @@ function bucketTooltipLines(bucket: MonitorMatrixBucket): string[] {
   return lines
 }
 function emptyTooltipLines(start: string): string[] {
-  return [formatBucketRange(start), t('channelMonitorV2.matrix.noTraffic')]
+  return [formatBucketRange(start), t('channelMonitorV2.matrix.unobservedLegend')]
 }
 
-function showTooltip(event: MouseEvent | FocusEvent, slot: AlignedSlot) {
+const tooltipRef = ref<HTMLElement | null>(null)
+
+async function showTooltip(event: MouseEvent | FocusEvent, slot: AlignedSlot) {
   floatingTooltip.lines = slot.bucket ? bucketTooltipLines(slot.bucket) : emptyTooltipLines(slot.start)
   floatingTooltip.visible = true
+  await nextTick()
   positionTooltip(event)
 }
 
@@ -418,16 +426,17 @@ function hideTooltip() {
 }
 
 function positionTooltip(event: MouseEvent | FocusEvent) {
-  if ('clientX' in event) {
-    floatingTooltip.x = Math.min(window.innerWidth - 12, Math.max(12, event.clientX))
-    floatingTooltip.y = Math.min(window.innerHeight - 12, Math.max(12, event.clientY)) - 12
-    return
-  }
   const target = event.target as HTMLElement | null
   const rect = target?.getBoundingClientRect()
   if (!rect) return
-  floatingTooltip.x = rect.left + rect.width / 2
-  floatingTooltip.y = rect.top - 10
+  const box = tooltipRef.value?.getBoundingClientRect()
+  const width = box?.width ?? 288
+  const height = box?.height ?? 220
+  const x = 'clientX' in event && event.clientX > 0 ? event.clientX : rect.left + rect.width / 2
+  const y = 'clientY' in event && event.clientY > 0 ? event.clientY : rect.top
+  floatingTooltip.x = Math.max(12, Math.min(window.innerWidth - width - 12, x - width / 2))
+  const top = y - height - 12
+  floatingTooltip.y = Math.max(12, Math.min(window.innerHeight - height - 12, top >= 12 ? top : rect.bottom + 12))
 }
 
 function latencyPrivacy(metric: LatencyMetric) {
@@ -507,37 +516,27 @@ function formatBucketRange(value: string) {
   border-radius: 9999px;
 }
 
-/* Multi-stop green → yellow → red (score10 best … score0 worst) */
-.health-score10 { background: #16a34a; }
-.health-score9  { background: #22c55e; }
-.health-score8  { background: #4ade80; }
-.health-score7  { background: #a3e635; }
-.health-score6  { background: #facc15; }
-.health-score5  { background: #fbbf24; }
-.health-score4  { background: #f59e0b; }
-.health-score3  { background: #f97316; }
-.health-score2  { background: #fb7185; }
-.health-score1  { background: #f87171; }
-.health-score0  { background: rgb(239, 67, 67); }
-/* Coarse fallbacks (older payloads without score) */
-.health-healthy  { background: #22c55e; }
-.health-warning  { background: #f59e0b; }
-.health-critical { background: #ef4444; }
-.health-unknown  { background: #9ca3af; }
-
-.score-legend {
-  background: linear-gradient(
-    90deg,
-    rgb(239, 67, 67) 0%,
-    #f87171 15%,
-    #f97316 30%,
-    #f59e0b 45%,
-    #facc15 55%,
-    #a3e635 70%,
-    #22c55e 85%,
-    #16a34a 100%
-  );
-}
+/* Operational health bands are data colors, independent of action accents. */
+.pt-monitor-matrix { --monitor-unrated: var(--pt-blue, #2554ff); }
+.health-score0 { --monitor-health: #e52d40; }
+.health-score1 { --monitor-health: #f04442; }
+.health-score2 { --monitor-health: #ff5a36; }
+.health-score3 { --monitor-health: #ff741f; }
+.health-score4 { --monitor-health: #ff9700; }
+.health-score5 { --monitor-health: #ffbd00; }
+.health-score6 { --monitor-health: #d8cf00; }
+.health-score7 { --monitor-health: #a7d800; }
+.health-score8 { --monitor-health: #54c900; }
+.health-score9 { --monitor-health: #00b875; }
+.health-score10 { --monitor-health: #009d72; }
+.health-healthy { --monitor-health: #009d72; }
+.health-warning { --monitor-health: #ffbd00; }
+.health-critical { --monitor-health: #e52d40; }
+.pt-monitor-matrix :is(.pulse-cell, .status-dot, .score-legend > i) { background-color: var(--monitor-health, var(--pt-chip)); border-radius: 0; }
+.pt-monitor-matrix .health-unrated { --monitor-health: var(--monitor-unrated); background-image: repeating-linear-gradient(135deg,transparent 0 5px,rgb(255 255 255 / .45) 5px 6px); }
+.pt-monitor-matrix .health-unknown { --monitor-health: var(--pt-chip, #e4e4e0); background-image: repeating-linear-gradient(135deg,transparent 0 5px,color-mix(in srgb,var(--pt-muted) 40%,transparent) 5px 6px); }
+.score-legend > i { display: block; height: 8px; flex: 1; }
+.score-legend { background: none; }
 
 .pulse-cell {
   position: relative;
@@ -547,12 +546,12 @@ function formatBucketRange(value: string) {
   cursor: help;
 }
 .pulse-cell.is-empty {
-  opacity: 0.55;
+  opacity: 1;
   cursor: default;
 }
 .pulse-cell.has-data:hover,
 .pulse-cell.has-data:focus-visible {
-  outline: 2px solid rgb(var(--color-primary-500, 99 102 241) / 0.55);
+  outline: 2px solid var(--pt-ink);
   outline-offset: 1px;
   z-index: 5;
 }
@@ -569,15 +568,15 @@ function formatBucketRange(value: string) {
   min-width: 11.5rem;
   max-width: 16rem;
   transform: translateX(-50%) translateY(4px);
-  border-radius: 0.75rem;
-  border: 1px solid rgb(229 231 235);
-  background: rgb(255 255 255);
+  border-radius: 0;
+  border: 1px solid var(--pt-ink, #161616);
+  background: var(--pt-panel, #fff);
   padding: 0.5rem 0.625rem;
   box-shadow: 0 10px 25px -5px rgb(0 0 0 / 0.15);
   opacity: 0;
   visibility: hidden;
   transition: opacity 0.12s ease, transform 0.12s ease, visibility 0.12s;
-  white-space: nowrap;
+  white-space: normal;
 }
 :global(.dark) .pulse-tooltip {
   border-color: rgb(55 65 81);
@@ -588,7 +587,7 @@ function formatBucketRange(value: string) {
   display: block;
   font-size: 11px;
   line-height: 1.45;
-  color: rgb(75 85 99);
+  color: var(--pt-muted);
 }
 :global(.dark) .pulse-tooltip-line {
   color: rgb(209 213 219);
@@ -596,7 +595,7 @@ function formatBucketRange(value: string) {
 .pulse-tooltip-title {
   margin-bottom: 0.2rem;
   font-weight: 600;
-  color: rgb(17 24 39);
+  color: var(--pt-ink);
 }
 :global(.dark) .pulse-tooltip-title {
   color: rgb(243 244 246);
@@ -618,13 +617,13 @@ function formatBucketRange(value: string) {
   z-index: 9999;
   min-width: 11.5rem;
   max-width: min(18rem, calc(100vw - 1.5rem));
-  transform: translate(-50%, -100%);
-  border-radius: 0.75rem;
-  border: 1px solid rgb(229 231 235);
-  background: rgb(255 255 255);
+  width: max-content;
+  border-radius: 0;
+  border: 1px solid var(--pt-ink, #161616);
+  background: var(--pt-panel, #fff);
   padding: 0.5rem 0.625rem;
-  box-shadow: 0 18px 40px -12px rgb(0 0 0 / 0.28);
-  white-space: nowrap;
+  box-shadow: none;
+  white-space: normal;
 }
 :global(.dark) .matrix-floating-tooltip {
   border-color: rgb(55 65 81);
@@ -635,7 +634,7 @@ function formatBucketRange(value: string) {
   display: block;
   font-size: 11px;
   line-height: 1.45;
-  color: rgb(75 85 99);
+  color: var(--pt-muted);
 }
 :global(.dark) .matrix-floating-tooltip-line {
   color: rgb(209 213 219);
@@ -643,22 +642,17 @@ function formatBucketRange(value: string) {
 .matrix-floating-tooltip-title {
   margin-bottom: 0.2rem;
   font-weight: 600;
-  color: rgb(17 24 39);
+  color: var(--pt-ink);
 }
 :global(.dark) .matrix-floating-tooltip-title {
   color: rgb(243 244 246);
 }
 
-@media (max-width: 640px) {
-  .matrix-row {
-    grid-template-columns: minmax(88px, 1fr) minmax(48px, 0.45fr) minmax(54px, 0.5fr) minmax(96px, 2.6fr);
-    gap: 0.35rem;
-  }
-  .matrix-row > :nth-child(2) {
-    left: 0;
-  }
-  .matrix-row > :nth-child(3) {
-    left: 0;
-  }
+@media (max-width: 639px) {
+  .matrix-row, .matrix-row--with-tps { grid-template-columns: minmax(86px,.9fr) minmax(110px,2fr); gap: 8px; min-height: 48px; }
+  .matrix-row > .summary-value, .matrix-header > span:not(:first-child):not(:last-child) { display: none; }
+  .dimension-cell strong { white-space: normal; overflow-wrap: anywhere; font-size: 10px; }
+  .pulse-axis { font-size: 9px; gap: 6px; }
+  .status-dot { width: 6px; height: 6px; }
 }
 </style>

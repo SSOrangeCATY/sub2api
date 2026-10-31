@@ -1,87 +1,125 @@
+/* eslint-disable */
 /** @type {import('tailwindcss').Config} */
+
+/* ── 函数式颜色：让 var() 也能吃 /50 这类透明度修饰符 ───────────────
+   Tailwind 的 withAlphaValue 对 var(...) 调 parseColor 会返回 null，
+   直接写 'var(--x)' 会让 bg-x/50 完全不产出 CSS。函数式返回 color-mix
+   即可绕过，且 endfield 本身就以 color-mix 为浏览器基线。 */
+const v = (name) => ({ opacityValue }) =>
+  opacityValue === undefined
+    ? `var(${name})`
+    : `color-mix(in srgb, var(${name}) calc(${opacityValue} * 100%), transparent)`
+
+const T = {
+  paper: v('--ef-paper'),   panel: v('--ef-panel'),  ink:  v('--ef-ink'),
+  ink2:  v('--ef-ink-2'),   rule:  v('--ef-rule'),   chip: v('--ef-chip'),
+  tagBg: v('--ef-tag-bg'),  tagFg: v('--ef-tag-fg'), soft: v('--ef-signal-soft')
+}
+
+const STEPS = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950]
+const mk = (pick) => Object.fromEntries(STEPS.map((s) => [s, T[pick(s)]]))
+
+/* 底色阶梯（普通色族） */
+const bgL = mk((s) => (s <= 50 ? 'paper' : s <= 100 ? 'chip' : s <= 300 ? 'rule'
+                      : s <= 400 ? 'chip' : s <= 900 ? 'tagBg' : 'paper'))
+
+/* 文字阶梯（所有色族共用：低阶次级墨，高阶墨） */
+const txL = mk((s) => (s <= 50 ? 'paper' : s <= 600 ? 'ink2' : 'ink'))
+
+/* 描边阶梯 */
+const bdL = mk((s) => (s <= 300 ? 'rule' : s === 400 ? 'ink2' : s <= 900 ? 'tagBg' : 'paper'))
+
+/* 警告色族（amber / orange / yellow / red）：低阶三档换浅黄底 */
+const bgW = mk((s) => (s <= 200 ? 'soft' : s <= 300 ? 'rule' : s <= 400 ? 'chip'
+                      : s <= 900 ? 'tagBg' : 'paper'))
+const bdW = mk((s) => (s <= 200 ? 'soft' : s <= 300 ? 'rule' : s === 400 ? 'ink2'
+                      : s <= 900 ? 'tagBg' : 'paper'))
+
+/* dark 色族专属：它是反色阶，必须单独一张表，否则深色面板会翻转 */
+const bgD = mk((s) => (s <= 300 ? 'paper' : s === 400 ? 'chip' : s === 500 ? 'tagBg'
+                      : s === 600 ? 'panel' : s === 700 ? 'chip' : s === 800 ? 'panel' : 'paper'))
+const txD = mk((s) => (s <= 50 ? 'paper' : s <= 200 ? 'ink' : s <= 600 ? 'ink2' : 'ink'))
+const bdD = mk((s) => (s <= 300 ? 'rule' : s === 400 ? 'ink2' : 'rule'))
+
+const PLAIN = ['primary', 'gray', 'slate', 'zinc', 'neutral', 'stone', 'blue', 'indigo',
+               'sky', 'cyan', 'teal', 'violet', 'purple', 'pink', 'rose', 'fuchsia',
+               'lime', 'emerald', 'green', 'accent']
+const WARN = ['amber', 'orange', 'yellow', 'red']
+const ALL = [...PLAIN, ...WARN, 'dark']
+
+const fromEntries = (list, obj) => Object.fromEntries(list.map((f) => [f, obj]))
+
 export default {
+  darkMode: 'class', // 保持不变：仍靠 html.dark
   content: ['./index.html', './src/**/*.{vue,js,ts,jsx,tsx}'],
-  darkMode: 'class',
   theme: {
     extend: {
       colors: {
-        // 主色调 - Teal/Cyan 青色系
-        primary: {
-          50: '#f0fdfa',
-          100: '#ccfbf1',
-          200: '#99f6e4',
-          300: '#5eead4',
-          400: '#2dd4bf',
-          500: '#14b8a6',
-          600: '#0d9488',
-          700: '#0f766e',
-          800: '#115e59',
-          900: '#134e4a',
-          950: '#042f2e'
-        },
-        // 辅助色 - 深蓝灰
-        accent: {
-          50: '#f8fafc',
-          100: '#f1f5f9',
-          200: '#e2e8f0',
-          300: '#cbd5e1',
-          400: '#94a3b8',
-          500: '#64748b',
-          600: '#475569',
-          700: '#334155',
-          800: '#1e293b',
-          900: '#0f172a',
-          950: '#020617'
-        },
-        // 深色模式背景
-        dark: {
-          50: '#f8fafc',
-          100: '#f1f5f9',
-          200: '#e2e8f0',
-          300: '#cbd5e1',
-          400: '#94a3b8',
-          500: '#64748b',
-          600: '#475569',
-          700: '#334155',
-          800: '#1e293b',
-          900: '#0f172a',
-          950: '#020617'
-        }
+        ...fromEntries(PLAIN, bgL),
+        ...fromEntries(WARN, bgW),
+        dark: bgD,
+        white: T.panel,
+        black: '#000000'
       },
-      fontFamily: {
-        sans: [
-          'system-ui',
-          '-apple-system',
-          'BlinkMacSystemFont',
-          'Segoe UI',
-          'Roboto',
-          'Helvetica Neue',
-          'Arial',
-          'PingFang SC',
-          'Hiragino Sans GB',
-          'Microsoft YaHei',
-          'sans-serif'
-        ],
-        mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace']
+
+      /* 同一台阶、不同属性必须取不同令牌，所以这四个键要单独覆盖。
+         没在这里列出的族，text-* 会退回用 colors 的 bg 阶梯。 */
+      textColor: {
+        ...fromEntries(ALL, txL),
+        dark: txD,
+        white: T.tagFg,
+        black: T.panel
       },
+      borderColor: {
+        ...fromEntries(PLAIN, bdL),
+        ...fromEntries(WARN, bdW),
+        dark: bdD,
+        white: T.tagFg,
+        black: T.tagFg
+      },
+      ringColor: {
+        ...fromEntries(PLAIN, bdL),
+        ...fromEntries(WARN, bdW),
+        dark: bdD,
+        white: T.tagFg,
+        black: T.tagFg
+      },
+      divideColor: {
+        ...fromEntries(PLAIN, bdL),
+        ...fromEntries(WARN, bdW),
+        dark: bdD,
+        white: T.tagFg,
+        black: T.tagFg
+      },
+
+      /* ── 几何归零：endfield 是直角 ── */
+      borderRadius: {
+        none: '0', sm: '0', DEFAULT: '0', md: '0', lg: '0',
+        xl: '0', '2xl': '0', '3xl': '0', '4xl': '0', full: '0'
+      },
+      /* ── 阴影归零：endfield 用描边，不用投影 ── */
       boxShadow: {
-        glass: '0 8px 32px rgba(0, 0, 0, 0.08)',
-        'glass-sm': '0 4px 16px rgba(0, 0, 0, 0.06)',
-        glow: '0 0 20px rgba(20, 184, 166, 0.25)',
-        'glow-lg': '0 0 40px rgba(20, 184, 166, 0.35)',
-        card: '0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.06)',
-        'card-hover': '0 10px 40px rgba(0, 0, 0, 0.08)',
-        'inner-glow': 'inset 0 1px 0 rgba(255, 255, 255, 0.1)'
+        sm: 'none', DEFAULT: 'none', md: 'none', lg: 'none', xl: 'none',
+        '2xl': 'none', inner: 'none',
+        glass: 'none', 'glass-sm': 'none', glow: 'none', 'glow-lg': 'none',
+        card: 'none', 'card-hover': 'none', 'inner-glow': 'none'
       },
+      /* ── 渐变归零 ── */
       backgroundImage: {
-        'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
-        'gradient-primary': 'linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)',
-        'gradient-dark': 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
-        'gradient-glass':
-          'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%)',
-        'mesh-gradient':
-          'radial-gradient(at 40% 20%, rgba(20, 184, 166, 0.12) 0px, transparent 50%), radial-gradient(at 80% 0%, rgba(6, 182, 212, 0.08) 0px, transparent 50%), radial-gradient(at 0% 50%, rgba(20, 184, 166, 0.08) 0px, transparent 50%)'
+        'gradient-radial': 'none',
+        'gradient-primary': 'none',
+        'gradient-dark': 'none',
+        'gradient-glass': 'none',
+        'mesh-gradient': 'none'
       },
+
+      fontFamily: {
+        sans: ['Saira Variable', 'Saira', 'Noto Sans SC Variable', 'Noto Sans SC',
+               'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'system-ui', 'sans-serif'],
+        mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Consolas', 'monospace']
+      },
+
+      /* ── 原样保留：动画是中性能力 ── */
       animation: {
         'fade-in': 'fadeIn 0.3s ease-out',
         'slide-up': 'slideUp 0.3s ease-out',
@@ -93,10 +131,7 @@ export default {
         glow: 'glow 2s ease-in-out infinite alternate'
       },
       keyframes: {
-        fadeIn: {
-          '0%': { opacity: '0' },
-          '100%': { opacity: '1' }
-        },
+        fadeIn: { '0%': { opacity: '0' }, '100%': { opacity: '1' } },
         slideUp: {
           '0%': { opacity: '0', transform: 'translateY(10px)' },
           '100%': { opacity: '1', transform: 'translateY(0)' }
@@ -122,12 +157,7 @@ export default {
           '100%': { boxShadow: '0 0 30px rgba(20, 184, 166, 0.4)' }
         }
       },
-      backdropBlur: {
-        xs: '2px'
-      },
-      borderRadius: {
-        '4xl': '2rem'
-      }
+      backdropBlur: { xs: '2px' }
     }
   },
   plugins: []

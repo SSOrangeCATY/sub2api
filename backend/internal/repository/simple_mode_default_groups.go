@@ -77,7 +77,7 @@ func createGroupIfNotExists(ctx context.Context, client *dbent.Client, name, pla
 		SetSubscriptionType(service.SubscriptionTypeStandard).
 		SetRateMultiplier(1.0).
 		SetIsExclusive(false).
-		SetAllowImageGeneration(service.DefaultAllowImageGenerationForPlatform(platform)).
+		SetAllowImageGeneration(platform == service.PlatformGrok).
 		Save(ctx)
 	if err != nil {
 		if dbent.IsConstraintError(err) {

@@ -634,23 +634,34 @@
     @apply my-4 h-px bg-gray-200 dark:bg-dark-700;
   }
 
-  /* ============ 标签页 ============ */
+  /* ============ 标签页 ============
+     endfield 语义：外层是一条横贯的细线，选中项直接坐在信号黄填充上。
+     选中态不再靠“白底+阴影”，改用 skill 的切角信号块 —— 因为
+     bridge 把阴影和圆角清零后，白底在纸色面板上几乎没有区分度。 */
   .tabs {
-    @apply flex gap-1 p-1;
-    @apply rounded-xl bg-gray-100 dark:bg-dark-800;
+    @apply flex flex-wrap gap-0;
+    @apply border-b border-gray-200 dark:border-dark-700;
   }
 
   .tab {
-    @apply rounded-lg px-4 py-2 text-sm font-medium;
-    @apply text-gray-600 dark:text-dark-400;
-    @apply transition-all duration-200;
+    @apply px-3 py-2 text-sm font-medium;
+    @apply text-gray-500 dark:text-dark-400;
+    @apply transition-colors duration-150;
     @apply hover:text-gray-900 dark:hover:text-white;
   }
 
-  .tab-active {
-    @apply bg-white dark:bg-dark-700;
-    @apply text-gray-900 dark:text-white;
-    @apply shadow-sm;
+  /* 与 .ef-seg 的选中段同构：墨色填充 + 纸色文字。
+     不用 bg-gray-900/text-white —— 那组映射到 tagBg/tagFg，
+     深色下是 #a3a3a3 压 #3a3a3a，仅 4.51，且与面板区分度很弱。 */
+  .tab-active,
+  .dark .tab-active {
+    background: var(--ef-ink);
+    color: var(--ef-paper);
+    font-weight: 700;
+    margin-bottom: -1px;
+    border-bottom: 2px solid var(--ef-ink);
+    -webkit-mask: linear-gradient(-45deg, transparent calc(0.5rem - 0.5px), #000 calc(0.5rem - 0.5px));
+    mask: linear-gradient(-45deg, transparent calc(0.5rem - 0.5px), #000 calc(0.5rem - 0.5px));
   }
 
   /* ============ 进度条 ============ */

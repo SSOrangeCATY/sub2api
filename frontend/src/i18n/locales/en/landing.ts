@@ -5,11 +5,20 @@ export default {
   },
   // Home Page
   home: {
+    community: {
+      title: 'QQ Community',
+      copyGroup: 'Copy QQ group number 487375322',
+      showQr: 'Show group QR code',
+      scanToJoin: 'Scan to join the group',
+      qrAlt: 'QR code for QQ community {number}',
+    },
     viewOnGithub: 'View on GitHub',
     viewDocs: 'View Documentation',
     docs: 'Docs',
     switchToLight: 'Switch to Light Mode',
     switchToDark: 'Switch to Dark Mode',
+    themeLight: 'Light',
+    themeDark: 'Dark',
     dashboard: 'Dashboard',
     login: 'Login',
     getStarted: 'Get Started',
@@ -93,6 +102,40 @@ export default {
         }
       }
     },
+    // Showcase homepage (endfield rewrite, P1)
+    eyebrowIndex: 'SUBSCRIPTION TO API',
+    eyebrowCapabilities: 'CAPABILITIES',
+    eyebrowStatus: 'STATUS',
+    field: {
+      version: 'Version',
+      timezone: 'Timezone',
+      registration: 'Sign-up',
+      invitation: 'Invite code',
+      subscription: 'Subscription'
+    },
+    value: {
+      open: 'Open',
+      closed: 'Closed',
+      required: 'Required',
+      none: 'Not required',
+      enabled: 'Enabled',
+      disabled: 'Disabled'
+    },
+    capability: {
+      access: 'One-click access',
+      accessDesc: 'Get a single API key and call every connected model. No extra setup.',
+      reliable: 'Always reliable',
+      reliableDesc: 'Requests are spread across a pool of upstream accounts with automatic failover.',
+      billing: 'Pay for what you use',
+      billingDesc: 'Usage-based billing with per-key quota caps. Every call is itemised.'
+    },
+    status: {
+      monitors: 'Channel monitor',
+      plaza: 'Model plaza',
+      noMonitors: 'No channels are being monitored right now.',
+      signedOutHint: 'Sign in to see live channel availability and latency.'
+    },
+    footerTagline: 'Subscription to API gateway',
     providers: {
       title: 'Supported AI Models',
       description: 'One API, Multiple Choices',

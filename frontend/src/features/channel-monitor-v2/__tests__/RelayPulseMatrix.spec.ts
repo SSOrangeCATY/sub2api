@@ -28,6 +28,9 @@ const i18nT = (key: string, params?: Record<string, unknown>) => {
     'channelMonitorV2.matrix.warningLegend': '警告',
     'channelMonitorV2.matrix.criticalLegend': '异常',
     'channelMonitorV2.matrix.unknownLegend': '未知',
+    'channelMonitorV2.matrix.unratedLegend': '有流量 / 待评分',
+    'channelMonitorV2.matrix.unratedHint': '已有流量，样本可能不足，不代表故障。',
+    'channelMonitorV2.matrix.unobservedLegend': '无评分 / 无可见流量信号',
   }
   const template = map[key] || key
   return template.replace(/\{(\w+)\}/g, (_, name) => String(params?.[name] ?? ''))
@@ -82,6 +85,30 @@ function metrics(requestCount: number): MonitorMetric {
 }
 
 describe('RelayPulseMatrix', () => {
+  it('separates unrated traffic from empty intervals without inventing a score', async () => {
+    const unrated: MonitorHealth = { ...health, overall: 'unknown', score: null }
+    const silent = { ...metrics(0), rpm: 0, tpm: 0, cache_rate: 0, ttft: { sample_count: 0, p50_ms: null, p95_ms: null, avg_ms: null } }
+    const wrapper = mount(RelayPulseMatrix, { props: {
+      rows: [{ platform: 'openai', group_id: 7, metrics: metrics(3), health: unrated, buckets: [
+        { bucket_start: '2026-08-01T00:00:00Z', metrics: metrics(3), health: unrated },
+        { bucket_start: '2026-08-01T00:01:00Z', metrics: silent, health: unrated },
+      ] }],
+      coverage: { requested_start: '2026-08-01T00:00:00Z', requested_end: '2026-08-01T00:02:00Z', coverage_start: '2026-08-01T00:00:00Z', data_through: '2026-08-01T00:02:00Z', computed_at: '2026-08-01T00:02:00Z', aggregation_lag_seconds: 0, coverage_complete: true, bucket_seconds: 60 },
+      healthMode: 'overall',
+    } })
+    const cells = wrapper.findAll('.pulse-cell')
+    expect(cells[0].classes()).toContain('health-unrated')
+    expect(cells[1].classes()).toContain('health-unknown')
+    expect(wrapper.findAll('.score-legend > i')).toHaveLength(11)
+    expect(wrapper.text()).toContain('有流量 / 待评分')
+    await cells[0].trigger('click')
+    expect(document.querySelector('.matrix-floating-tooltip')?.textContent).toContain('不代表故障')
+    expect(document.querySelector('.matrix-floating-tooltip')?.textContent).toContain('评分 —')
+    await cells[0].trigger('keydown', { key: 'Escape' })
+    expect(document.querySelector('.matrix-floating-tooltip')).toBeNull()
+    wrapper.unmount()
+  })
+
   it('shows privacy-safe hover tooltips and multi-band colors without click modal', async () => {
     const wrapper = mount(RelayPulseMatrix, {
       props: {

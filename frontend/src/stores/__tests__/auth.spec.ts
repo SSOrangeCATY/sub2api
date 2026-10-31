@@ -161,6 +161,91 @@ describe('useAuthStore', () => {
   // --- checkAuth ---
 
   describe('checkAuth', () => {
+    it('waits for token renewal before requesting a restored expired profile', async () => {
+      localStorage.setItem('auth_token', 'expired-token')
+      localStorage.setItem('auth_user', JSON.stringify(fakeUser))
+      localStorage.setItem('refresh_token', 'saved-refresh')
+      localStorage.setItem('token_expires_at', String(Date.now() - 1000))
+      let resolveRefresh!: (value: typeof fakeAuthResponse) => void
+      const pending = new Promise<typeof fakeAuthResponse>((resolve) => { resolveRefresh = resolve })
+      mockRefreshToken.mockReturnValue(pending)
+      mockGetCurrentUser.mockResolvedValue({ data: fakeUser })
+
+      const store = useAuthStore()
+      store.checkAuth()
+      expect(mockRefreshToken).toHaveBeenCalled()
+      expect(mockGetCurrentUser).not.toHaveBeenCalled()
+
+      resolveRefresh(fakeAuthResponse)
+      await vi.advanceTimersByTimeAsync(0)
+      expect(store.token).toBe(fakeAuthResponse.access_token)
+      expect(mockGetCurrentUser).toHaveBeenCalledTimes(1)
+    })
+
+    it('does not delay a profile request when the token is still valid', async () => {
+      localStorage.setItem('auth_token', 'valid-token')
+      localStorage.setItem('auth_user', JSON.stringify(fakeUser))
+      localStorage.setItem('refresh_token', 'saved-refresh')
+      localStorage.setItem('token_expires_at', String(Date.now() + 3600_000))
+      mockGetCurrentUser.mockResolvedValue({ data: fakeUser })
+      useAuthStore().checkAuth()
+      expect(mockGetCurrentUser).toHaveBeenCalledTimes(1)
+      expect(mockRefreshToken).not.toHaveBeenCalled()
+    })
+
+    it('continues to the profile request if preflight renewal is unavailable', async () => {
+      localStorage.setItem('auth_token', 'expired-token')
+      localStorage.setItem('auth_user', JSON.stringify(fakeUser))
+      localStorage.setItem('refresh_token', 'saved-refresh')
+      localStorage.setItem('token_expires_at', '0')
+      mockRefreshToken.mockRejectedValue(new Error('Temporary refresh outage'))
+      mockGetCurrentUser.mockResolvedValue({ data: fakeUser })
+      const store = useAuthStore()
+      store.checkAuth()
+      await vi.advanceTimersByTimeAsync(0)
+      expect(mockGetCurrentUser).toHaveBeenCalledTimes(1)
+      expect(store.isAuthenticated).toBe(true)
+    })
+
+    it('does not restore the session when logout occurs during preflight renewal', async () => {
+      localStorage.setItem('auth_token', 'expired-token')
+      localStorage.setItem('auth_user', JSON.stringify(fakeUser))
+      localStorage.setItem('refresh_token', 'saved-refresh')
+      localStorage.setItem('token_expires_at', '0')
+      let resolveRefresh!: (value: typeof fakeAuthResponse) => void
+      mockRefreshToken.mockReturnValue(new Promise<typeof fakeAuthResponse>((resolve) => { resolveRefresh = resolve }))
+      mockLogout.mockResolvedValue(undefined)
+      const store = useAuthStore()
+      store.checkAuth()
+      await store.logout()
+      resolveRefresh(fakeAuthResponse)
+      await vi.advanceTimersByTimeAsync(0)
+      expect(store.isAuthenticated).toBe(false)
+      expect(localStorage.getItem('auth_token')).toBeNull()
+      expect(mockGetCurrentUser).not.toHaveBeenCalled()
+    })
+
+    it('does not replace a new login when an old preflight renewal finishes', async () => {
+      localStorage.setItem('auth_token', 'expired-token')
+      localStorage.setItem('auth_user', JSON.stringify(fakeUser))
+      localStorage.setItem('refresh_token', 'saved-refresh')
+      localStorage.setItem('token_expires_at', '0')
+      let resolveRefresh!: (value: typeof fakeAuthResponse) => void
+      mockRefreshToken.mockReturnValue(new Promise<typeof fakeAuthResponse>((resolve) => { resolveRefresh = resolve }))
+      const store = useAuthStore()
+      store.checkAuth()
+      const newSession = { ...fakeAuthResponse, access_token: 'new-login-token', refresh_token: 'new-login-refresh', user: fakeAdminUser }
+      mockLogin.mockResolvedValue(newSession)
+      mockGetCurrentUser.mockResolvedValue({ data: fakeAdminUser })
+      await store.login({ email: fakeAdminUser.email, password: 'test-password' })
+      resolveRefresh(fakeAuthResponse)
+      await vi.advanceTimersByTimeAsync(0)
+      expect(store.token).toBe('new-login-token')
+      expect(store.user).toEqual(fakeAdminUser)
+      expect(localStorage.getItem('auth_token')).toBe('new-login-token')
+      expect(localStorage.getItem('refresh_token')).toBe('new-login-refresh')
+    })
+
     it('从 localStorage 恢复持久化状态', () => {
       localStorage.setItem('auth_token', 'saved-token')
       localStorage.setItem('auth_user', JSON.stringify(fakeUser))
