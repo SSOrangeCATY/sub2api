@@ -336,6 +336,62 @@ describe('EditAccountModal', () => {
 
   afterEach(() => vi.useRealTimers())
 
+  it('loads and saves first output timeout without losing other account metadata', async () => {
+    const account = buildAccount()
+    account.extra = { openai_first_output_timeout_seconds: 6, keep_me: { enabled: true } }
+    updateAccountMock.mockReset().mockResolvedValue(account)
+    checkMixedChannelRiskMock.mockReset().mockResolvedValue({ has_risk: false })
+    const wrapper = mountModal(account)
+    const input = wrapper.get('[data-testid="first-output-timeout-input"]')
+    expect((input.element as HTMLInputElement).value).toBe('6')
+    await input.setValue('12')
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+    expect(updateAccountMock.mock.calls[0]?.[1]?.extra).toMatchObject({
+      openai_first_output_timeout_seconds: 12, keep_me: { enabled: true }
+    })
+  })
+
+  it('disables first output timeout with zero and preserves unrelated metadata', async () => {
+    const account = buildAccount()
+    account.extra = { openai_first_output_timeout_seconds: 6, keep_me: true }
+    updateAccountMock.mockReset().mockResolvedValue(account)
+    const wrapper = mountModal(account)
+    await wrapper.get('[data-testid="first-output-timeout-input"]').setValue('0')
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+    const extra = updateAccountMock.mock.calls[0]?.[1]?.extra
+    expect(extra).not.toHaveProperty('openai_first_output_timeout_seconds')
+    expect(extra.keep_me).toBe(true)
+  })
+
+  it.each(['-1', '0.5', '301'])('rejects invalid first output timeout %s', async (value) => {
+    updateAccountMock.mockReset()
+    const wrapper = mountModal()
+    await wrapper.get('[data-testid="first-output-timeout-input"]').setValue(value)
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+    expect(updateAccountMock).not.toHaveBeenCalled()
+  })
+
+  it('reloads timeout when another account is opened and hides it for OAuth accounts', async () => {
+    const account = buildAccount()
+    account.extra = { openai_first_output_timeout_seconds: 6 }
+    const wrapper = mountModal(account)
+    await wrapper.setProps({ account: { ...account, id: 2, extra: { openai_first_output_timeout_seconds: 12 } } })
+    expect((wrapper.get('[data-testid="first-output-timeout-input"]').element as HTMLInputElement).value).toBe('12')
+    await wrapper.setProps({ account: { ...account, type: 'oauth' } })
+    expect(wrapper.find('[data-testid="first-output-timeout-settings"]').exists()).toBe(false)
+  })
+
+  it('does not rewrite timeout metadata when its saved value is unchanged', async () => {
+    const account = buildAccount()
+    account.extra = { openai_first_output_timeout_seconds: 6 }
+    updateAccountMock.mockReset().mockResolvedValue(account)
+    const wrapper = mountModal(account)
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+    const extra = updateAccountMock.mock.calls[0]?.[1]?.extra
+    if (extra) expect(extra.openai_first_output_timeout_seconds).toBe(6)
+    else expect(updateAccountMock).toHaveBeenCalledOnce()
+  })
+
   it('passes existing non-identity mappings to the whitelist selector and preserves them on save', async () => {
     const account = buildAccount()
     account.credentials.model_mapping = { 'gpt-5.2': 'gpt-5.2', 'gpt-latest': 'deepseek-chat' }

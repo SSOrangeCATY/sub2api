@@ -1,0 +1,73 @@
+name: Repository lanes
+
+on:
+  pull_request:
+    branches: [custom/main, production]
+  push:
+    branches: [custom/main, production]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lanes-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  policy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enforce production PR source
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.base_ref }}
+          HEAD: ${{ github.head_ref }}
+          SOURCE_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          if [ "$EVENT" = pull_request ] && [ "$BASE" = production ]; then
+            test "$HEAD" = custom/main
+            test "$SOURCE_REPO" = "$REPO"
+          fi
+  frontend:
+    name: Custom frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 9
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+        working-directory: frontend
+      - run: pnpm --dir frontend run typecheck
+      - run: make test-frontend-critical
+      - run: pnpm --dir frontend run build
+  timeout-regression:
+    name: Timeout regression
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - name: Account first output regression with race detector
+        working-directory: backend
+        run: go test -tags unit -race -count=1 ./internal/service -run '^TestAccountFirstOutput'
+  release-gate:
+    name: Release gate
+    if: always()
+    needs: [policy, frontend, timeout-regression]
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          POLICY: ${{ needs.policy.result }}
+          FRONTEND: ${{ needs.frontend.result }}
+          TIMEOUT: ${{ needs.timeout-regression.result }}
+        run: test "$POLICY" = success && test "$FRONTEND" = success && test "$TIMEOUT" = success
