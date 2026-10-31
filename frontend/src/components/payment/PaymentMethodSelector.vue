@@ -11,6 +11,7 @@
         v-for="method in sortedMethods"
         :key="method.type"
         type="button"
+        :aria-pressed="selected === method.type"
         :title="methodLabel(method)"
         :disabled="!method.available"
         :class="[

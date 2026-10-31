@@ -1,16 +1,16 @@
 <template>
   <AppLayout>
-    <div class="mx-auto max-w-2xl space-y-6">
+    <div class="pt-redeem-layout mx-auto max-w-2xl space-y-6">
       <!-- Current Balance Card -->
-      <div class="card overflow-hidden">
-        <div class="bg-gradient-to-br from-primary-500 to-primary-600 px-6 py-8 text-center">
+      <div class="card pt-redeem-balance overflow-hidden">
+        <div class="pt-redeem-balance-inner px-6 py-8">
+          <p class="pt-redeem-eyebrow">// {{ t('redeem.currentBalance') }}</p>
           <div
             class="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-sm"
           >
             <Icon name="creditCard" size="xl" class="text-white" />
           </div>
-          <p class="text-sm font-medium text-primary-100">{{ t('redeem.currentBalance') }}</p>
-          <p class="mt-2 text-4xl font-bold text-white">
+          <p class="pt-redeem-value mt-2 text-4xl font-bold">
             ${{ user?.balance?.toFixed(2) || '0.00' }}
           </p>
           <p class="mt-2 text-sm text-primary-100">
@@ -20,8 +20,9 @@
       </div>
 
       <!-- Redeem Form -->
-      <div class="card">
+      <div class="card pt-redeem-form">
         <div class="p-6">
+          <h2 class="pt-redeem-form-title">{{ t('redeem.title') }}</h2>
           <form @submit.prevent="handleRedeem" class="space-y-5">
             <div>
               <label for="code" class="input-label">
@@ -164,7 +165,7 @@
 
       <!-- Information Card -->
       <div
-        class="card border-primary-200 bg-primary-50 dark:border-primary-800/50 dark:bg-primary-900/20"
+        class="pt-redeem-info card border-primary-200 bg-primary-50 dark:border-primary-800/50 dark:bg-primary-900/20"
       >
         <div class="p-6">
           <div class="flex items-start gap-4">

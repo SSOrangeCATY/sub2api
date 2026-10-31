@@ -5,6 +5,13 @@ export default {
   },
   // Home Page
   home: {
+    community: {
+      title: 'QQ 交流群',
+      copyGroup: '复制 QQ 群号 487375322',
+      showQr: '查看入群二维码',
+      scanToJoin: '扫码加入交流群',
+      qrAlt: 'QQ 交流群 {number} 入群二维码',
+    },
     viewOnGithub: '在 GitHub 上查看',
     viewDocs: '查看文档',
     docs: '文档',

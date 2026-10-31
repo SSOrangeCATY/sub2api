@@ -93,14 +93,13 @@
   <!-- Default Home Page -->
   <div
     v-else
-    class="ef ef-contours flex min-h-screen flex-col"
+    class="ef ef-default-home pt-home-refined ef-contours flex min-h-screen flex-col"
   >
     <!-- ============ 命令栏 ============ -->
     <header class="ef-cmdbar">
       <router-link to="/" class="brand">
         <span class="seal" aria-hidden="true">
-          <img v-if="siteLogo" :src="siteLogo" alt="" class="h-5 w-5 object-contain" />
-          <template v-else>▌</template>
+          <img :src="siteLogo || DEFAULT_BRAND_MARK" alt="" class="h-full w-full object-contain" />
         </span>
         <span>{{ siteName }}</span>
       </router-link>
@@ -125,7 +124,8 @@
           :aria-label="isDark ? t('home.switchToLight') : t('home.switchToDark')"
           @click="toggleTheme"
         >
-          {{ isDark ? t('home.themeLight') : t('home.themeDark') }}
+          <Icon :name="isDark ? 'sun' : 'moon'" size="sm" />
+          <span class="hidden sm:inline">{{ isDark ? t('home.themeLight') : t('home.themeDark') }}</span>
         </button>
         <router-link :to="isAuthenticated ? dashboardPath : '/login'" class="ef-btn go">
           {{ isAuthenticated ? t('home.dashboard') : t('home.login') }}
@@ -133,27 +133,30 @@
       </div>
     </header>
 
-    <div class="ef-tri ef-in-sweep" aria-hidden="true"><i></i><i></i><i></i></div>
-
     <main class="flex-1">
       <!-- ============ 首屏 ============ -->
-      <section class="mx-auto w-full max-w-6xl px-[var(--ef-pad)] pb-14 pt-10 md:pt-14">
-        <p class="ef-eyebrow slash ef-in-stroke">
-          {{ t('home.eyebrowIndex') }}<template v-if="todayLabel"> · {{ todayLabel }}</template>
-        </p>
+      <section class="pt-home-intro mx-auto w-full max-w-6xl px-[var(--ef-pad)]">
+        <div class="pt-home-overline">
+          <p>// {{ t('home.eyebrowIndex') }}</p>
+          <time v-if="todayLabel" :datetime="todayLabel.replace(/\./g, '-')">{{ todayLabel }}</time>
+        </div>
 
-        <div class="mt-7 grid gap-10 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start lg:gap-14">
+        <div class="pt-home-hero">
           <div class="min-w-0">
             <h1 class="m-0">
               <span class="ef-wordmark">
                 <span class="solid ef-in-power" style="--i: 0">{{ siteName }}</span>
-                <span class="hollow ef-in-power" style="--i: 1">{{ siteSubtitle }}</span>
+                <span v-if="wordmarkSub" class="hollow ef-in-power" style="--i: 1">{{ wordmarkSub }}</span>
               </span>
             </h1>
 
-            <p class="ef-lede ef-in-come" style="--i: 2">{{ t('home.heroDescription') }}</p>
+            <h2 class="pt-home-promise">{{ t('home.heroSubtitle') }}</h2>
+            <p class="ef-lede ef-in-come" style="--i: 2">
+              <span v-if="subtitleIsDescription" class="home-subtitle">{{ siteSubtitle }}</span>
+              {{ t('home.heroDescription') }}
+            </p>
 
-            <div class="mt-7 flex flex-wrap items-center gap-2.5">
+            <div class="pt-home-hero-actions flex flex-wrap items-center gap-2.5">
               <router-link
                 :to="isAuthenticated ? dashboardPath : '/login'"
                 class="ef-btn go"
@@ -165,96 +168,96 @@
                 {{ t('home.viewDocs') }}
               </a>
             </div>
-
-            <ul class="ef-facts mt-9 ef-in-come" style="--i: 3">
-              <li class="ef-field">{{ t('home.tags.subscriptionToApi') }}</li>
-              <li class="ef-field">{{ t('home.tags.stickySession') }}</li>
-              <li class="ef-field">{{ t('home.tags.realtimeBilling') }}</li>
-            </ul>
           </div>
-
-          <!-- 右：站点真实字段（替换原装饰性假终端） -->
-          <aside class="ef-panel cut-br ef-in-come" style="--i: 2">
-            <h2>
-              {{ t('home.eyebrowStatus') }}
-              <small v-if="appStore.cachedPublicSettings?.version">
-                v{{ appStore.cachedPublicSettings.version }}
-              </small>
-            </h2>
-            <ul class="ef-ledger">
-              <li v-for="f in facts" :key="f.label">
-                <span>{{ f.label }}</span>
-                <b>{{ f.value }}</b>
-              </li>
-            </ul>
-          </aside>
+        </div>
+        <div class="pt-home-hero-tail">
+          <ul class="pt-home-tags">
+            <li class="ef-field">{{ t('home.tags.subscriptionToApi') }}</li>
+            <li class="ef-field">{{ t('home.tags.stickySession') }}</li>
+            <li class="ef-field">{{ t('home.tags.realtimeBilling') }}</li>
+          </ul>
+          <HomeCommunityCard />
         </div>
       </section>
 
       <!-- ============ 能力 ============ -->
-      <section class="mx-auto w-full max-w-6xl px-[var(--ef-pad)] pb-14">
-        <div class="ef-group-head">
-          <span class="ef-eyebrow slash">{{ t('home.eyebrowCapabilities') }}</span>
-          <span class="ef-field">No.01</span>
+      <section class="pt-home-section mx-auto w-full max-w-6xl px-[var(--ef-pad)]">
+        <div class="pt-home-section-head">
+          <div>
+            <p>// CAPABILITIES</p>
+            <h2>{{ t('home.eyebrowCapabilities') }}</h2>
+          </div>
+          <span class="ef-field">01 / 02</span>
         </div>
-        <ul class="ef-records">
-          <li v-for="(c, i) in capabilities" :key="c.title">
-            <div class="ef-record">
-              <span class="ef-field">{{ String(i + 1).padStart(2, '0') }}</span>
-              <span class="ef-tag">{{ c.title }}</span>
-              <span class="name ef-read">{{ c.desc }}</span>
-              <span class="ef-field" aria-hidden="true">{{ c.mark }}</span>
+        <ul class="pt-capabilities">
+          <li v-for="(c, i) in capabilities" :key="c.title" class="pt-capability">
+            <div class="pt-capability-mark">
+              <Icon :name="i === 0 ? 'key' : i === 1 ? 'server' : 'dollar'" size="lg" />
+              <span>{{ String(i + 1).padStart(2, '0') }}</span>
             </div>
+            <h3>{{ c.title }}</h3>
+            <p>{{ c.desc }}</p>
           </li>
         </ul>
       </section>
 
       <!-- ============ 运行状态 ============ -->
-      <section class="mx-auto w-full max-w-6xl px-[var(--ef-pad)] pb-16">
-        <div class="ef-group-head">
-          <span class="ef-eyebrow slash">{{ t('home.eyebrowStatus') }}</span>
-          <span class="ef-field">No.02</span>
+      <section class="pt-home-section pt-home-channels mx-auto w-full max-w-6xl px-[var(--ef-pad)]">
+        <div class="pt-home-section-head">
+          <div>
+            <p>// CHANNEL STATUS</p>
+            <h2>{{ t('home.eyebrowStatus') }}</h2>
+          </div>
+          <span class="ef-field">02 / 02</span>
         </div>
 
-        <div class="mt-5 flex flex-wrap items-center gap-x-8 gap-y-3">
+        <div class="pt-home-feature-flags flex flex-wrap items-center gap-x-8 gap-y-3">
           <span class="flex items-center gap-2">
             <span class="ef-field">{{ t('home.status.monitors') }}</span>
-            <span class="ef-state" :class="monitorsOn ? '' : 'is-draft'">
+            <span class="pt-status" :class="monitorsOn ? '' : 'pt-status--muted'">
               {{ monitorsOn ? t('home.value.enabled') : t('home.value.disabled') }}
             </span>
           </span>
           <span class="flex items-center gap-2">
             <span class="ef-field">{{ t('home.status.plaza') }}</span>
-            <span class="ef-state" :class="plazaOn ? '' : 'is-draft'">
+            <span class="pt-status" :class="plazaOn ? '' : 'pt-status--muted'">
               {{ plazaOn ? t('home.value.enabled') : t('home.value.disabled') }}
             </span>
           </span>
         </div>
 
-        <ul v-if="monitorRows.length" class="ef-records mt-6">
+        <ul v-if="monitorRows.length" class="pt-home-monitor-list">
           <li v-for="m in monitorRows" :key="m.id">
-            <div class="ef-record">
-              <span class="ef-field">{{ m.provider }}</span>
-              <span class="ef-tag">{{ m.name }}</span>
-              <span class="name ef-read">{{ m.model }}</span>
-              <span class="ef-field">{{ m.availability }}</span>
+            <div class="pt-home-monitor-row">
+              <span class="pt-home-monitor-name">{{ m.name }}</span>
+              <span class="pt-home-monitor-model">
+                <small>{{ m.provider }}</small>
+                <span>{{ m.model }}</span>
+              </span>
+              <span class="pt-home-monitor-availability">
+                <strong>{{ m.availability }}</strong>
+                <small>{{ t('channelStatus.columns.availability7d') }}</small>
+              </span>
             </div>
           </li>
         </ul>
-        <p v-else class="ef-empty">
+        <p v-else class="pt-home-monitor-empty">
           {{ isAuthenticated ? t('home.status.noMonitors') : t('home.status.signedOutHint') }}
         </p>
       </section>
     </main>
 
     <!-- ============ 页脚 ============ -->
-    <footer class="border-t border-[var(--ef-rule)] px-[var(--ef-pad)] py-7">
+    <footer class="pt-home-footer border-t border-[var(--ef-rule)] px-[var(--ef-pad)] py-7">
       <div class="mx-auto flex w-full max-w-6xl flex-wrap items-start justify-between gap-5">
         <div>
-          <p class="ef-eyebrow">{{ siteName }}</p>
+          <p class="ef-eyebrow ef-site-name">{{ siteName }}</p>
           <p class="ef-field mt-1.5">{{ t('home.footerTagline') }}</p>
         </div>
         <div class="flex flex-wrap items-center gap-x-6 gap-y-1.5">
+          <router-link v-if="showModelPlazaEntry" to="/model-plaza" class="ef-field">
+            {{ t('nav.modelPlaza') }}
+          </router-link>
           <a v-if="docUrl" :href="docUrl" target="_blank" rel="noopener noreferrer" class="ef-field">
             {{ t('home.docs') }}
           </a>
@@ -262,7 +265,7 @@
             GitHub
           </a>
           <span class="ef-field">
-            © {{ currentYear }} {{ siteName }} · {{ t('home.footer.allRightsReserved') }}
+            © {{ currentYear }} <span class="ef-site-name">{{ siteName }}</span> · {{ t('home.footer.allRightsReserved') }}
           </span>
         </div>
       </div>
@@ -276,10 +279,13 @@ import { useI18n } from 'vue-i18n'
 import { useAuthStore, useAppStore } from '@/stores'
 import LocaleSwitcher from '@/components/common/LocaleSwitcher.vue'
 import Icon from '@/components/icons/Icon.vue'
+import HomeCommunityCard from '@/components/home/HomeCommunityCard.vue'
 import { sanitizeUrl } from '@/utils/url'
+import { DEFAULT_BRAND_MARK } from '@/utils/branding'
 import { FeatureFlags, isFeatureFlagEnabled } from '@/utils/featureFlags'
 import { isEfDark, setEfTheme } from '@/utils/theme'
 import { channelMonitorUserAPI, type UserMonitorView } from '@/api/channelMonitor'
+import '@/styles/endfield/home.css'
 
 const { t } = useI18n()
 
@@ -287,9 +293,17 @@ const authStore = useAuthStore()
 const appStore = useAppStore()
 
 // Site settings - directly from appStore (already initialized from injected config)
-const siteName = computed(() => appStore.cachedPublicSettings?.site_name || appStore.siteName || 'Sub2API')
+const siteName = computed(() => appStore.cachedPublicSettings?.site_name || appStore.siteName || 'ptcrys ai')
 const siteLogo = computed(() => sanitizeUrl(appStore.cachedPublicSettings?.site_logo || appStore.siteLogo || '', { allowRelative: true, allowDataUrl: true }))
-const siteSubtitle = computed(() => appStore.cachedPublicSettings?.site_subtitle || 'AI API Gateway Platform')
+const siteSubtitle = computed(() => appStore.cachedPublicSettings?.site_subtitle ?? 'gateway')
+// 字标只承载短副名；后台填写的长描述仍完整放在正文中。
+const wordmarkSub = computed(() => {
+  const raw = siteSubtitle.value.trim()
+  if (!raw) return ''
+  const head = raw.split(/[·|/—–-]/)[0].trim()
+  return Array.from(head).length <= 24 ? head : 'gateway'
+})
+const subtitleIsDescription = computed(() => siteSubtitle.value.trim() !== wordmarkSub.value)
 const docUrl = computed(() => sanitizeUrl(appStore.cachedPublicSettings?.doc_url || appStore.docUrl || ''))
 const homeContent = computed(() => appStore.cachedPublicSettings?.home_content || '')
 const hasHomeContent = computed(() => homeContent.value.trim().length > 0)
@@ -333,35 +347,11 @@ const todayLabel = computed(() => {
 const monitorsOn = computed(() => appStore.cachedPublicSettings?.channel_monitor_enabled === true)
 const plazaOn = computed(() => appStore.cachedPublicSettings?.model_plaza_enabled === true)
 
-/** 侧栏字段表：全部来自 cachedPublicSettings，缺失一律显示 "—" */
-const facts = computed(() => {
-  const s = appStore.cachedPublicSettings
-  const dash = '—'
-  const tri = (v: boolean | undefined, on: string, off: string) =>
-    v === true ? on : v === false ? off : dash
-  return [
-    { label: t('home.field.version'), value: s?.version || dash },
-    { label: t('home.field.timezone'), value: s?.server_timezone || dash },
-    {
-      label: t('home.field.registration'),
-      value: tri(s?.registration_enabled, t('home.value.open'), t('home.value.closed')),
-    },
-    {
-      label: t('home.field.invitation'),
-      value: tri(s?.invitation_code_enabled, t('home.value.required'), t('home.value.none')),
-    },
-    {
-      label: t('home.field.subscription'),
-      value: tri(s?.subscription_enabled, t('home.value.enabled'), t('home.value.disabled')),
-    },
-  ]
-})
-
-/** 三条能力：文案走 i18n，序号右侧的短码只用拉丁字母保证等宽 */
+/** 三条能力：文案走 i18n，模板按实际顺序编号。 */
 const capabilities = computed(() => [
-  { title: t('home.capability.access'), desc: t('home.capability.accessDesc'), mark: 'KEY' },
-  { title: t('home.capability.reliable'), desc: t('home.capability.reliableDesc'), mark: 'SLA' },
-  { title: t('home.capability.billing'), desc: t('home.capability.billingDesc'), mark: 'USD' },
+  { title: t('home.capability.access'), desc: t('home.capability.accessDesc') },
+  { title: t('home.capability.reliable'), desc: t('home.capability.reliableDesc') },
+  { title: t('home.capability.billing'), desc: t('home.capability.billingDesc') },
 ])
 
 /** 渠道监控行：仅登录且开关开启时才拉取，匿名请求会 401 */
@@ -416,6 +406,101 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.ef-default-home .ef-btn.go {
+  --fill: var(--ef-signal);
+  color: var(--ef-on-signal);
+}
+.ef-default-home .ef-btn.go:focus-visible {
+  outline-color: var(--ef-on-signal);
+}
+.ef-default-home a:hover {
+  text-decoration-color: var(--ef-trace);
+}
+.ef-default-home :deep(.ef-state.is-alert) {
+  border-color: var(--ef-on-signal);
+}
+.ef-default-home :deep(.ef-prose a) {
+  text-decoration-color: var(--ef-trace);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.25em;
+  text-decoration-skip-ink: auto;
+}
+
+.ef-wordmark,
+.ef-cmdbar .brand,
+.ef-site-name {
+  text-transform: none;
+}
+
+.ef-wordmark {
+  --ef-wordmark: clamp(2.75rem, 7.5vw, 6rem);
+  max-width: 100%;
+}
+.ef-wordmark .solid {
+  overflow-wrap: anywhere;
+  line-height: 0.95;
+}
+.ef-wordmark .hollow {
+  margin-top: 0.35em;
+  font-size: clamp(1.25rem, 3vw, 2rem);
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+  -webkit-text-stroke: 1px var(--ef-ink);
+}
+.home-subtitle {
+  display: block;
+  margin-bottom: 0.5rem;
+  overflow-wrap: anywhere;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+.ef-cmdbar .ef-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+@media (max-width: 719px) {
+  .ef-cmdbar {
+    height: 55px;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 0.5rem;
+    padding-inline: 1rem;
+  }
+  .ef-cmdbar .brand {
+    min-width: 0;
+    margin-right: auto;
+    gap: 0.5rem;
+    padding-block: 0;
+    font-size: 0.875rem;
+  }
+  .ef-cmdbar .brand > span:last-child {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .ef-cmdbar .seal {
+    width: 1.625rem;
+    height: 1.625rem;
+    flex-shrink: 0;
+  }
+  .ef-cmdbar nav {
+    display: none;
+  }
+  .ef-cmdbar .util {
+    flex-shrink: 0;
+    gap: 0.5rem;
+  }
+  .ef-cmdbar .ef-state {
+    min-width: 2rem;
+    min-height: 2rem;
+    justify-content: center;
+  }
+  .ef-cmdbar .ef-btn {
+    padding-inline: 0.75rem;
+  }
+}
+
 /* LocaleSwitcher 原本是浅色页头组件，放进固定深色的 .ef-cmdbar 后
    需要把它的灰字与白底下拉面板改成命令栏的配色，否则几乎不可见。
 
@@ -435,8 +520,8 @@ onMounted(() => {
   transition: color 0.15s;
 }
 .ef-cmdbar-i18n :deep(button:hover) {
-  color: var(--ef-signal);
-  background: transparent;
+  color: var(--ef-on-signal);
+  background: var(--ef-signal);
 }
 /* 下拉面板：深色底 + 浅色字，去掉圆角与投影 */
 .ef-cmdbar-i18n :deep(.absolute) {
@@ -471,7 +556,7 @@ onMounted(() => {
   text-decoration: underline;
   text-decoration-thickness: 1px;
   text-underline-offset: 0.25em;
-  text-decoration-color: var(--ef-signal);
+  text-decoration-color: var(--ef-trace);
 }
 .code-comment {
   color: var(--ef-ink-2);

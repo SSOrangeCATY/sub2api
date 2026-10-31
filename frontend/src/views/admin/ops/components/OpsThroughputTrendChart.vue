@@ -10,11 +10,10 @@ import { formatHistoryLabel, sumNumbers } from '../utils/opsFormatters'
 import HelpTooltip from '@/components/common/HelpTooltip.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import { formatNumber } from '@/utils/format'
-import { efChartPalette, efSemanticColors } from '@/utils/chartTheme'
+import { useChartPalette, efLineStyle, efLineLegendLabels } from '@/utils/chartTheme'
 
 
-const p = efChartPalette()
-const sem = efSemanticColors()
+const p = useChartPalette()
 ChartJS.register(Title, Tooltip, Legend, LineElement, LinearScale, PointElement, CategoryScale, Filler)
 
 interface Props {
@@ -50,9 +49,9 @@ watch(
 const isDarkMode = computed(() => document.documentElement.classList.contains('dark'))
 const colors = computed(() => ({
   blue: p.ink2,
-  blueAlpha: sem.infoFill,
+  blueAlpha: p.chip,
   green: p.ink,
-  greenAlpha: sem.goodFill,
+  greenAlpha: p.chip,
   grid: isDarkMode.value ? p.rule : p.rule,
   text: isDarkMode.value ? p.ink2 : p.ink2
 }))
@@ -66,23 +65,13 @@ const chartData = computed(() => {
     datasets: [
       {
         label: 'QPS',
+        ...efLineStyle(0, p),
         data: props.points.map((p) => p.qps ?? 0),
-        borderColor: colors.value.blue,
-        backgroundColor: colors.value.blueAlpha,
-        fill: true,
-        tension: 0.4,
-        pointRadius: 0,
-        pointHitRadius: 10
       },
       {
         label: t('admin.ops.tpsK'),
+        ...efLineStyle(1, p),
         data: props.points.map((p) => (p.tps ?? 0) / 1000),
-        borderColor: colors.value.green,
-        backgroundColor: colors.value.greenAlpha,
-        fill: true,
-        tension: 0.4,
-        pointRadius: 0,
-        pointHitRadius: 10,
         yAxisID: 'y1'
       }
     ]
@@ -99,18 +88,19 @@ const options = computed(() => {
   const c = colors.value
   return {
     responsive: true,
+    animation: { duration: p.motionDuration },
     maintainAspectRatio: false,
     interaction: { intersect: false, mode: 'index' as const },
     plugins: {
       legend: {
         position: 'top' as const,
         align: 'end' as const,
-        labels: { color: c.text, usePointStyle: true, boxWidth: 6, font: { size: 10 } }
+        labels: efLineLegendLabels(p)
       },
       tooltip: {
-        backgroundColor: efChartPalette().panel,
-        titleColor: efChartPalette().ink,
-        bodyColor: efChartPalette().ink2,
+        backgroundColor: p.panel,
+        titleColor: p.ink,
+        bodyColor: p.ink2,
         borderColor: c.grid,
         borderWidth: 1,
         padding: 10,

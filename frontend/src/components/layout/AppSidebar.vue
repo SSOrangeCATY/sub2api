@@ -14,7 +14,7 @@
         class="sidebar-logo flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl shadow-glow transition-opacity hover:opacity-80"
         @click="handleMenuItemClick(homePath)"
       >
-        <img v-if="settingsLoaded" :src="siteLogo || '/logo.svg'" alt="Logo" class="h-full w-full object-contain" />
+        <img v-if="settingsLoaded" :src="siteLogo || DEFAULT_BRAND_MARK" :alt="siteName" class="h-full w-full object-contain" />
       </router-link>
       <div class="sidebar-brand" :class="{ 'sidebar-brand-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">
         <router-link
@@ -196,6 +196,7 @@ import VersionBadge from '@/components/common/VersionBadge.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { sanitizeSvg } from '@/utils/sanitize'
 import { sanitizeUrl } from '@/utils/url'
+import { DEFAULT_BRAND_MARK } from '@/utils/branding'
 import { FeatureFlags, makeSidebarFlag } from '@/utils/featureFlags'
 import { resolveSiteBillingMode } from '@/utils/siteBillingMode'
 import { useBatchImageAccess } from '@/composables/useBatchImageAccess'
@@ -972,6 +973,21 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+/* @apply expands the dark and hover rules, so the current route needs an
+   explicit override. Weight and the inset outline also identify it without hue. */
+.sidebar-link-active,
+.sidebar-link-active:hover {
+  background-color: var(--ef-signal) !important;
+  color: var(--ef-on-signal) !important;
+  font-weight: 800;
+  outline: 1px solid var(--ef-on-signal);
+  outline-offset: -1px;
+}
+.sidebar-link-active:focus-visible {
+  outline: 2px dashed var(--ef-on-signal);
+  outline-offset: -4px;
+}
+
 .sidebar-logo {
   flex: 0 0 2.25rem;
   min-width: 2.25rem;

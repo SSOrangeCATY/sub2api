@@ -148,6 +148,22 @@ export function healthStateClass(state: string | undefined): string {
   return `health-${state || 'unknown'}`
 }
 
+/** Distinguish observed but unrated traffic from genuinely empty intervals.
+ * Rates and latency remain available when absolute counts are privacy-redacted.
+ * Never derive a health score or bypass the server's minimum sample policy.
+ */
+export function monitorActivityClass(
+  health: MonitorHealth,
+  mode: HealthDisplayMode,
+  metrics: { request_count: number; rpm: number; tpm: number; error_rate: number; cache_rate: number; ttft: { p50_ms: number | null } },
+): string {
+  const rated = healthScoreClass(health, mode, metrics.request_count)
+  if (rated !== 'health-unknown') return rated
+  const observed = metrics.request_count > 0 || metrics.rpm > 0 || metrics.tpm > 0
+    || metrics.error_rate > 0 || metrics.cache_rate > 0 || metrics.ttft.p50_ms != null
+  return observed ? 'health-unrated' : 'health-unknown'
+}
+
 /** Privacy-safe latency summary: avg + p50 + p90 (no absolute sample counts). */
 export function formatLatencyPrivacy(
   p50: number | null | undefined,

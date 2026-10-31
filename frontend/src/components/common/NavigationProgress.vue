@@ -4,9 +4,11 @@
  * 在页面顶部显示加载进度，提供导航反馈
  */
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useNavigationLoadingState } from '@/composables/useNavigationLoading'
 
 const { isLoading } = useNavigationLoadingState()
+const { t } = useI18n()
 
 // 进度条可见性
 const isVisible = computed(() => isLoading.value)
@@ -18,8 +20,7 @@ const isVisible = computed(() => isLoading.value)
       v-show="isVisible"
       class="navigation-progress"
       role="progressbar"
-      aria-label="Loading"
-      aria-valuenow="0"
+      :aria-label="t('common.loading')"
       aria-valuemin="0"
       aria-valuemax="100"
     >
@@ -34,25 +35,20 @@ const isVisible = computed(() => isLoading.value)
   top: 0;
   left: 0;
   right: 0;
-  height: 3px;
+  height: 4px;
   z-index: 9999;
   overflow: hidden;
-  background: transparent;
+  background: #161616;
 }
 
-/* endfield：导航反馈归信号黄，两端透明收口。深浅色同一个色——
-   信号黄在纸底与墨底上都足够醒目，无需再分主题。 */
 .navigation-progress-bar {
   height: 100%;
-  width: 100%;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    var(--ef-signal) 20%,
-    var(--ef-signal) 80%,
-    transparent 100%
-  );
-  animation: progress-slide 1.5s ease-in-out infinite;
+  width: 24%;
+  background: var(--ef-signal);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .navigation-progress-bar { animation: progress-slide 1200ms steps(8, end) infinite; }
 }
 
 /* 进度条滑动动画 */
@@ -61,7 +57,7 @@ const isVisible = computed(() => isLoading.value)
     transform: translateX(-100%);
   }
   100% {
-    transform: translateX(100%);
+    transform: translateX(420%);
   }
 }
 
@@ -81,18 +77,13 @@ const isVisible = computed(() => isLoading.value)
 
 /* 减少动画模式 */
 @media (prefers-reduced-motion: reduce) {
+  .progress-fade-enter-active,
+  .progress-fade-leave-active { transition: none; }
   .navigation-progress-bar {
-    animation: progress-pulse 2s ease-in-out infinite;
-  }
-
-  @keyframes progress-pulse {
-    0%,
-    100% {
-      opacity: 0.4;
-    }
-    50% {
-      opacity: 1;
-    }
+    animation: none;
+    transform: none;
+    width: 100%;
+    background: repeating-linear-gradient(90deg, var(--ef-signal) 0 12px, #161616 12px 16px);
   }
 }
 </style>

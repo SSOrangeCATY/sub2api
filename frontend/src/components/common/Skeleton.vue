@@ -1,11 +1,11 @@
 <template>
   <div
     :class="[
-      'animate-pulse bg-gray-200 dark:bg-dark-700',
-      variant === 'circle' ? 'rounded-full' : 'rounded-lg',
+      'pt-skeleton',
       customClass
     ]"
     :style="style"
+    aria-hidden="true"
   ></div>
 </template>
 
@@ -44,3 +44,7 @@ const style = computed(() => {
   return s
 })
 </script>
+
+<style scoped>
+.pt-skeleton { background-color: var(--ef-chip, #e4e4e0); background-image: repeating-linear-gradient(135deg, transparent 0 5px, var(--ef-rule, #d9d9d6) 5px 6px); border-radius: 0; }
+</style>

@@ -1,12 +1,13 @@
 <template>
   <AppLayout>
-    <div class="space-y-6 pb-12">
-      <!-- Ops-style elevated shell: title toolbar + filters (mirrors OpsDashboardHeader) -->
+    <div class="pt-channel-status space-y-6 pb-12">
+      <!-- Page title opens onto the contour background; controls stay on a solid surface. -->
       <section
-        class="card sticky top-0 z-20 !rounded-3xl !border-0 p-0 shadow-sm ring-1 ring-gray-900/5 backdrop-blur-sm dark:!bg-dark-800 dark:ring-dark-700 supports-[backdrop-filter]:bg-white/95 dark:supports-[backdrop-filter]:bg-dark-800/95"
+        class="card pt-monitor-command p-0"
       >
         <header class="page-header mb-0 flex flex-wrap items-start justify-between gap-4 border-b border-gray-100 px-5 py-4 dark:border-dark-700 sm:px-6">
           <div class="min-w-0">
+            <p class="pt-monitor-kicker">// CHANNEL MONITOR</p>
             <h1 class="page-title flex items-center gap-2 text-xl font-black text-gray-900 dark:text-white">
               <span class="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-blue-50 text-blue-500 dark:bg-blue-900/30 dark:text-blue-400">
                 <Icon name="chart" size="sm" />
@@ -57,7 +58,7 @@
         <!-- First-upgrade silent backfill: show until 30d product window is covered -->
         <div
           v-if="bootstrapActive"
-          class="border-b border-blue-100 bg-blue-50/90 px-5 py-3 dark:border-blue-900/40 dark:bg-blue-950/40 sm:px-6"
+          class="pt-monitor-backfill border-b border-blue-100 bg-blue-50/90 px-5 py-3 dark:border-blue-900/40 dark:bg-blue-950/40 sm:px-6"
           role="status"
           aria-live="polite"
         >
@@ -196,8 +197,7 @@
       <!-- Overview KPI: success · TTFT · tokens/s(optional) · cache · (+ RPM when throughput visible) -->
       <section
         v-if="snapshot"
-        class="grid grid-cols-2 gap-3 sm:grid-cols-3"
-        :class="showThroughput ? 'xl:grid-cols-5' : 'xl:grid-cols-4'"
+        class="pt-monitor-summary"
         :aria-label="t('channelMonitorV2.summaryAria')"
       >
         <MetricCell
@@ -458,6 +458,7 @@
 </template>
 
 <script setup lang="ts">
+import '@/styles/endfield/channel-status.css'
 import { useI18n } from 'vue-i18n'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'

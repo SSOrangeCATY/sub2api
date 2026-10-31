@@ -3,9 +3,7 @@
     <div class="custom-page-layout">
       <div class="card flex-1 min-h-0 overflow-hidden">
         <div v-if="loading" class="flex h-full items-center justify-center py-12">
-          <div
-            class="h-8 w-8 animate-spin rounded-full border-2 border-primary-500 border-t-transparent"
-          ></div>
+          <LoadingSpinner />
         </div>
 
         <div
@@ -116,6 +114,8 @@
           </a>
           <iframe
             :src="embeddedUrl"
+            :title="menuItem.label || t('customPage.title')"
+            :referrerpolicy="isRedemptionShop ? 'no-referrer' : undefined"
             class="custom-embed-frame"
             allowfullscreen
           ></iframe>
@@ -126,6 +126,7 @@
 </template>
 
 <script setup lang="ts">
+import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useResizeObserver } from '@vueuse/core'
@@ -241,9 +242,12 @@ const markdownSlug = computed(() => {
 })
 
 const isMarkdownMode = computed(() => !!markdownSlug.value)
+const isRedemptionShop = computed(() => menuItem.value?.url === 'https://catfk.com/shop/SSOrangeCATY')
 
 const embeddedUrl = computed(() => {
   if (!menuItem.value || isMarkdownMode.value) return ''
+  // The redemption shop is an external storefront and has no site SSO integration.
+  if (isRedemptionShop.value) return menuItem.value.url
   return buildEmbeddedUrl(
     menuItem.value.url,
     authStore.user?.id,

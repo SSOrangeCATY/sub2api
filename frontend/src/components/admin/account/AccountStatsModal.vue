@@ -469,11 +469,10 @@ import EndpointDistributionChart from '@/components/charts/EndpointDistributionC
 import Icon from '@/components/icons/Icon.vue'
 import { adminAPI } from '@/api/admin'
 import type { Account, AccountUsageStatsResponse } from '@/types'
-import { efChartPalette, efSemanticColors } from '@/utils/chartTheme'
+import { useChartPalette, efLineStyle, efLineLegendLabels } from '@/utils/chartTheme'
 
 
-const p = efChartPalette()
-const sem = efSemanticColors()
+const p = useChartPalette()
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -501,8 +500,8 @@ const stats = ref<AccountUsageStatsResponse | null>(null)
 
 // Chart colors
 const chartColors = computed(() => ({
-  text: efChartPalette().ink2,
-  grid: efChartPalette().rule
+  text: p.ink2,
+  grid: p.rule
 }))
 
 // Line chart data
@@ -514,30 +513,20 @@ const trendChartData = computed(() => {
     datasets: [
       {
         label: t('usage.accountBilled') + ' (USD)',
+        ...efLineStyle(0, p),
         data: stats.value.history.map((h) => h.actual_cost),
-        borderColor: p.ink2,
-        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-        fill: true,
-        tension: 0.3,
         yAxisID: 'y'
       },
       {
         label: t('usage.userBilled') + ' (USD)',
+        ...efLineStyle(1, p),
         data: stats.value.history.map((h) => h.user_cost),
-        borderColor: p.ink,
-        backgroundColor: sem.goodFill,
-        fill: false,
-        tension: 0.3,
-        borderDash: [5, 5],
         yAxisID: 'y'
       },
       {
         label: t('admin.accounts.stats.requests'),
+        ...efLineStyle(2, p),
         data: stats.value.history.map((h) => h.requests),
-        borderColor: sem.warn,
-        backgroundColor: 'rgba(249, 115, 22, 0.1)',
-        fill: false,
-        tension: 0.3,
         yAxisID: 'y1'
       }
     ]
@@ -547,6 +536,7 @@ const trendChartData = computed(() => {
 // Line chart options with dual Y-axis
 const lineChartOptions = computed(() => ({
   responsive: true,
+  animation: { duration: p.motionDuration },
   maintainAspectRatio: false,
   interaction: {
     intersect: false,
@@ -555,15 +545,7 @@ const lineChartOptions = computed(() => ({
   plugins: {
     legend: {
       position: 'top' as const,
-      labels: {
-        color: chartColors.value.text,
-        usePointStyle: true,
-        pointStyle: 'circle',
-        padding: 15,
-        font: {
-          size: 11
-        }
-      }
+      labels: efLineLegendLabels(p)
     },
     tooltip: {
       callbacks: {
@@ -623,7 +605,7 @@ const lineChartOptions = computed(() => ({
         drawOnChartArea: false
       },
       ticks: {
-        color: sem.warn,
+        color: p.ink2,
         font: {
           size: 10
         },
@@ -632,7 +614,7 @@ const lineChartOptions = computed(() => ({
       title: {
         display: true,
         text: t('admin.accounts.stats.requests'),
-        color: sem.warn,
+        color: p.ink2,
         font: {
           size: 11
         }

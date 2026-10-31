@@ -1,6 +1,11 @@
 <template>
   <AppLayout>
-    <div class="space-y-6">
+    <div class="pt-subscriptions space-y-6">
+      <div v-if="!loading && subscriptions.length" class="pt-subscription-summary">
+        <div><p class="pt-kicker">// {{ t('userSubscriptions.title') }}</p><strong>{{ subscriptions.length }}</strong></div>
+        <div><p>{{ t('userSubscriptions.status.active') }}</p><strong>{{ subscriptions.filter(s => s.status === 'active').length }}</strong></div>
+        <div><p>{{ t('userSubscriptions.status.expired') }}</p><strong>{{ subscriptions.filter(s => s.status === 'expired').length }}</strong></div>
+      </div>
       <!-- Loading State -->
       <div v-if="loading" class="flex justify-center py-12">
         <div
@@ -24,22 +29,22 @@
       </div>
 
       <!-- Subscriptions Grid -->
-      <div v-else class="grid gap-6 lg:grid-cols-2">
+      <div v-else class="pt-subscription-grid grid gap-6 lg:grid-cols-2">
         <div
           v-for="subscription in subscriptions"
           :key="subscription.id"
-          class="overflow-hidden rounded-2xl border bg-white dark:bg-dark-800"
+          class="pt-subscription-record overflow-hidden rounded-2xl border bg-white dark:bg-dark-800"
           :class="platformBorderClass(subscription.group?.platform || '')"
         >
           <!-- Header -->
           <div
-            class="flex items-center justify-between border-b border-gray-100 p-4 dark:border-dark-700"
+            class="pt-subscription-head flex items-center justify-between border-b border-gray-100 p-4 dark:border-dark-700"
           >
             <div class="flex items-center gap-3">
               <div :class="['h-1.5 w-1.5 shrink-0 rounded-full', platformAccentDotClass(subscription.group?.platform || '')]" />
               <div>
                 <div class="flex items-center gap-2">
-                  <h3 class="font-semibold text-gray-900 dark:text-white">
+                  <h3 class="pt-subscription-name font-semibold text-gray-900 dark:text-white">
                     {{ subscription.group?.name || `Group #${subscription.group_id}` }}
                   </h3>
                   <span :class="['rounded-md border px-2 py-0.5 text-[11px] font-medium', platformBadgeClass(subscription.group?.platform || '')]">
@@ -59,6 +64,8 @@
             </div>
             <div class="flex items-center gap-2">
               <span
+                class="pt-subscription-status"
+                :data-status="subscription.status"
                 :class="[
                   'rounded-full px-2 py-0.5 text-xs font-medium',
                   subscription.status === 'active'
@@ -81,7 +88,7 @@
           </div>
 
           <!-- Usage Progress -->
-          <div class="space-y-4 p-4">
+            <div class="pt-subscription-usage space-y-4 p-4">
             <!-- Expiration Info -->
             <div v-if="subscription.expires_at" class="flex items-center justify-between text-sm">
               <span class="text-gray-500 dark:text-dark-400">{{

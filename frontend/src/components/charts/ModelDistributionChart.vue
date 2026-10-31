@@ -1,7 +1,8 @@
 <template>
-  <div class="card p-4">
+  <div class="card pt-chart-panel pt-chart-panel--distribution">
     <div class="mb-4 flex items-center justify-between gap-3">
       <h3 class="text-sm font-semibold text-gray-900 dark:text-white">
+        <span class="pt-kicker mb-1 block">{{ !enableRankingView || activeView === 'model_distribution' ? '// MODEL MIX' : '// USER SPENDING' }}</span>
         {{ !enableRankingView || activeView === 'model_distribution'
           ? t('admin.dashboard.modelDistribution')
           : t('admin.dashboard.spendingRankingTitle') }}
@@ -102,7 +103,7 @@
     <div v-else-if="activeView === 'model_distribution' && displayModelStats.length > 0" class="flex flex-col gap-4">
       <!-- 横向占比条（.ef-progress 契约）。长度编码取代颜色编码。 -->
       <ol class="ef-dist">
-        <li v-for="m in displayModelStats" :key="'bar-' + m.model">
+        <li v-for="(m, index) in displayModelStats" :key="'bar-' + m.model" :style="{ '--series-color': p.steps[index % p.steps.length] }">
           <span class="ef-dist-name" :title="m.model">{{ m.model }}</span>
           <span class="ef-dist-pct">{{ percentOfModel(m) }}</span>
           <span class="ef-dist-track" :style="{ '--p': shareOfModel(m) }"></span>
@@ -187,7 +188,7 @@
     </div>
     <div v-else-if="rankingDisplayItems.length > 0" class="flex flex-col gap-4">
       <ol class="ef-dist">
-        <li v-for="(item, idx) in rankingDisplayItems" :key="'rbar-' + idx">
+        <li v-for="(item, idx) in rankingDisplayItems" :key="'rbar-' + idx" :style="{ '--series-color': p.steps[idx % p.steps.length] }">
           <span class="ef-dist-name" :title="getRankingUserLabel(item)">
             {{ item.isOther ? t('admin.dashboard.spendingRankingOther') : getRankingUserLabel(item) }}
           </span>
@@ -260,6 +261,8 @@ import UserBreakdownSubTable from './UserBreakdownSubTable.vue'
 import type { ModelStat, UserSpendingRankingItem, UserBreakdownItem } from '@/types'
 import { getUserBreakdown } from '@/api/admin/dashboard'
 
+import { useChartPalette } from '@/utils/chartTheme'
+const p = useChartPalette()
 const { t } = useI18n()
 
 type DistributionMetric = 'tokens' | 'actual_cost'

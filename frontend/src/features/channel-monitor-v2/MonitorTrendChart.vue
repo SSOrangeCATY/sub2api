@@ -15,15 +15,6 @@
         </p>
       </div>
       <div class="flex w-full min-w-0 flex-wrap items-center justify-end gap-2 text-xs text-gray-500 dark:text-gray-400 sm:w-auto">
-        <span class="flex shrink-0 items-center gap-1">
-          <span class="h-2 w-2 rounded-full bg-red-500"></span>{{ t('channelMonitorV2.chart.errorLegend') }}
-        </span>
-        <span class="flex shrink-0 items-center gap-1">
-          <span class="h-2 w-2 rounded-full bg-emerald-500"></span>{{ t('channelMonitorV2.chart.cacheLegend') }}
-        </span>
-        <span class="flex shrink-0 items-center gap-1">
-          <span class="h-2 w-2 rounded-full bg-sky-500"></span>{{ t('channelMonitorV2.chart.ttftLegend') }}
-        </span>
         <span class="badge badge-gray shrink-0">{{ bucketLabel }}</span>
         <button
           type="button"
@@ -76,7 +67,7 @@ import EmptyState from '@/components/common/EmptyState.vue'
 import Icon from '@/components/icons/Icon.vue'
 import type { MonitorCoverage, MonitorMetric, MonitorHealth } from '@/api/channelMonitorV2'
 import { formatMonitorMs, formatMonitorPercent } from '@/features/channel-monitor-v2/monitorFormat'
-import { efChartPalette, efSemanticColors } from '@/utils/chartTheme'
+import { useChartPalette, efLineStyle, efLineLegendLabels } from '@/utils/chartTheme'
 import {
   applyWheelZoom,
   clientXRatio,
@@ -86,8 +77,7 @@ import {
   type ZoomState,
 } from '@/features/channel-monitor-v2/monitorZoom'
 
-const p = efChartPalette()
-const sem = efSemanticColors()
+const p = useChartPalette()
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler)
 const { t, locale } = useI18n()
@@ -130,45 +120,24 @@ const chartData = computed(() => {
     datasets: [
       {
         label: t('channelMonitorV2.chart.errorDataset'),
+        ...efLineStyle(0, p),
         data: errorRates,
-        borderColor: sem.danger,
-        backgroundColor: sem.dangerFill,
         yAxisID: 'yPct',
-        tension: 0.4,
         cubicInterpolationMode: 'monotone' as const,
-        fill: 'origin' as const,
-        pointRadius: 0,
-        pointHoverRadius: 4,
-        pointHitRadius: 10,
-        borderWidth: 2,
       },
       {
         label: t('channelMonitorV2.chart.cacheDataset'),
+        ...efLineStyle(1, p),
         data: cacheRates,
-        borderColor: p.ink,
-        backgroundColor: sem.goodFill,
         yAxisID: 'yPct',
-        tension: 0.4,
         cubicInterpolationMode: 'monotone' as const,
-        fill: false,
-        pointRadius: 0,
-        pointHoverRadius: 4,
-        pointHitRadius: 10,
-        borderWidth: 2,
       },
       {
         label: t('channelMonitorV2.chart.ttftDataset'),
+        ...efLineStyle(2, p),
         data: ttftP50,
-        borderColor: sem.info,
-        backgroundColor: sem.infoFill,
         yAxisID: 'yTtft',
-        tension: 0.4,
         cubicInterpolationMode: 'monotone' as const,
-        fill: false,
-        pointRadius: 0,
-        pointHoverRadius: 4,
-        pointHitRadius: 10,
-        borderWidth: 2,
         spanGaps: true,
       },
     ],
@@ -205,7 +174,7 @@ function smoothTrend(values: Array<number | null>): Array<number | null> {
 }
 
 const chartOptions = computed(() => {
-  const pal = efChartPalette()
+  const pal = p
   const text = pal.ink2
   const grid = pal.rule
   const tooltipBg = pal.panel
@@ -213,10 +182,11 @@ const chartOptions = computed(() => {
   const tooltipBody = pal.ink2
   return {
     responsive: true,
+    animation: { duration: p.motionDuration },
     maintainAspectRatio: false,
     interaction: { mode: 'index' as const, intersect: false },
     plugins: {
-      legend: { display: false },
+      legend: { position: 'top' as const, labels: efLineLegendLabels(p) },
       tooltip: {
         backgroundColor: tooltipBg,
         titleColor: tooltipTitle,
@@ -261,12 +231,12 @@ const chartOptions = computed(() => {
         position: 'right' as const,
         min: 0,
         ticks: {
-          color: sem.info,
+          color: p.ink2,
           font: { size: 10 },
           callback: (v: string | number) => formatMonitorMs(Number(v)),
         },
         grid: { display: false },
-        title: { display: true, text: t('channelMonitorV2.metrics.ttftP50'), color: sem.info, font: { size: 11 } },
+        title: { display: true, text: t('channelMonitorV2.metrics.ttftP50'), color: p.ink2, font: { size: 11 } },
       },
     },
   }

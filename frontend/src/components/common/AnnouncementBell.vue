@@ -73,10 +73,7 @@
             <div class="max-h-[65vh] overflow-y-auto">
               <!-- Loading -->
               <div v-if="loading" class="flex items-center justify-center py-16">
-                <div class="relative">
-                  <div class="h-12 w-12 animate-spin rounded-full border-4 border-gray-200 border-t-blue-600 dark:border-dark-600 dark:border-t-blue-400"></div>
-                  <div class="absolute inset-0 h-12 w-12 animate-pulse rounded-full border-4 border-blue-400/30"></div>
-                </div>
+                <LoadingSpinner size="lg" />
               </div>
 
               <!-- Announcements List -->
@@ -322,6 +319,7 @@ import { useAnnouncementStore } from '@/stores/announcements'
 import { formatRelativeTime, formatRelativeWithDateTime } from '@/utils/format'
 import type { UserAnnouncement } from '@/types'
 import Icon from '@/components/icons/Icon.vue'
+import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import '@/styles/announcement-markdown.css'
 
 const { t } = useI18n()

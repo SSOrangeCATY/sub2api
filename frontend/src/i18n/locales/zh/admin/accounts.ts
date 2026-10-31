@@ -964,6 +964,9 @@ export default {
       poolModeHint: '上游为账号池时启用，错误不标记本地账号状态',
       poolModeInfo:
         '启用后，上游 429/403/401 错误将自动重试而不标记账号限流或错误，适用于上游指向另一个 sub2api 实例的场景。',
+      firstOutputTimeout: '首输出超时（秒）',
+      firstOutputTimeoutHint: '0 表示关闭；启用范围为 1–300 秒。OpenAI API Key 的 Chat Completions / Responses 请求在该时间内没有有效输出时，按现有调度规则尝试其他可用账号。开始输出后不再受此时限限制。此为账号级设置，对该账号所在的所有分组生效。',
+      firstOutputTimeoutInvalid: '首输出超时须为 0（关闭）或 1–300 秒。',
       poolModeRetryCount: '同账号重试次数',
       poolModeRetryCountHint: '仅在池模式下生效。0 表示不原地重试；默认 {default}，最大 {max}。',
       poolModeRetryStatusCodes: '同账号重试状态码',

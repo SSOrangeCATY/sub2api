@@ -11,6 +11,7 @@ import './style.css'
 import './styles/endfield/fonts.css'
 import './styles/endfield/endfield.css'
 import './styles/endfield/bridge.css'
+import './styles/endfield/product.css'
 
 function initIOSViewportZoomFix() {
   // iOS Safari 在输入框字号小于 16px 时聚焦会自动放大页面，且失焦后不会恢复。
@@ -46,7 +47,7 @@ async function bootstrap() {
   appStore.initFromInjectedConfig()
 
   // Set document title immediately after config is loaded
-  if (appStore.siteName && appStore.siteName !== 'Sub2API') {
+  if (appStore.siteName) {
     document.title = `${appStore.siteName} - AI API Gateway`
   }
   updateFavicon(appStore.siteLogo)

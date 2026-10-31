@@ -9,6 +9,9 @@
  * 不要在图表里写死 #RRGGBB。
  */
 
+import { onMounted, onUnmounted, reactive } from 'vue'
+import type { Chart as ChartJS } from 'chart.js'
+
 const readVar = (name: string, fallback: string): string => {
   if (typeof window === 'undefined') return fallback
   const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
@@ -26,35 +29,126 @@ export interface EfChartPalette {
   onSignal: string
   trace: string
   danger: string
-  /** 墨色四阶，用于分类项（饼图改横向条后的替代） */
-  steps: [string, string, string, string]
+  motionDuration: number
+  /** Business categories, paired with line/point encoding for accessibility. */
+  steps: string[]
 }
 
 /** 读取当前主题下的完整图表调色板 */
 export function efChartPalette(): EfChartPalette {
-  const ink = readVar('--ef-ink', '#161616')
+  const ink = readVar('--pt-ink', '#161616')
   const trace = readVar('--ef-trace', ink)
   return {
-    paper: readVar('--ef-paper', '#f4f4f2'),
-    panel: readVar('--ef-panel', '#ffffff'),
+    paper: readVar('--pt-paper', '#f4f4f2'),
+    panel: readVar('--pt-panel', '#ffffff'),
     ink,
-    ink2: readVar('--ef-ink-2', '#5c5c5c'),
-    rule: readVar('--ef-rule', '#d9d9d6'),
-    chip: readVar('--ef-chip', '#e4e4e0'),
+    ink2: readVar('--pt-muted', '#5c5c5c'),
+    rule: readVar('--pt-rule', '#d9d9d6'),
+    chip: readVar('--pt-chip', '#e4e4e0'),
     signal: readVar('--ef-signal', '#fffa00'),
     onSignal: readVar('--ef-on-signal', '#161616'),
     trace,
     danger: readVar('--ef-danger', '#b3261e'),
+    motionDuration: typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 0 : 280,
     steps: [
-      `color-mix(in srgb, ${ink} 45%, transparent)`,
-      `color-mix(in srgb, ${ink} 65%, transparent)`,
-      `color-mix(in srgb, ${ink} 85%, transparent)`,
-      ink
+      readVar('--pt-blue', '#2554ff'),
+      readVar('--pt-teal', '#009d72'),
+      readVar('--pt-purple', '#8235ff'),
+      readVar('--pt-amber', '#e85d00'),
+      readVar('--pt-cyan', '#008bcc'),
+      readVar('--pt-orchid', '#d400e4')
     ]
   }
 }
 
-/** 分类色：按索引取墨色四阶，超出后循环 */
+/** 安全设置透明度；不能在 rgb()/color-mix() 后面拼接十六进制后缀。 */
+export function withAlpha(color: string, alpha: number): string {
+  const a = Number.isFinite(alpha) ? Math.max(0, Math.min(1, alpha)) : 0
+  const c = color.trim()
+  const hex = /^#([\da-f]{3}|[\da-f]{6})$/i.exec(c)
+  if (hex) {
+    const digits = hex[1].length === 3 ? [...hex[1]].map(v => v + v).join('') : hex[1]
+    const value = Number.parseInt(digits, 16)
+    return `rgba(${(value >> 16) & 255}, ${(value >> 8) & 255}, ${value & 255}, ${a})`
+  }
+  return `color-mix(in srgb, ${c} ${a * 100}%, transparent)`
+}
+
+/** 已挂载的图表也随主题切换，避免 setup 时的快照留在旧主题。 */
+export function useChartPalette(): EfChartPalette {
+  const palette = reactive(efChartPalette())
+  let observer: MutationObserver | undefined
+  let motion: MediaQueryList | undefined
+  const refresh = () => Object.assign(palette, efChartPalette())
+  onMounted(() => {
+    refresh()
+    observer = new MutationObserver(refresh)
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'class'] })
+    motion = window.matchMedia?.('(prefers-reduced-motion: reduce)')
+    motion?.addEventListener('change', refresh)
+  })
+  onUnmounted(() => { observer?.disconnect(); motion?.removeEventListener('change', refresh) })
+  return palette
+}
+
+/** 12 种线型配合 3 种点形，图例和曲线都能独立辨认。 */
+export function efLineStyle(index = 0, palette = efChartPalette()) {
+  const dashes = [[], [6, 3], [2, 3], [8, 3, 2, 3], [10, 4], [2, 2, 2, 6],
+    [12, 3, 2, 3], [4, 2, 4, 6], [1, 3], [8, 2, 1, 2, 1, 2], [14, 4, 4, 4], [4, 3, 1, 3]]
+  const points = ['circle', 'rectRot', 'triangle'] as const
+  const color = palette.steps[index % palette.steps.length]
+  return {
+    borderColor: color,
+    backgroundColor: withAlpha(color, 0.13),
+    borderWidth: index === 0 ? 2.5 : 2,
+    borderDash: dashes[index % dashes.length],
+    pointStyle: points[index % points.length],
+    pointRadius: 2,
+    pointHoverRadius: 5,
+    pointHitRadius: 10,
+    pointBackgroundColor: palette.panel,
+    pointBorderColor: color,
+    pointBorderWidth: 1.5,
+    fill: false,
+    tension: 0.3
+  }
+}
+
+/** 图例保留实际虚线；窄屏缩写姓名，完整名称仍在 tooltip 中。 */
+export function efLineLegendLabels(palette = efChartPalette()) {
+  return {
+    color: palette.ink2,
+    usePointStyle: true,
+    pointStyle: 'line' as const,
+    pointStyleWidth: 32,
+    boxWidth: 32,
+    boxHeight: 11,
+    padding: 10,
+    font: { size: 11, family: 'Saira Variable, Noto Sans SC, sans-serif' },
+    generateLabels(chart: ChartJS) {
+      const columns = chart.width < 480 ? 2 : chart.width < 800 ? 3 : 4
+      const budget = Math.max(12, chart.width / columns - 60)
+      const ctx = chart.ctx
+      ctx.save()
+      ctx.font = '11px "Saira Variable", "Noto Sans SC", sans-serif'
+      const ChartClass = chart.constructor as typeof ChartJS
+      const labels = ChartClass.defaults.plugins.legend.labels.generateLabels(chart).map(item => {
+        const chars = Array.from(item.text)
+        while (chars.length > 1 && ctx.measureText(chars.join('') + '…').width > budget) chars.pop()
+        // 读取整条线的样式；Chart.js 的 point 默认样式不含 borderDash。
+        const style = chart.data.datasets[item.datasetIndex ?? 0] as {
+          borderDash?: number[]; borderWidth?: number; borderColor?: string
+        }
+        return { ...item, text: chars.length < Array.from(item.text).length ? chars.join('') + '…' : item.text,
+          pointStyle: 'line' as const, lineDash: style.borderDash, lineWidth: style.borderWidth, strokeStyle: style.borderColor }
+      })
+      ctx.restore()
+      return labels
+    }
+  }
+}
+
+/** 分类色：按索引取业务分类色，超出后循环 */
 export function efSeriesColor(index: number): string {
   const { steps } = efChartPalette()
   return steps[index % steps.length]
@@ -95,11 +189,7 @@ export function efTooltipOptions() {
   }
 }
 
-/**
- * 语义色：数据本身带正负含义时（错误率、缓存命中、延迟）用这里，
- * 而不是随意取墨阶 —— 红必须还是红，只是换成主题声明的红。
- * 这些值本身是数据编码，不属于装饰，因此保留色相、统一由 token 提供。
- */
+/** Semantic data colors; red remains reserved for destructive actions. */
 export interface EfSemanticColors {
   danger: string;
   dangerFill: string;
@@ -115,14 +205,14 @@ export interface EfSemanticColors {
 export function efSemanticColors(): EfSemanticColors {
   const p = efChartPalette();
   return {
-    danger: p.danger,
-    dangerFill: `color-mix(in srgb, ${p.danger} 14%, transparent)`,
-    good: p.ink,
-    goodFill: `color-mix(in srgb, ${p.ink} 10%, transparent)`,
-    info: p.ink2,
-    infoFill: `color-mix(in srgb, ${p.ink2} 10%, transparent)`,
-    warn: p.signal,
-    warnFill: `color-mix(in srgb, ${p.signal} 18%, transparent)`,
+    danger: p.steps[3],
+    dangerFill: withAlpha(p.steps[3], 0.13),
+    good: p.steps[1],
+    goodFill: withAlpha(p.steps[1], 0.1),
+    info: p.steps[0],
+    infoFill: withAlpha(p.steps[0], 0.1),
+    warn: p.steps[3],
+    warnFill: withAlpha(p.steps[3], 0.13),
     muted: p.ink2,
   };
 }

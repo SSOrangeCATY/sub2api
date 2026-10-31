@@ -1,20 +1,22 @@
 <template>
-  <div class="card p-4">
+  <div class="card pt-chart-panel" :aria-busy="loading">
     <h3 class="mb-4 text-sm font-semibold text-gray-900 dark:text-white">
+      <span class="pt-kicker mb-1 block">// TOKEN ACTIVITY</span>
       {{ t('admin.dashboard.tokenUsageTrend') }}
     </h3>
-    <div v-if="loading" class="flex h-48 items-center justify-center">
+    <div v-if="loading && !trendData.length" class="flex h-64 items-center justify-center">
       <LoadingSpinner />
     </div>
-    <div v-else-if="trendData.length > 0 && chartData" class="h-48">
+    <div v-else-if="trendData.length > 0 && chartData" class="h-64">
       <Line :data="chartData" :options="lineOptions" />
     </div>
     <div
       v-else
-      class="flex h-48 items-center justify-center text-sm text-gray-500 dark:text-gray-400"
+      class="flex h-64 items-center justify-center text-sm text-gray-500 dark:text-gray-400"
     >
       {{ t('admin.dashboard.noDataAvailable') }}
     </div>
+    <div v-if="loading && trendData.length" class="pt-chart-loading"><LoadingSpinner size="sm" /><span>{{ t('common.loading') }}</span></div>
   </div>
 </template>
 
@@ -35,11 +37,10 @@ import {
 import { Line } from 'vue-chartjs'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import type { TrendDataPoint } from '@/types'
-import { efChartPalette, efSemanticColors } from '@/utils/chartTheme'
+import { useChartPalette, efLineStyle, efLineLegendLabels } from '@/utils/chartTheme'
 
 
-const p = efChartPalette()
-const sem = efSemanticColors()
+const p = useChartPalette()
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -58,15 +59,7 @@ const props = defineProps<{
   loading?: boolean
 }>()
 
-const chartColors = computed(() => ({
-  text: efChartPalette().ink2,
-  grid: efChartPalette().rule,
-  input: p.ink2,
-  output: p.ink,
-  cacheCreation: sem.warn,
-  cacheRead: p.ink2,
-  cacheHitRate: p.ink2
-}))
+const chartColors = computed(() => ({ text: p.ink2, grid: p.rule }))
 
 const chartData = computed(() => {
   if (!props.trendData?.length) return null
@@ -76,47 +69,31 @@ const chartData = computed(() => {
     datasets: [
       {
         label: 'Input',
+        ...efLineStyle(0, p),
         data: props.trendData.map((d) => d.input_tokens),
-        borderColor: chartColors.value.input,
-        backgroundColor: `${chartColors.value.input}20`,
-        fill: true,
-        tension: 0.3
       },
       {
         label: 'Output',
+        ...efLineStyle(1, p),
         data: props.trendData.map((d) => d.output_tokens),
-        borderColor: chartColors.value.output,
-        backgroundColor: `${chartColors.value.output}20`,
-        fill: true,
-        tension: 0.3
       },
       {
         label: 'Cache Creation',
+        ...efLineStyle(2, p),
         data: props.trendData.map((d) => d.cache_creation_tokens),
-        borderColor: chartColors.value.cacheCreation,
-        backgroundColor: `${chartColors.value.cacheCreation}20`,
-        fill: true,
-        tension: 0.3
       },
       {
         label: 'Cache Read',
+        ...efLineStyle(3, p),
         data: props.trendData.map((d) => d.cache_read_tokens),
-        borderColor: chartColors.value.cacheRead,
-        backgroundColor: `${chartColors.value.cacheRead}20`,
-        fill: true,
-        tension: 0.3
       },
       {
         label: 'Cache Hit Rate',
+        ...efLineStyle(4, p),
         data: props.trendData.map((d) => {
           const totalPromptTokens = d.input_tokens + d.cache_read_tokens + d.cache_creation_tokens
           return totalPromptTokens > 0 ? (d.cache_read_tokens / totalPromptTokens) * 100 : 0
         }),
-        borderColor: chartColors.value.cacheHitRate,
-        backgroundColor: `${chartColors.value.cacheHitRate}20`,
-        borderDash: [5, 5],
-        fill: false,
-        tension: 0.3,
         yAxisID: 'yPercent'
       }
     ]
@@ -125,6 +102,7 @@ const chartData = computed(() => {
 
 const lineOptions = computed(() => ({
   responsive: true,
+  animation: { duration: p.motionDuration },
   maintainAspectRatio: false,
   interaction: {
     intersect: false,
@@ -133,15 +111,7 @@ const lineOptions = computed(() => ({
   plugins: {
     legend: {
       position: 'top' as const,
-      labels: {
-        color: chartColors.value.text,
-        usePointStyle: true,
-        pointStyle: 'circle',
-        padding: 15,
-        font: {
-          size: 11
-        }
-      }
+      labels: efLineLegendLabels(p)
     },
     tooltip: {
       callbacks: {
@@ -194,7 +164,7 @@ const lineOptions = computed(() => ({
         drawOnChartArea: false
       },
       ticks: {
-        color: chartColors.value.cacheHitRate,
+        color: p.ink2,
         font: {
           size: 10
         },

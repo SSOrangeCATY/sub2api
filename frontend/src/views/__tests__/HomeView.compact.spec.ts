@@ -85,6 +85,7 @@ describe('HomeView compact mode', () => {
 
     expect(wrapper.get('#custom-home').text()).toBe('Custom home')
     expect(wrapper.find('[data-testid="compact-home"]').exists()).toBe(false)
+    expect(wrapper.find('.pt-community').exists()).toBe(false)
   })
 
   it('renders custom URL content ahead of compact mode', () => {
@@ -95,12 +96,14 @@ describe('HomeView compact mode', () => {
 
     expect(wrapper.get('iframe').attributes('src')).toBe('https://example.com/home')
     expect(wrapper.find('[data-testid="compact-home"]').exists()).toBe(false)
+    expect(wrapper.find('.pt-community').exists()).toBe(false)
   })
 
   it('treats whitespace-only custom content as empty and selects compact mode', () => {
     const wrapper = mountHome({ compact_home_enabled: true, home_content: ' \n\t ' })
 
     expect(wrapper.get('[data-testid="compact-home"]').text()).toContain('Test site')
+    expect(wrapper.find('.pt-community').exists()).toBe(false)
   })
 
   it.each([undefined, false])('selects the default home when compact mode is %s', (enabled) => {
@@ -108,7 +111,8 @@ describe('HomeView compact mode', () => {
     const wrapper = mountHome(settings)
 
     expect(wrapper.find('[data-testid="compact-home"]').exists()).toBe(false)
-    expect(wrapper.find('.terminal-container').exists()).toBe(true)
+    expect(wrapper.find('.ef-default-home').exists()).toBe(true)
+    expect(wrapper.get('.pt-community').text()).toContain('487375322')
   })
 
   it('links unauthenticated visitors to login', () => {

@@ -5,6 +5,13 @@ export default {
   },
   // Home Page
   home: {
+    community: {
+      title: 'QQ Community',
+      copyGroup: 'Copy QQ group number 487375322',
+      showQr: 'Show group QR code',
+      scanToJoin: 'Scan to join the group',
+      qrAlt: 'QR code for QQ community {number}',
+    },
     viewOnGithub: 'View on GitHub',
     viewDocs: 'View Documentation',
     docs: 'Docs',

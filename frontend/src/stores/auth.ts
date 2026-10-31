@@ -212,8 +212,15 @@ export const useAuthStore = defineStore('auth', () => {
       return
     }
 
+    const previousAccessToken = token.value
+    const previousRefreshToken = refreshTokenValue.value
     try {
       const response = await authAPI.refreshToken()
+
+      // A pending refresh must not restore a session after logout or replace a new login.
+      if (token.value !== previousAccessToken || refreshTokenValue.value !== previousRefreshToken) {
+        return
+      }
 
       // Update state
       token.value = response.access_token
@@ -438,6 +445,17 @@ export const useAuthStore = defineStore('auth', () => {
     }
 
     try {
+      // A restored or backgrounded page can resume after its access token expires.
+      // Wait for the shared token refresh before asking for the profile, rather than
+      // sending an expired token and relying on a 401 to start recovery.
+      const savedExpiresAt = localStorage.getItem(TOKEN_EXPIRES_AT_KEY)
+      const expiresAt = savedExpiresAt === null ? NaN : Number(savedExpiresAt)
+      if (Number.isFinite(expiresAt) && expiresAt <= Date.now() + TOKEN_REFRESH_BUFFER) {
+        await performTokenRefresh()
+        if (!token.value) {
+          throw new Error('Not authenticated')
+        }
+      }
       const response = await authAPI.getCurrentUser()
       if (response.data.run_mode) {
         runMode.value = response.data.run_mode
