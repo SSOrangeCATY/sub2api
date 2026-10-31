@@ -56,6 +56,11 @@ jobs:
         with:
           ref: ${{ inputs.tag || github.ref }}
           fetch-depth: 0
+      - name: Only publish an approved production commit
+        if: ${{ env.DRY_RUN != 'true' }}
+        run: |
+          git fetch origin production
+          git merge-base --is-ancestor HEAD origin/production
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
@@ -193,6 +198,7 @@ jobs:
   release:
     needs: [prepare, build-binaries]
     runs-on: ubuntu-latest
+    environment: production
     permissions:
       contents: write
       packages: write
