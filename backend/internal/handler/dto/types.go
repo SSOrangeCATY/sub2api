@@ -95,6 +95,7 @@ type Group struct {
 	Name           string  `json:"name"`
 	Description    string  `json:"description"`
 	Platform       string  `json:"platform"`
+	GroupType      string  `json:"group_type"`
 	RateMultiplier float64 `json:"rate_multiplier"`
 	IsExclusive    bool    `json:"is_exclusive"`
 	Status         string  `json:"status"`
@@ -171,6 +172,8 @@ type Group struct {
 // 注意：普通用户接口不得返回 model_routing/account_count/account_groups 等内部信息。
 type AdminGroup struct {
 	Group
+	// Ordered fallback candidates are internal routing configuration.
+	FallbackGroupIDs []int64 `json:"fallback_group_ids"`
 	// ForceOpenAIFast 是管理端请求策略，用户侧分组 DTO 无需暴露。
 	ForceOpenAIFast bool `json:"force_openai_fast"`
 	// FreeOpenAIFast 是管理端计费策略，用户侧分组 DTO 无需暴露。

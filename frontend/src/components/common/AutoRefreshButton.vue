@@ -1,8 +1,10 @@
 <template>
-  <div class="relative" ref="dropdownRef">
+  <div class="auto-refresh relative" ref="dropdownRef" @keydown.esc="showDropdown = false">
     <button
       @click="showDropdown = !showDropdown"
-      class="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-dark-600 dark:bg-dark-800 dark:text-gray-300 dark:hover:bg-dark-700"
+      type="button"
+      class="btn btn-secondary btn-sm auto-refresh__trigger"
+      :aria-expanded="showDropdown"
       :title="t('common.autoRefresh.title')"
     >
       <svg
@@ -22,10 +24,12 @@
 
     <div
       v-if="showDropdown"
-      class="absolute right-0 z-20 mt-1 w-44 rounded-lg border border-gray-200 bg-white shadow-lg dark:border-dark-600 dark:bg-dark-800"
+      class="auto-refresh__menu absolute right-0 z-20 mt-1 w-44"
     >
       <div class="p-1.5">
         <button
+          type="button"
+          :aria-pressed="enabled"
           @click="$emit('update:enabled', !enabled)"
           class="flex w-full items-center justify-between rounded-md px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-dark-700"
         >
@@ -38,6 +42,8 @@
         <button
           v-for="sec in intervals"
           :key="sec"
+          type="button"
+          :aria-pressed="intervalSeconds === sec"
           @click="$emit('update:interval', sec)"
           class="flex w-full items-center justify-between rounded-md px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-dark-700"
         >

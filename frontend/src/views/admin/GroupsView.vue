@@ -115,6 +115,7 @@
       </template>
 
       <template #table>
+        <MonitorFallbackRoutes v-if="!authStore.isSimpleMode" />
         <DataTable
           :columns="columns"
           :data="groups"
@@ -521,8 +522,15 @@
           />
           <p class="input-hint">{{ t("admin.groups.platformHint") }}</p>
         </div>
+        <MonitorFallbackFields
+          v-if="!authStore.isSimpleMode"
+          v-model:group-type="createForm.group_type"
+          v-model:group-ids="createForm.fallback_group_ids"
+          :platform="createForm.platform"
+          @update:group-type="resetFallbackEntryOptions(createForm, $event)"
+        />
         <!-- 从分组复制账号 -->
-        <div v-if="!authStore.isSimpleMode && copyAccountsGroupOptions.length > 0">
+        <div v-if="!authStore.isSimpleMode && createForm.group_type !== 'fallback' && copyAccountsGroupOptions.length > 0">
           <div class="mb-1.5 flex items-center gap-1">
             <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
               {{ t("admin.groups.copyAccounts.title") }}
@@ -707,7 +715,7 @@
         </div>
 
         <!-- Subscription Configuration -->
-        <div class="mt-4 border-t pt-4">
+        <div v-if="createForm.group_type !== 'fallback'" class="mt-4 border-t pt-4">
           <div>
             <label class="input-label">{{
               t("admin.groups.subscription.type")
@@ -1399,7 +1407,7 @@
         </div>
 
         <!-- Claude Code 客户端限制（仅 anthropic 平台） -->
-        <div v-if="createForm.platform === 'anthropic'" class="border-t pt-4">
+        <div v-if="createForm.platform === 'anthropic' && createForm.group_type !== 'fallback'" class="border-t pt-4">
           <div class="mb-1.5 flex items-center gap-1">
             <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
               {{ t("admin.groups.claudeCode.title") }}
@@ -1893,6 +1901,7 @@
         <div
           v-if="
             ['anthropic', 'antigravity'].includes(createForm.platform) &&
+            createForm.group_type !== 'fallback' &&
             createForm.subscription_type !== 'subscription'
           "
           class="border-t pt-4"
@@ -2173,8 +2182,16 @@
           <p class="input-hint">{{ t("admin.groups.platformNotEditable") }}</p>
         </div>
         <template v-if="!authStore.isSimpleMode">
+        <MonitorFallbackFields
+          v-model:group-type="editForm.group_type"
+          v-model:group-ids="editForm.fallback_group_ids"
+          :platform="editForm.platform"
+          :current-id="editingGroup?.id"
+          :subscription-type="editingGroup?.subscription_type"
+          @update:group-type="resetFallbackEntryOptions(editForm, $event)"
+        />
         <!-- 从分组复制账号（编辑时） -->
-        <div v-if="copyAccountsGroupOptionsForEdit.length > 0">
+        <div v-if="editForm.group_type !== 'fallback' && copyAccountsGroupOptionsForEdit.length > 0">
           <div class="mb-1.5 flex items-center gap-1">
             <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
               {{ t("admin.groups.copyAccounts.title") }}
@@ -3053,7 +3070,7 @@
         </div>
 
         <!-- Claude Code 客户端限制（仅 anthropic 平台） -->
-        <div v-if="editForm.platform === 'anthropic'" class="border-t pt-4">
+        <div v-if="editForm.platform === 'anthropic' && editForm.group_type !== 'fallback'" class="border-t pt-4">
           <div class="mb-1.5 flex items-center gap-1">
             <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
               {{ t("admin.groups.claudeCode.title") }}
@@ -3556,6 +3573,7 @@
         <div
           v-if="
             ['anthropic', 'antigravity'].includes(editForm.platform) &&
+            editForm.group_type !== 'fallback' &&
             editForm.subscription_type !== 'subscription'
           "
           class="border-t pt-4"
@@ -4329,6 +4347,8 @@ import PlatformIcon from "@/components/common/PlatformIcon.vue";
 import { platformLabel } from "@/utils/platformColors";
 import Icon from "@/components/icons/Icon.vue";
 import GroupI18nField from "@/components/admin/group/GroupI18nField.vue";
+import MonitorFallbackFields from "@/components/admin/group/MonitorFallbackFields.vue";
+import MonitorFallbackRoutes from "@/components/admin/group/MonitorFallbackRoutes.vue";
 import GroupRateMultipliersModal from "@/components/admin/group/GroupRateMultipliersModal.vue";
 import GroupRPMOverridesModal from "@/components/admin/group/GroupRPMOverridesModal.vue";
 import GroupCapacityBadge from "@/components/common/GroupCapacityBadge.vue";
@@ -4970,6 +4990,8 @@ const submitEditAllowlistCustomEntry = () => {
 };
 
 const createForm = reactive({
+  group_type: "business" as "business" | "fallback",
+  fallback_group_ids: [] as number[],
   name: "",
   description: "",
   i18n: {} as GroupI18n,
@@ -5336,6 +5358,8 @@ const convertApiFormatToRoutingRules = async (
 };
 
 const editForm = reactive({
+  group_type: "business" as "business" | "fallback",
+  fallback_group_ids: [] as number[],
   name: "",
   description: "",
   i18n: {} as GroupI18n,
@@ -5817,6 +5841,8 @@ const closeCreateModal = () => {
   createForm.description = "";
   createForm.i18n = {};
   createForm.platform = "anthropic";
+  createForm.group_type = "business";
+  createForm.fallback_group_ids = [];
   createForm.rate_multiplier = 1.0;
   createForm.is_exclusive = false;
   createForm.subscription_type = "standard";
@@ -5928,6 +5954,9 @@ const validateGroupReasoningMultipliers = (pricing: PricingFormEntry[]): boolean
 };
 
 const handleCreateGroup = async () => {
+  if (createForm.group_type === "fallback" && createForm.fallback_group_ids.length === 0) {
+    appStore.showError(t("admin.groups.monitorFallback.required")); return;
+  }
   if (!createForm.name.trim()) {
     appStore.showError(t("admin.groups.nameRequired"));
     return;
@@ -6095,7 +6124,18 @@ const handleCreateGroup = async () => {
   }
 };
 
+function resetFallbackEntryOptions(form: { subscription_type: string; claude_code_only: boolean; fallback_group_id: number | null; fallback_group_id_on_invalid_request: number | null; copy_accounts_from_group_ids: number[] }, kind: string) {
+  if (kind !== 'fallback') return;
+  form.subscription_type = 'standard';
+  form.claude_code_only = false;
+  form.fallback_group_id = null;
+  form.fallback_group_id_on_invalid_request = null;
+  form.copy_accounts_from_group_ids = [];
+}
+
 const handleEdit = async (group: AdminGroup) => {
+  editForm.group_type = group.group_type ?? "business";
+  editForm.fallback_group_ids = [...(group.fallback_group_ids ?? [])];
   editingGroup.value = group;
   editForm.name = group.name;
   editForm.description = group.description || "";
@@ -6267,6 +6307,9 @@ const closeEditModal = () => {
 };
 
 const handleUpdateGroup = async () => {
+  if (editForm.group_type === "fallback" && editForm.fallback_group_ids.length === 0) {
+    appStore.showError(t("admin.groups.monitorFallback.required")); return;
+  }
   if (!editingGroup.value) return;
   if (!editForm.name.trim()) {
     appStore.showError(t("admin.groups.nameRequired"));

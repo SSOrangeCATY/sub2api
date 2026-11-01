@@ -9,6 +9,7 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
+	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ip"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 
@@ -161,6 +162,13 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 			return
 		}
 		if abortIfAPIKeyGroupNotAllowed(c, apiKey) {
+			return
+		}
+		apiKey, err = resolveAuthenticatedMonitorFallback(c, apiKeyService, apiKey)
+		if err != nil {
+			if !c.IsAborted() {
+				AbortWithError(c, infraerrors.Code(err), "FALLBACK_UNAVAILABLE", infraerrors.Message(err))
+			}
 			return
 		}
 		ctx := context.WithValue(c.Request.Context(), ctxkey.UserID, apiKey.User.ID)

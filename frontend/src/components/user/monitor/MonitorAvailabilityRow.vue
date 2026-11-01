@@ -5,14 +5,12 @@
     </div>
     <div class="flex items-baseline gap-0.5">
       <span
-        class="text-3xl font-bold tabular-nums leading-none"
-        :style="colorStyle"
+        class="monitor-availability text-3xl font-bold tabular-nums leading-none"
       >
         {{ displayValue }}
       </span>
       <span
-        class="text-base font-semibold leading-none"
-        :style="colorStyle"
+        class="monitor-availability text-base font-semibold leading-none"
       >%</span>
     </div>
   </div>
@@ -27,7 +25,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { hslForPct } from '@/composables/useChannelMonitorFormat'
 
 const props = defineProps<{
   windowLabel: string
@@ -42,8 +39,4 @@ const displayValue = computed(() => {
   return props.value.toFixed(2)
 })
 
-const colorStyle = computed(() => {
-  const colour = hslForPct(props.value)
-  return colour ? { color: colour } : { color: 'rgb(156 163 175)' }
-})
 </script>

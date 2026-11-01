@@ -852,10 +852,17 @@ func ProvideAPIKeyService(
 	cfg *config.Config,
 	billingCacheService *BillingCacheService,
 	concurrencyService *ConcurrencyService,
+	monitors ChannelMonitorRepository,
+	passive ChannelMonitorV2Repository,
+	settings *SettingService,
+	accounts AccountRepository,
 ) *APIKeyService {
 	svc := NewAPIKeyService(apiKeyRepo, userRepo, groupRepo, userSubRepo, userGroupRateRepo, cache, cfg)
 	svc.SetRateLimitCacheInvalidator(billingCacheService)
 	svc.SetConcurrencyService(concurrencyService)
+	reader := &monitorGroupHealthReader{groups: groupRepo, monitors: monitors, passive: passive, settings: settings}
+	svc.monitorGroupRouter = NewMonitorGroupRouter(groupRepo, &cachedGroupHealthReader{reader: reader, entries: map[string]groupHealthCacheEntry{}})
+	svc.monitorGroupRouter.accounts = accounts
 	return svc
 }
 
@@ -1037,8 +1044,10 @@ func ProvideChannelMonitorService(
 	repo ChannelMonitorRepository,
 	encryptor SecretEncryptor,
 	settingService *SettingService,
+	localKeys APIKeyRepository,
 ) *ChannelMonitorService {
 	svc := NewChannelMonitorService(repo, encryptor)
+	svc.localKeys = localKeys
 	svc.SetRuntimeReader(settingService)
 	return svc
 }

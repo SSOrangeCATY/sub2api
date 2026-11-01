@@ -50,6 +50,10 @@ type Group struct {
 	DuplicateOperationID *string `json:"duplicate_operation_id,omitempty"`
 	// Platform holds the value of the "platform" field.
 	Platform string `json:"platform,omitempty"`
+	// 分组类型：business 业务分组，fallback 兜底分组
+	GroupType string `json:"group_type,omitempty"`
+	// 按优先级排列的兜底分组 ID 列表
+	FallbackGroupIds []int64 `json:"fallback_group_ids,omitempty"`
 	// SubscriptionType holds the value of the "subscription_type" field.
 	SubscriptionType string `json:"subscription_type,omitempty"`
 	// DailyLimitUsd holds the value of the "daily_limit_usd" field.
@@ -262,7 +266,7 @@ func (*Group) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case group.FieldI18n, group.FieldVideoModelPrices, group.FieldModelPricing, group.FieldModelRouting, group.FieldSupportedModelScopes, group.FieldMessagesDispatchModelConfig, group.FieldModelAllowlist, group.FieldCodexModelsManifestConfig, group.FieldReasoningEffortMappings:
+		case group.FieldI18n, group.FieldFallbackGroupIds, group.FieldVideoModelPrices, group.FieldModelPricing, group.FieldModelRouting, group.FieldSupportedModelScopes, group.FieldMessagesDispatchModelConfig, group.FieldModelAllowlist, group.FieldCodexModelsManifestConfig, group.FieldReasoningEffortMappings:
 			values[i] = new([]byte)
 		case group.FieldPeakRateEnabled, group.FieldIsExclusive, group.FieldAllowImageGeneration, group.FieldAllowBatchImageGeneration, group.FieldImageCountBilling, group.FieldImageRateIndependent, group.FieldVideoRateIndependent, group.FieldLongContextPricingEnabled, group.FieldClaudeCodeOnly, group.FieldModelRoutingEnabled, group.FieldMcpXMLInject, group.FieldAllowMessagesDispatch, group.FieldAllowLive, group.FieldForceOpenaiFast, group.FieldFreeOpenaiFast, group.FieldRequireOauthOnly, group.FieldRequirePrivacySet, group.FieldProfitControlEnabled:
 			values[i] = new(sql.NullBool)
@@ -270,7 +274,7 @@ func (*Group) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullFloat64)
 		case group.FieldID, group.FieldDefaultValidityDays, group.FieldFallbackGroupID, group.FieldFallbackGroupIDOnInvalidRequest, group.FieldSortOrder, group.FieldRpmLimit:
 			values[i] = new(sql.NullInt64)
-		case group.FieldName, group.FieldDescription, group.FieldPeakStart, group.FieldPeakEnd, group.FieldStatus, group.FieldDuplicateOperationID, group.FieldPlatform, group.FieldSubscriptionType, group.FieldDefaultMappedModel, group.FieldMaxReasoningEffort, group.FieldMaxReasoningEffortOverLimit:
+		case group.FieldName, group.FieldDescription, group.FieldPeakStart, group.FieldPeakEnd, group.FieldStatus, group.FieldDuplicateOperationID, group.FieldPlatform, group.FieldGroupType, group.FieldSubscriptionType, group.FieldDefaultMappedModel, group.FieldMaxReasoningEffort, group.FieldMaxReasoningEffortOverLimit:
 			values[i] = new(sql.NullString)
 		case group.FieldCreatedAt, group.FieldUpdatedAt, group.FieldDeletedAt:
 			values[i] = new(sql.NullTime)
@@ -389,6 +393,20 @@ func (_m *Group) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field platform", values[i])
 			} else if value.Valid {
 				_m.Platform = value.String
+			}
+		case group.FieldGroupType:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field group_type", values[i])
+			} else if value.Valid {
+				_m.GroupType = value.String
+			}
+		case group.FieldFallbackGroupIds:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field fallback_group_ids", values[i])
+			} else if value != nil && len(*value) > 0 {
+				if err := json.Unmarshal(*value, &_m.FallbackGroupIds); err != nil {
+					return fmt.Errorf("unmarshal field fallback_group_ids: %w", err)
+				}
 			}
 		case group.FieldSubscriptionType:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -866,6 +884,12 @@ func (_m *Group) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("platform=")
 	builder.WriteString(_m.Platform)
+	builder.WriteString(", ")
+	builder.WriteString("group_type=")
+	builder.WriteString(_m.GroupType)
+	builder.WriteString(", ")
+	builder.WriteString("fallback_group_ids=")
+	builder.WriteString(fmt.Sprintf("%v", _m.FallbackGroupIds))
 	builder.WriteString(", ")
 	builder.WriteString("subscription_type=")
 	builder.WriteString(_m.SubscriptionType)

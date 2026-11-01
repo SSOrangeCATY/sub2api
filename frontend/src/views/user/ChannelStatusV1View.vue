@@ -10,6 +10,7 @@
       @refresh="refresh()"
     />
 
+    <MonitorFallbackRoutes audience="user" />
     <MonitorCardGrid
       :items="items"
       :window="currentWindow"
@@ -40,6 +41,7 @@ import {
   type UserMonitorDetail,
 } from '@/api/channelMonitor'
 import AppLayout from '@/components/layout/AppLayout.vue'
+import MonitorFallbackRoutes from '@/components/admin/group/MonitorFallbackRoutes.vue'
 import MonitorHero, {
   type MonitorWindow,
   type OverallStatus,

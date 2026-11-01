@@ -148,6 +148,7 @@ func GroupFromServiceAdmin(g *service.Group) *AdminGroup {
 	}
 	out := &AdminGroup{
 		Group:                       groupFromServiceBase(g),
+		FallbackGroupIDs:            g.FallbackGroupIDs,
 		ForceOpenAIFast:             g.ForceOpenAIFast,
 		FreeOpenAIFast:              g.FreeOpenAIFast,
 		ProfitControlEnabled:        g.ProfitControlEnabled,
@@ -184,6 +185,7 @@ func groupFromServiceBase(g *service.Group) Group {
 		Description:                     g.Description,
 		I18n:                            g.I18n,
 		Platform:                        g.Platform,
+		GroupType:                       g.GroupType,
 		RateMultiplier:                  g.RateMultiplier,
 		IsExclusive:                     g.IsExclusive,
 		Status:                          g.Status,

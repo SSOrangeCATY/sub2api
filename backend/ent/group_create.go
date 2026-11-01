@@ -224,6 +224,26 @@ func (_c *GroupCreate) SetNillablePlatform(v *string) *GroupCreate {
 	return _c
 }
 
+// SetGroupType sets the "group_type" field.
+func (_c *GroupCreate) SetGroupType(v string) *GroupCreate {
+	_c.mutation.SetGroupType(v)
+	return _c
+}
+
+// SetNillableGroupType sets the "group_type" field if the given value is not nil.
+func (_c *GroupCreate) SetNillableGroupType(v *string) *GroupCreate {
+	if v != nil {
+		_c.SetGroupType(*v)
+	}
+	return _c
+}
+
+// SetFallbackGroupIds sets the "fallback_group_ids" field.
+func (_c *GroupCreate) SetFallbackGroupIds(v []int64) *GroupCreate {
+	_c.mutation.SetFallbackGroupIds(v)
+	return _c
+}
+
 // SetSubscriptionType sets the "subscription_type" field.
 func (_c *GroupCreate) SetSubscriptionType(v string) *GroupCreate {
 	_c.mutation.SetSubscriptionType(v)
@@ -1103,6 +1123,14 @@ func (_c *GroupCreate) defaults() error {
 		v := group.DefaultPlatform
 		_c.mutation.SetPlatform(v)
 	}
+	if _, ok := _c.mutation.GroupType(); !ok {
+		v := group.DefaultGroupType
+		_c.mutation.SetGroupType(v)
+	}
+	if _, ok := _c.mutation.FallbackGroupIds(); !ok {
+		v := group.DefaultFallbackGroupIds
+		_c.mutation.SetFallbackGroupIds(v)
+	}
 	if _, ok := _c.mutation.SubscriptionType(); !ok {
 		v := group.DefaultSubscriptionType
 		_c.mutation.SetSubscriptionType(v)
@@ -1309,6 +1337,17 @@ func (_c *GroupCreate) check() error {
 		if err := group.PlatformValidator(v); err != nil {
 			return &ValidationError{Name: "platform", err: fmt.Errorf(`ent: validator failed for field "Group.platform": %w`, err)}
 		}
+	}
+	if _, ok := _c.mutation.GroupType(); !ok {
+		return &ValidationError{Name: "group_type", err: errors.New(`ent: missing required field "Group.group_type"`)}
+	}
+	if v, ok := _c.mutation.GroupType(); ok {
+		if err := group.GroupTypeValidator(v); err != nil {
+			return &ValidationError{Name: "group_type", err: fmt.Errorf(`ent: validator failed for field "Group.group_type": %w`, err)}
+		}
+	}
+	if _, ok := _c.mutation.FallbackGroupIds(); !ok {
+		return &ValidationError{Name: "fallback_group_ids", err: errors.New(`ent: missing required field "Group.fallback_group_ids"`)}
 	}
 	if _, ok := _c.mutation.SubscriptionType(); !ok {
 		return &ValidationError{Name: "subscription_type", err: errors.New(`ent: missing required field "Group.subscription_type"`)}
@@ -1538,6 +1577,14 @@ func (_c *GroupCreate) createSpec() (*Group, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.Platform(); ok {
 		_spec.SetField(group.FieldPlatform, field.TypeString, value)
 		_node.Platform = value
+	}
+	if value, ok := _c.mutation.GroupType(); ok {
+		_spec.SetField(group.FieldGroupType, field.TypeString, value)
+		_node.GroupType = value
+	}
+	if value, ok := _c.mutation.FallbackGroupIds(); ok {
+		_spec.SetField(group.FieldFallbackGroupIds, field.TypeJSON, value)
+		_node.FallbackGroupIds = value
 	}
 	if value, ok := _c.mutation.SubscriptionType(); ok {
 		_spec.SetField(group.FieldSubscriptionType, field.TypeString, value)
@@ -2084,6 +2131,30 @@ func (u *GroupUpsert) SetPlatform(v string) *GroupUpsert {
 // UpdatePlatform sets the "platform" field to the value that was provided on create.
 func (u *GroupUpsert) UpdatePlatform() *GroupUpsert {
 	u.SetExcluded(group.FieldPlatform)
+	return u
+}
+
+// SetGroupType sets the "group_type" field.
+func (u *GroupUpsert) SetGroupType(v string) *GroupUpsert {
+	u.Set(group.FieldGroupType, v)
+	return u
+}
+
+// UpdateGroupType sets the "group_type" field to the value that was provided on create.
+func (u *GroupUpsert) UpdateGroupType() *GroupUpsert {
+	u.SetExcluded(group.FieldGroupType)
+	return u
+}
+
+// SetFallbackGroupIds sets the "fallback_group_ids" field.
+func (u *GroupUpsert) SetFallbackGroupIds(v []int64) *GroupUpsert {
+	u.Set(group.FieldFallbackGroupIds, v)
+	return u
+}
+
+// UpdateFallbackGroupIds sets the "fallback_group_ids" field to the value that was provided on create.
+func (u *GroupUpsert) UpdateFallbackGroupIds() *GroupUpsert {
+	u.SetExcluded(group.FieldFallbackGroupIds)
 	return u
 }
 
@@ -3242,6 +3313,34 @@ func (u *GroupUpsertOne) SetPlatform(v string) *GroupUpsertOne {
 func (u *GroupUpsertOne) UpdatePlatform() *GroupUpsertOne {
 	return u.Update(func(s *GroupUpsert) {
 		s.UpdatePlatform()
+	})
+}
+
+// SetGroupType sets the "group_type" field.
+func (u *GroupUpsertOne) SetGroupType(v string) *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetGroupType(v)
+	})
+}
+
+// UpdateGroupType sets the "group_type" field to the value that was provided on create.
+func (u *GroupUpsertOne) UpdateGroupType() *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateGroupType()
+	})
+}
+
+// SetFallbackGroupIds sets the "fallback_group_ids" field.
+func (u *GroupUpsertOne) SetFallbackGroupIds(v []int64) *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetFallbackGroupIds(v)
+	})
+}
+
+// UpdateFallbackGroupIds sets the "fallback_group_ids" field to the value that was provided on create.
+func (u *GroupUpsertOne) UpdateFallbackGroupIds() *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateFallbackGroupIds()
 	})
 }
 
@@ -4716,6 +4815,34 @@ func (u *GroupUpsertBulk) SetPlatform(v string) *GroupUpsertBulk {
 func (u *GroupUpsertBulk) UpdatePlatform() *GroupUpsertBulk {
 	return u.Update(func(s *GroupUpsert) {
 		s.UpdatePlatform()
+	})
+}
+
+// SetGroupType sets the "group_type" field.
+func (u *GroupUpsertBulk) SetGroupType(v string) *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetGroupType(v)
+	})
+}
+
+// UpdateGroupType sets the "group_type" field to the value that was provided on create.
+func (u *GroupUpsertBulk) UpdateGroupType() *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateGroupType()
+	})
+}
+
+// SetFallbackGroupIds sets the "fallback_group_ids" field.
+func (u *GroupUpsertBulk) SetFallbackGroupIds(v []int64) *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetFallbackGroupIds(v)
+	})
+}
+
+// UpdateFallbackGroupIds sets the "fallback_group_ids" field to the value that was provided on create.
+func (u *GroupUpsertBulk) UpdateFallbackGroupIds() *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateFallbackGroupIds()
 	})
 }
 

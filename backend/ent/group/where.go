@@ -125,6 +125,11 @@ func Platform(v string) predicate.Group {
 	return predicate.Group(sql.FieldEQ(FieldPlatform, v))
 }
 
+// GroupType applies equality check predicate on the "group_type" field. It's identical to GroupTypeEQ.
+func GroupType(v string) predicate.Group {
+	return predicate.Group(sql.FieldEQ(FieldGroupType, v))
+}
+
 // SubscriptionType applies equality check predicate on the "subscription_type" field. It's identical to SubscriptionTypeEQ.
 func SubscriptionType(v string) predicate.Group {
 	return predicate.Group(sql.FieldEQ(FieldSubscriptionType, v))
@@ -1053,6 +1058,71 @@ func PlatformEqualFold(v string) predicate.Group {
 // PlatformContainsFold applies the ContainsFold predicate on the "platform" field.
 func PlatformContainsFold(v string) predicate.Group {
 	return predicate.Group(sql.FieldContainsFold(FieldPlatform, v))
+}
+
+// GroupTypeEQ applies the EQ predicate on the "group_type" field.
+func GroupTypeEQ(v string) predicate.Group {
+	return predicate.Group(sql.FieldEQ(FieldGroupType, v))
+}
+
+// GroupTypeNEQ applies the NEQ predicate on the "group_type" field.
+func GroupTypeNEQ(v string) predicate.Group {
+	return predicate.Group(sql.FieldNEQ(FieldGroupType, v))
+}
+
+// GroupTypeIn applies the In predicate on the "group_type" field.
+func GroupTypeIn(vs ...string) predicate.Group {
+	return predicate.Group(sql.FieldIn(FieldGroupType, vs...))
+}
+
+// GroupTypeNotIn applies the NotIn predicate on the "group_type" field.
+func GroupTypeNotIn(vs ...string) predicate.Group {
+	return predicate.Group(sql.FieldNotIn(FieldGroupType, vs...))
+}
+
+// GroupTypeGT applies the GT predicate on the "group_type" field.
+func GroupTypeGT(v string) predicate.Group {
+	return predicate.Group(sql.FieldGT(FieldGroupType, v))
+}
+
+// GroupTypeGTE applies the GTE predicate on the "group_type" field.
+func GroupTypeGTE(v string) predicate.Group {
+	return predicate.Group(sql.FieldGTE(FieldGroupType, v))
+}
+
+// GroupTypeLT applies the LT predicate on the "group_type" field.
+func GroupTypeLT(v string) predicate.Group {
+	return predicate.Group(sql.FieldLT(FieldGroupType, v))
+}
+
+// GroupTypeLTE applies the LTE predicate on the "group_type" field.
+func GroupTypeLTE(v string) predicate.Group {
+	return predicate.Group(sql.FieldLTE(FieldGroupType, v))
+}
+
+// GroupTypeContains applies the Contains predicate on the "group_type" field.
+func GroupTypeContains(v string) predicate.Group {
+	return predicate.Group(sql.FieldContains(FieldGroupType, v))
+}
+
+// GroupTypeHasPrefix applies the HasPrefix predicate on the "group_type" field.
+func GroupTypeHasPrefix(v string) predicate.Group {
+	return predicate.Group(sql.FieldHasPrefix(FieldGroupType, v))
+}
+
+// GroupTypeHasSuffix applies the HasSuffix predicate on the "group_type" field.
+func GroupTypeHasSuffix(v string) predicate.Group {
+	return predicate.Group(sql.FieldHasSuffix(FieldGroupType, v))
+}
+
+// GroupTypeEqualFold applies the EqualFold predicate on the "group_type" field.
+func GroupTypeEqualFold(v string) predicate.Group {
+	return predicate.Group(sql.FieldEqualFold(FieldGroupType, v))
+}
+
+// GroupTypeContainsFold applies the ContainsFold predicate on the "group_type" field.
+func GroupTypeContainsFold(v string) predicate.Group {
+	return predicate.Group(sql.FieldContainsFold(FieldGroupType, v))
 }
 
 // SubscriptionTypeEQ applies the EQ predicate on the "subscription_type" field.

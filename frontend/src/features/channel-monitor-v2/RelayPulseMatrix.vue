@@ -513,28 +513,16 @@ function formatBucketRange(value: string) {
   height: 0.5rem;
   width: 0.5rem;
   flex: none;
-  border-radius: 9999px;
+  border-radius: 0;
 }
 
-/* Operational health bands are data colors, independent of action accents. */
-.pt-monitor-matrix { --monitor-unrated: var(--pt-blue, #2554ff); }
-.health-score0 { --monitor-health: #e52d40; }
-.health-score1 { --monitor-health: #f04442; }
-.health-score2 { --monitor-health: #ff5a36; }
-.health-score3 { --monitor-health: #ff741f; }
-.health-score4 { --monitor-health: #ff9700; }
-.health-score5 { --monitor-health: #ffbd00; }
-.health-score6 { --monitor-health: #d8cf00; }
-.health-score7 { --monitor-health: #a7d800; }
-.health-score8 { --monitor-health: #54c900; }
-.health-score9 { --monitor-health: #00b875; }
-.health-score10 { --monitor-health: #009d72; }
-.health-healthy { --monitor-health: #009d72; }
-.health-warning { --monitor-health: #ffbd00; }
-.health-critical { --monitor-health: #e52d40; }
-.pt-monitor-matrix :is(.pulse-cell, .status-dot, .score-legend > i) { background-color: var(--monitor-health, var(--pt-chip)); border-radius: 0; }
-.pt-monitor-matrix .health-unrated { --monitor-health: var(--monitor-unrated); background-image: repeating-linear-gradient(135deg,transparent 0 5px,rgb(255 255 255 / .45) 5px 6px); }
-.pt-monitor-matrix .health-unknown { --monitor-health: var(--pt-chip, #e4e4e0); background-image: repeating-linear-gradient(135deg,transparent 0 5px,color-mix(in srgb,var(--pt-muted) 40%,transparent) 5px 6px); }
+/* Fill and texture are shared with channel status badges in monitor.css. */
+.pt-monitor-matrix :is(.pulse-cell, .status-dot, .score-legend > i) {
+  background-color: var(--monitor-health, var(--ef-chip));
+  background-image: var(--monitor-pattern, none);
+  border: 1px solid var(--monitor-edge, var(--ef-rule));
+  border-radius: 0;
+}
 .score-legend > i { display: block; height: 8px; flex: 1; }
 .score-legend { background: none; }
 
@@ -572,16 +560,16 @@ function formatBucketRange(value: string) {
   border: 1px solid var(--pt-ink, #161616);
   background: var(--pt-panel, #fff);
   padding: 0.5rem 0.625rem;
-  box-shadow: 0 10px 25px -5px rgb(0 0 0 / 0.15);
+  box-shadow: none;
   opacity: 0;
   visibility: hidden;
   transition: opacity 0.12s ease, transform 0.12s ease, visibility 0.12s;
   white-space: normal;
 }
 :global(.dark) .pulse-tooltip {
-  border-color: rgb(55 65 81);
-  background: rgb(17 24 39);
-  color: rgb(229 231 235);
+  border-color: var(--ef-ink-2);
+  background: var(--ef-panel);
+  color: var(--ef-ink);
 }
 .pulse-tooltip-line {
   display: block;
@@ -590,7 +578,7 @@ function formatBucketRange(value: string) {
   color: var(--pt-muted);
 }
 :global(.dark) .pulse-tooltip-line {
-  color: rgb(209 213 219);
+  color: var(--ef-ink-2);
 }
 .pulse-tooltip-title {
   margin-bottom: 0.2rem;
@@ -598,7 +586,7 @@ function formatBucketRange(value: string) {
   color: var(--pt-ink);
 }
 :global(.dark) .pulse-tooltip-title {
-  color: rgb(243 244 246);
+  color: var(--ef-ink);
 }
 .pulse-cell:hover .pulse-tooltip,
 .pulse-cell:focus-visible .pulse-tooltip {
@@ -626,9 +614,9 @@ function formatBucketRange(value: string) {
   white-space: normal;
 }
 :global(.dark) .matrix-floating-tooltip {
-  border-color: rgb(55 65 81);
-  background: rgb(17 24 39);
-  color: rgb(229 231 235);
+  border-color: var(--ef-ink-2);
+  background: var(--ef-panel);
+  color: var(--ef-ink);
 }
 .matrix-floating-tooltip-line {
   display: block;
@@ -637,7 +625,7 @@ function formatBucketRange(value: string) {
   color: var(--pt-muted);
 }
 :global(.dark) .matrix-floating-tooltip-line {
-  color: rgb(209 213 219);
+  color: var(--ef-ink-2);
 }
 .matrix-floating-tooltip-title {
   margin-bottom: 0.2rem;
@@ -645,7 +633,7 @@ function formatBucketRange(value: string) {
   color: var(--pt-ink);
 }
 :global(.dark) .matrix-floating-tooltip-title {
-  color: rgb(243 244 246);
+  color: var(--ef-ink);
 }
 
 @media (max-width: 639px) {

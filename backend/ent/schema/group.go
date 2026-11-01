@@ -84,6 +84,14 @@ func (Group) Fields() []ent.Field {
 		field.String("platform").
 			MaxLen(50).
 			Default(domain.PlatformAnthropic),
+		field.String("group_type").
+			MaxLen(20).
+			Default("business").
+			Comment("分组类型：business 业务分组，fallback 兜底分组"),
+		field.JSON("fallback_group_ids", []int64{}).
+			Default([]int64{}).
+			SchemaType(map[string]string{dialect.Postgres: "jsonb"}).
+			Comment("按优先级排列的兜底分组 ID 列表"),
 		field.String("subscription_type").
 			MaxLen(20).
 			Default(domain.SubscriptionTypeStandard),

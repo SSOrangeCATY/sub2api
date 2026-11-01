@@ -207,6 +207,7 @@ const mountView = () =>
     global: {
       plugins: [createPinia()],
       stubs: {
+        MonitorFallbackRoutes: true,
         AppLayout: AppLayoutStub,
         TablePageLayout: TablePageLayoutStub,
         DataTable: DataTableStub,

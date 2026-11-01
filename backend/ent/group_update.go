@@ -229,6 +229,32 @@ func (_u *GroupUpdate) SetNillablePlatform(v *string) *GroupUpdate {
 	return _u
 }
 
+// SetGroupType sets the "group_type" field.
+func (_u *GroupUpdate) SetGroupType(v string) *GroupUpdate {
+	_u.mutation.SetGroupType(v)
+	return _u
+}
+
+// SetNillableGroupType sets the "group_type" field if the given value is not nil.
+func (_u *GroupUpdate) SetNillableGroupType(v *string) *GroupUpdate {
+	if v != nil {
+		_u.SetGroupType(*v)
+	}
+	return _u
+}
+
+// SetFallbackGroupIds sets the "fallback_group_ids" field.
+func (_u *GroupUpdate) SetFallbackGroupIds(v []int64) *GroupUpdate {
+	_u.mutation.SetFallbackGroupIds(v)
+	return _u
+}
+
+// AppendFallbackGroupIds appends value to the "fallback_group_ids" field.
+func (_u *GroupUpdate) AppendFallbackGroupIds(v []int64) *GroupUpdate {
+	_u.mutation.AppendFallbackGroupIds(v)
+	return _u
+}
+
 // SetSubscriptionType sets the "subscription_type" field.
 func (_u *GroupUpdate) SetSubscriptionType(v string) *GroupUpdate {
 	_u.mutation.SetSubscriptionType(v)
@@ -1528,6 +1554,11 @@ func (_u *GroupUpdate) check() error {
 			return &ValidationError{Name: "platform", err: fmt.Errorf(`ent: validator failed for field "Group.platform": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.GroupType(); ok {
+		if err := group.GroupTypeValidator(v); err != nil {
+			return &ValidationError{Name: "group_type", err: fmt.Errorf(`ent: validator failed for field "Group.group_type": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.SubscriptionType(); ok {
 		if err := group.SubscriptionTypeValidator(v); err != nil {
 			return &ValidationError{Name: "subscription_type", err: fmt.Errorf(`ent: validator failed for field "Group.subscription_type": %w`, err)}
@@ -1636,6 +1667,17 @@ func (_u *GroupUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.Platform(); ok {
 		_spec.SetField(group.FieldPlatform, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.GroupType(); ok {
+		_spec.SetField(group.FieldGroupType, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.FallbackGroupIds(); ok {
+		_spec.SetField(group.FieldFallbackGroupIds, field.TypeJSON, value)
+	}
+	if value, ok := _u.mutation.AppendedFallbackGroupIds(); ok {
+		_spec.AddModifier(func(u *sql.UpdateBuilder) {
+			sqljson.Append(u, group.FieldFallbackGroupIds, value)
+		})
 	}
 	if value, ok := _u.mutation.SubscriptionType(); ok {
 		_spec.SetField(group.FieldSubscriptionType, field.TypeString, value)
@@ -2446,6 +2488,32 @@ func (_u *GroupUpdateOne) SetNillablePlatform(v *string) *GroupUpdateOne {
 	if v != nil {
 		_u.SetPlatform(*v)
 	}
+	return _u
+}
+
+// SetGroupType sets the "group_type" field.
+func (_u *GroupUpdateOne) SetGroupType(v string) *GroupUpdateOne {
+	_u.mutation.SetGroupType(v)
+	return _u
+}
+
+// SetNillableGroupType sets the "group_type" field if the given value is not nil.
+func (_u *GroupUpdateOne) SetNillableGroupType(v *string) *GroupUpdateOne {
+	if v != nil {
+		_u.SetGroupType(*v)
+	}
+	return _u
+}
+
+// SetFallbackGroupIds sets the "fallback_group_ids" field.
+func (_u *GroupUpdateOne) SetFallbackGroupIds(v []int64) *GroupUpdateOne {
+	_u.mutation.SetFallbackGroupIds(v)
+	return _u
+}
+
+// AppendFallbackGroupIds appends value to the "fallback_group_ids" field.
+func (_u *GroupUpdateOne) AppendFallbackGroupIds(v []int64) *GroupUpdateOne {
+	_u.mutation.AppendFallbackGroupIds(v)
 	return _u
 }
 
@@ -3761,6 +3829,11 @@ func (_u *GroupUpdateOne) check() error {
 			return &ValidationError{Name: "platform", err: fmt.Errorf(`ent: validator failed for field "Group.platform": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.GroupType(); ok {
+		if err := group.GroupTypeValidator(v); err != nil {
+			return &ValidationError{Name: "group_type", err: fmt.Errorf(`ent: validator failed for field "Group.group_type": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.SubscriptionType(); ok {
 		if err := group.SubscriptionTypeValidator(v); err != nil {
 			return &ValidationError{Name: "subscription_type", err: fmt.Errorf(`ent: validator failed for field "Group.subscription_type": %w`, err)}
@@ -3886,6 +3959,17 @@ func (_u *GroupUpdateOne) sqlSave(ctx context.Context) (_node *Group, err error)
 	}
 	if value, ok := _u.mutation.Platform(); ok {
 		_spec.SetField(group.FieldPlatform, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.GroupType(); ok {
+		_spec.SetField(group.FieldGroupType, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.FallbackGroupIds(); ok {
+		_spec.SetField(group.FieldFallbackGroupIds, field.TypeJSON, value)
+	}
+	if value, ok := _u.mutation.AppendedFallbackGroupIds(); ok {
+		_spec.AddModifier(func(u *sql.UpdateBuilder) {
+			sqljson.Append(u, group.FieldFallbackGroupIds, value)
+		})
 	}
 	if value, ok := _u.mutation.SubscriptionType(); ok {
 		_spec.SetField(group.FieldSubscriptionType, field.TypeString, value)

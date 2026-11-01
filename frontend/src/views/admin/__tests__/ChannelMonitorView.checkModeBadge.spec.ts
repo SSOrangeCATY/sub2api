@@ -98,6 +98,7 @@ function mountView() {
   return mount(ChannelMonitorView, {
     global: {
       stubs: {
+        MonitorFallbackRoutes: true,
         AppLayout: AppLayoutStub,
         TablePageLayout: TablePageLayoutStub,
         DataTable: DataTableStub,
