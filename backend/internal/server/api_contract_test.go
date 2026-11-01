@@ -320,6 +320,7 @@ func TestAPIContracts(t *testing.T) {
 					{
 						ID:                   10,
 						Name:                 "Group One",
+						GroupType:            service.GroupTypeBusiness,
 						Description:          "desc",
 						Platform:             service.PlatformAnthropic,
 						RateMultiplier:       1.5,
@@ -351,6 +352,7 @@ func TestAPIContracts(t *testing.T) {
 					{
 						"id": 10,
 						"name": "Group One",
+						"group_type": "business",
 						"description": "desc",
 						"platform": "anthropic",
 						"rate_multiplier": 1.5,
