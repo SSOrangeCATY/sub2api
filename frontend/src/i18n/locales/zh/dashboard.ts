@@ -560,6 +560,8 @@ export default {
     dialogLatency: '对话延迟',
     endpointPing: '端点 PING',
     history60pts: '近 {n} 次记录',
+    timelineLegend: '记录状态图例与数量',
+    timelineNoData: '暂无记录',
     nextUpdateIn: '{n}s 后刷新',
     past: 'PAST',
     now: 'NOW',

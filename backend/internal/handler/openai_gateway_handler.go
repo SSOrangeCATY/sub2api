@@ -2132,6 +2132,21 @@ type openAIWSTurnAPIKeyLookup interface {
 	GetByKey(ctx context.Context, key string) (*service.APIKey, error)
 }
 
+type openAIWSMonitorKeyResolver interface {
+	ResolveMonitorFallbackKey(context.Context, *service.APIKey, string) (*service.APIKey, *service.MonitorGroupRoute, error)
+}
+
+func resolveOpenAIWSMonitorTurnKey(ctx context.Context, resolver openAIWSMonitorKeyResolver, entry, conn *service.APIKey, model string) (*service.APIKey, error) {
+	key, _, err := resolver.ResolveMonitorFallbackKey(ctx, entry, model)
+	if err != nil {
+		return nil, err
+	}
+	if key == nil || key.Group == nil || conn == nil || conn.Group == nil || key.ID != conn.ID || key.Group.ID != conn.Group.ID {
+		return nil, errors.New("monitored route changed")
+	}
+	return key, nil
+}
+
 // openAIWSTurnBillingAPIKeys 按 turn 号保存每个 turn 计费用的 API Key 快照。
 //
 // API Key 认证快照只在建连时取一次。若连接内所有 turn 共用它，分组定价（倍率、
@@ -2519,6 +2534,24 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 	if reqModel == "" {
 		closeOpenAIClientWS(wsConn, coderws.StatusPolicyViolation, "model is required in first response.create payload")
 		return
+	}
+	fallbackEntry, _ := c.Get(middleware2.ContextKeyMonitorFallbackEntry)
+	monitorEntry, _ := fallbackEntry.(*service.APIKey)
+	if monitorEntry != nil {
+		if blocked := blockedModelAllowlistCandidate(monitorEntry.Group, requestmodel.FromBodyCandidates("", "application/json", firstMessage)); blocked != "" {
+			closeOpenAIClientWS(wsConn, coderws.StatusPolicyViolation, "model is not allowed for fallback entry")
+			return
+		}
+		routed, route, routeErr := h.apiKeyService.ResolveMonitorFallbackKey(ctx, monitorEntry, reqModel)
+		if routeErr != nil {
+			closeOpenAIClientWS(wsConn, coderws.StatusTryAgainLater, "monitored route unavailable; reconnect to retry")
+			return
+		}
+		apiKey = routed
+		c.Set(string(middleware2.ContextKeyAPIKey), apiKey)
+		c.Set(middleware2.ContextKeyMonitorFallbackRoute, route)
+		ctx = context.WithValue(ctx, ctxkey.Group, apiKey.Group)
+		c.Request = c.Request.WithContext(ctx)
 	}
 	// 分组级模型白名单：首帧校验客户端模型，不通过则关闭连接并标记运维原因。
 	// 必须在合成路由解析和上游模型映射之前执行。
@@ -2977,6 +3010,26 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 				c.Set(securityAuditWSTurnContextKey, turn)
 				service.BeginOpsStreamTurn(c, turn)
 				setCyberTurnBody(turn, payload)
+				if monitorEntry != nil {
+					model := strings.TrimSpace(originalModel)
+					if model == "" {
+						model = strings.TrimSpace(gjson.GetBytes(payload, "model").String())
+					}
+					if model == "" {
+						model = reqModel
+					}
+					candidates := append([]string{model}, requestmodel.FromBodyCandidates("", "application/json", payload)...)
+					if blockedModelAllowlistCandidate(monitorEntry.Group, candidates) != "" {
+						return service.NewOpenAIWSClientCloseError(coderws.StatusPolicyViolation, "model is not allowed for fallback entry", nil)
+					}
+					routed, routeErr := resolveOpenAIWSMonitorTurnKey(ctx, h.apiKeyService, monitorEntry, apiKey, model)
+					if routeErr != nil {
+						// A connected upstream cannot migrate previous_response_id safely.
+						// Finish the prior turn, then ask the client to reconnect before sending.
+						return service.NewOpenAIWSClientCloseError(coderws.StatusTryAgainLater, "monitored route changed; reconnect to select the current group", routeErr)
+					}
+					turnBillingAPIKeys.set(turn, routed)
+				}
 				// 连接级 cyber session gate 也在 BeforeRequest 先执行，使 native 与
 				// passthrough ingress 都能在 BeforeTurn 及上游写入前无副作用地拒绝。
 				// BeforeTurn 中保留同一检查作为防御式兜底。
@@ -3047,7 +3100,14 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 				// 长连接跨峰谷/倍率刷新防护：每个 turn 按当前时刻重装门并复核
 				// 当前账号，越线即要求客户端重连重选（连接绑定单一上游账号，
 				// 无法中途换号）。本 turn 的准入与计费共用同一 pricingAt。
-				turnBillingCtx := turnBillingAPIKeys.begin(ctx, h.apiKeyService, turn, apiKey)
+				var turnBillingCtx context.Context
+				if monitorEntry != nil {
+					// BeforeRequest already resolved this turn's business target. The
+					// persisted key belongs to the entry and cannot refresh its prices.
+					turnBillingCtx = withOpenAIWSTurnBillingGroup(ctx, turnBillingAPIKeys.forTurn(turn, apiKey))
+				} else {
+					turnBillingCtx = turnBillingAPIKeys.begin(ctx, h.apiKeyService, turn, apiKey)
+				}
 				turnCtx, turnAt := h.gatewayService.WithOpenAITurnPricingContext(turnBillingCtx, apiKey.GroupID)
 				if _, vetoed, reason := h.gatewayService.ProfitControlVetoLatest(turnCtx, account); vetoed {
 					reqLog.Info("openai.websocket_turn_profit_vetoed",

@@ -844,6 +844,26 @@ export default {
 
     // Groups Management
     groups: {
+      monitorFallback: {
+        health: { operational: '正常', degraded: '降级可用', unknown: '状态未知（尝试使用）', failed: '故障', error: '探测错误' },
+        "type": "分组类型",
+        "business": "业务分组",
+        "fallback": "兜底分组（监听路由）",
+        "hint": "按顺序选择独立业务分组。明确故障时跳过，正常/降级/未知时允许使用。主组恢复后新请求优先回切；入口自身不参与探测和调度。",
+        "billing": "使用目标业务组的定价、倍率、RPM 和用量归属；入口授权委托管理员配置的标准目标组。暂不支持订阅、合成平台和客户端专用目标。",
+        "required": "请至少添加一个监听的业务分组",
+        "add": "按优先级添加业务分组",
+        "up": "提高优先级",
+        "down": "降低优先级",
+        "remove": "移除分组",
+        "routes": "兜底分组 · 当前路由",
+        "refresh": "刷新路由",
+        "model": "按请求模型查看（留空为默认）",
+        "statusHint": "与实际路由使用同一判定。V1 读取独立业务组探测；V2 读取最近 5 分钟错误率。样本不足或过期为未知并允许尝试。被动监测在失败证据过期后重试主组，不代表已探测恢复。",
+        "unavailable": "所有候选不可用",
+        "empty": "尚未配置兜底分组",
+        "loadFailed": "无法加载兜底配置或状态，请重试"
+      },
       title: '分组管理',
       description: '管理 API 密钥分组和费率配置',
       searchGroups: '搜索分组...',

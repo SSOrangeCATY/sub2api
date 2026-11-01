@@ -1,6 +1,7 @@
 <template>
   <AppLayout>
     <div class="pt-channel-status space-y-6 pb-12">
+      <MonitorFallbackRoutes audience="user" />
       <!-- Page title opens onto the contour background; controls stay on a solid surface. -->
       <section
         class="card pt-monitor-command p-0"
@@ -463,6 +464,7 @@ import { useI18n } from 'vue-i18n'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppLayout from '@/components/layout/AppLayout.vue'
+import MonitorFallbackRoutes from '@/components/admin/group/MonitorFallbackRoutes.vue'
 import Icon from '@/components/icons/Icon.vue'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import Select from '@/components/common/Select.vue'
@@ -938,24 +940,8 @@ onBeforeUnmount(() => {
   height: 0.5rem;
   width: 0.5rem;
   flex: none;
-  border-radius: 9999px;
+  border-radius: 0;
 }
-/* Multi-stop green → yellow → red score bands */
-.health-score10 { background: #16a34a; }
-.health-score9  { background: #22c55e; }
-.health-score8  { background: #4ade80; }
-.health-score7  { background: #a3e635; }
-.health-score6  { background: #facc15; }
-.health-score5  { background: #fbbf24; }
-.health-score4  { background: #f59e0b; }
-.health-score3  { background: #f97316; }
-.health-score2  { background: #fb7185; }
-.health-score1  { background: #f87171; }
-.health-score0  { background: rgb(239, 67, 67); }
-.health-healthy  { background: #22c55e; }
-.health-warning  { background: #f59e0b; }
-.health-critical { background: #ef4444; }
-.health-unknown  { background: #9ca3af; }
 .matrix-select {
   min-width: 10rem;
 }

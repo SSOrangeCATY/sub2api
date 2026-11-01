@@ -244,6 +244,7 @@ func (s *GroupRepoSuite) TestUpdate() {
 	s.Require().NoError(s.repo.Create(s.ctx, group))
 
 	group.Name = "updated"
+	s.Require().Equal(service.GroupTypeBusiness, group.GroupType, "Create must return persisted defaults for subsequent updates")
 	err := s.repo.Update(s.ctx, group)
 	s.Require().NoError(err, "Update")
 

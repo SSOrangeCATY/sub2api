@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -16,6 +17,40 @@ type channelMonitorV2GroupAuthorizerStub struct {
 	groups []service.Group
 	err    error
 	calls  []int64
+}
+
+type userFallbackResolverStub struct{ entries []int64 }
+
+func (s *userFallbackResolverStub) Resolve(_ context.Context, entry *service.Group, model string) (*service.MonitorGroupRoute, error) {
+	s.entries = append(s.entries, entry.ID)
+	id := int64(200)
+	return &service.MonitorGroupRoute{EntryGroupID: entry.ID, EntryGroupName: entry.Name, TargetGroupID: &id, TargetGroupName: "B", Model: model, Candidates: []service.MonitorGroupRouteCandidate{{GroupID: 300, GroupName: "private-target"}}}, nil
+}
+
+func TestMonitorGroupUserRouteScopeAndRedaction(t *testing.T) {
+	writer := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(writer)
+	c.Request = httptest.NewRequest(http.MethodGet, "/channel-monitors/fallback-routes?model=allowed", nil)
+	c.Set(string(middleware.ContextKeyUser), middleware.AuthSubject{UserID: 42})
+	auth := &channelMonitorV2GroupAuthorizerStub{groups: []service.Group{
+		{ID: 1, GroupType: service.GroupTypeBusiness},
+		{ID: 2, Name: "Fallback", GroupType: service.GroupTypeFallback},
+		{ID: 3, GroupType: service.GroupTypeFallback, ModelAllowlist: service.GroupModelAllowlist{Enabled: true, Models: []string{"other"}}},
+	}}
+	resolver := &userFallbackResolverStub{}
+	h := &ChannelMonitorV2Handler{apiKeyService: auth, monitorRouter: resolver}
+	h.FallbackRoutes(c)
+	require.Equal(t, http.StatusOK, writer.Code)
+	require.Equal(t, []int64{42}, auth.calls)
+	require.Equal(t, []int64{2}, resolver.entries)
+	var result struct {
+		Data []service.MonitorGroupRoute `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(writer.Body.Bytes(), &result))
+	require.Len(t, result.Data, 1)
+	require.Equal(t, "B", result.Data[0].TargetGroupName)
+	require.Empty(t, result.Data[0].Candidates)
+	require.NotContains(t, writer.Body.String(), "private-target")
 }
 
 func (s *channelMonitorV2GroupAuthorizerStub) GetAvailableGroups(_ context.Context, userID int64) ([]service.Group, error) {

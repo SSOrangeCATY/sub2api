@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -407,6 +408,17 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 	}
 
 	platform := NormalizeGroupPlatform(input.Platform)
+	groupType := strings.TrimSpace(input.GroupType)
+	if groupType == "" {
+		groupType = GroupTypeBusiness
+	}
+	if groupType != GroupTypeBusiness && groupType != GroupTypeFallback {
+		return nil, infraerrors.BadRequest("INVALID_GROUP_TYPE", "group_type must be business or fallback")
+	}
+	monitorFallbackIDs, err := s.validateMonitorFallbackChain(ctx, 0, platform, groupType, input.FallbackGroupIDs)
+	if err != nil {
+		return nil, err
+	}
 	// 固定账号 manifest 配置：账号绑定发生在创建之后，创建时无法校验成员关系，
 	// 拒绝开启并在创建后的编辑里配置。
 	if normalizeCodexModelsManifestConfig(platform, input.CodexModelsManifestConfig).Enabled {
@@ -430,6 +442,9 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 	}
 
 	subscriptionType := input.SubscriptionType
+	if groupType == GroupTypeFallback && (subscriptionType == SubscriptionTypeSubscription || input.ClaudeCodeOnly || input.FallbackGroupID != nil || input.FallbackGroupIDOnInvalidRequest != nil || len(input.CopyAccountsFromGroupIDs) > 0) {
+		return nil, infraerrors.BadRequest("INVALID_FALLBACK_ENTRY", "fallback entries cannot use subscriptions, client fallbacks or copied accounts")
+	}
 	if subscriptionType == "" {
 		subscriptionType = SubscriptionTypeStandard
 	}
@@ -580,6 +595,8 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 		Description:                     input.Description,
 		I18n:                            i18n,
 		Platform:                        platform,
+		GroupType:                       groupType,
+		FallbackGroupIDs:                monitorFallbackIDs,
 		RateMultiplier:                  input.RateMultiplier,
 		IsExclusive:                     input.IsExclusive,
 		Status:                          StatusActive,
@@ -767,6 +784,67 @@ func (s *adminServiceImpl) validateFallbackGroupOnInvalidRequest(ctx context.Con
 	return nil
 }
 
+// validateMonitorFallbackChain validates the ordered, monitor-driven fallback
+// chain. Only fallback entry groups own a chain; business groups are terminal.
+func (s *adminServiceImpl) validateMonitorFallbackChain(ctx context.Context, currentGroupID int64, platform, groupType string, ids []int64) ([]int64, error) {
+	invalid := func(format string, args ...any) ([]int64, error) {
+		return nil, infraerrors.BadRequest("INVALID_MONITOR_FALLBACK_CHAIN", fmt.Sprintf(format, args...))
+	}
+	if groupType != GroupTypeBusiness && groupType != GroupTypeFallback {
+		return invalid("invalid group_type: %s", groupType)
+	}
+	if groupType == GroupTypeBusiness {
+		if len(ids) > 0 {
+			return invalid("business groups cannot configure a monitor fallback chain")
+		}
+		return []int64{}, nil
+	}
+	if len(ids) == 0 || len(ids) > 20 {
+		return invalid("fallback groups require between 1 and 20 ordered business groups")
+	}
+	if platform == PlatformComposite {
+		return invalid("monitor fallback entry groups require a concrete platform")
+	}
+	out := make([]int64, 0, len(ids))
+	seen := make(map[int64]struct{}, len(ids))
+	for _, targetID := range ids {
+		if targetID <= 0 {
+			return invalid("fallback group id must be positive")
+		}
+		if targetID == currentGroupID {
+			return invalid("cannot set self as monitor fallback group")
+		}
+		if _, ok := seen[targetID]; ok {
+			return invalid("duplicate monitor fallback group id: %d", targetID)
+		}
+		seen[targetID] = struct{}{}
+		target, err := s.groupRepo.GetByIDLite(ctx, targetID)
+		if err != nil {
+			if errors.Is(err, ErrGroupNotFound) {
+				return invalid("monitor fallback group %d not found", targetID)
+			}
+			return nil, fmt.Errorf("monitor fallback group %d not found: %w", targetID, err)
+		}
+		if target == nil || target.Status != "active" {
+			return invalid("monitor fallback group %d must be active", targetID)
+		}
+		if target.Platform != platform {
+			return invalid("monitor fallback group %d platform mismatch: expected %s, got %s", targetID, platform, target.Platform)
+		}
+		if target.GroupType != "" && target.GroupType != GroupTypeBusiness {
+			return invalid("monitor fallback target %d must be a business group", targetID)
+		}
+		if len(target.FallbackGroupIDs) != 0 {
+			return invalid("monitor fallback group %d cannot contain another fallback chain", targetID)
+		}
+		if target.IsSubscriptionType() || target.ClaudeCodeOnly || target.FallbackGroupIDOnInvalidRequest != nil {
+			return invalid("monitor fallback target %d must be a standard business group without client-specific fallback", targetID)
+		}
+		out = append(out, targetID)
+	}
+	return out, nil
+}
+
 func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *UpdateGroupInput) (*Group, error) {
 	group, err := s.groupRepo.GetByID(ctx, id)
 	if err != nil {
@@ -784,6 +862,8 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 
 	// 渠道缓存里存了 groupID → platform 的映射，改了平台要让它失效（见函数末尾）
 	previousPlatform := group.Platform
+	previousGroupType := group.GroupType
+	previousMonitorFallbackIDs := slices.Clone(group.FallbackGroupIDs)
 
 	if input.Name != "" {
 		group.Name = input.Name
@@ -800,6 +880,36 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 	}
 	if input.Platform != "" {
 		group.Platform = input.Platform
+	}
+	if input.GroupType != nil {
+		group.GroupType = strings.TrimSpace(*input.GroupType)
+		if group.GroupType == "" {
+			group.GroupType = GroupTypeBusiness
+		}
+	}
+	if group.GroupType == "" {
+		group.GroupType = GroupTypeBusiness
+	}
+	if group.GroupType == GroupTypeFallback && previousGroupType != GroupTypeFallback {
+		total, _, countErr := s.groupRepo.GetAccountCount(ctx, id)
+		if countErr != nil {
+			return nil, countErr
+		}
+		if total > 0 {
+			return nil, infraerrors.BadRequest("FALLBACK_ENTRY_HAS_ACCOUNTS", "unbind accounts before converting a business group into a fallback entry")
+		}
+	}
+	if input.FallbackGroupIDs != nil {
+		group.FallbackGroupIDs = append([]int64(nil), (*input.FallbackGroupIDs)...)
+	}
+	// Broken/deleted targets must not prevent disabling or renaming an entry.
+	// Validate changes to routing, while runtime resolution skips stale targets.
+	if group.GroupType != previousGroupType || group.Platform != previousPlatform || !slices.Equal(group.FallbackGroupIDs, previousMonitorFallbackIDs) {
+		validatedMonitorFallbackIDs, err := s.validateMonitorFallbackChain(ctx, id, group.Platform, group.GroupType, group.FallbackGroupIDs)
+		if err != nil {
+			return nil, err
+		}
+		group.FallbackGroupIDs = validatedMonitorFallbackIDs
 	}
 	if input.RateMultiplier != nil {
 		if *input.RateMultiplier <= 0 {
@@ -1084,6 +1194,9 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 		}
 	}
 
+	if group.GroupType == GroupTypeFallback && (group.IsSubscriptionType() || group.ClaudeCodeOnly || group.FallbackGroupID != nil || group.FallbackGroupIDOnInvalidRequest != nil || len(input.CopyAccountsFromGroupIDs) > 0) {
+		return nil, infraerrors.BadRequest("INVALID_FALLBACK_ENTRY", "fallback entries cannot use subscriptions, client fallbacks or copied accounts")
+	}
 	if err := s.groupRepo.Update(ctx, group); err != nil {
 		return nil, err
 	}

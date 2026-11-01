@@ -156,6 +156,7 @@ function mountView() {
   return mount(GroupsView, {
     global: {
       stubs: {
+        MonitorFallbackRoutes: true,
         AppLayout: AppLayoutStub,
         TablePageLayout: TablePageLayoutStub,
         DataTable: DataTableStub,
@@ -176,6 +177,21 @@ function mountView() {
 }
 
 describe('GroupsView duplicate action', () => {
+  it('round-trips an existing fallback chain through the edit form', async () => {
+    const fallback = { ...sourceGroup, group_type: 'fallback', fallback_group_ids: [8, 9] }
+    listGroups.mockResolvedValue({ items: [fallback], total: 1, page: 1, page_size: 20, pages: 1 })
+    vi.mocked(adminAPI.groups.getAll).mockResolvedValue([
+      { ...sourceGroup, id: 8, name: 'A', group_type: 'business' },
+      { ...sourceGroup, id: 9, name: 'B', group_type: 'business' },
+    ])
+    updateGroup.mockResolvedValue(fallback)
+    const wrapper = mountView(); await flushPromises()
+    await wrapper.findAll('button').find(button => button.text() === 'common.edit')!.trigger('click')
+    await flushPromises()
+    await wrapper.get('#edit-group-form').trigger('submit'); await flushPromises()
+    expect(updateGroup).toHaveBeenCalledWith(sourceGroup.id, expect.objectContaining({ group_type: 'fallback', fallback_group_ids: [8, 9] }))
+    wrapper.unmount()
+  })
   beforeEach(() => {
     authState.isSimpleMode = false
     localStorage.clear()

@@ -57,6 +57,8 @@ type APIKeyAuthUserSnapshot struct {
 
 // APIKeyAuthGroupSnapshot 分组快照
 type APIKeyAuthGroupSnapshot struct {
+	GroupType                       string                        `json:"group_type"`
+	FallbackGroupIDs                []int64                       `json:"fallback_group_ids"`
 	ID                              int64                         `json:"id"`
 	Name                            string                        `json:"name"`
 	Platform                        string                        `json:"platform"`

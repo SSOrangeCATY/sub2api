@@ -22,6 +22,7 @@ import (
 
 // GroupHandler handles admin group management
 type GroupHandler struct {
+	monitorRouter        *service.MonitorGroupRouter
 	adminService         service.AdminService
 	dashboardService     *service.DashboardService
 	groupCapacityService *service.GroupCapacityService
@@ -102,6 +103,39 @@ func NewGroupHandlerWithConfig(adminService service.AdminService, dashboardServi
 		groupCapacityService: groupCapacityService,
 		cfg:                  cfg,
 	}
+}
+
+func ProvideMonitoredGroupHandler(adminService service.AdminService, dashboardService *service.DashboardService, capacity *service.GroupCapacityService, cfg *config.Config, keys *service.APIKeyService) *GroupHandler {
+	h := NewGroupHandlerWithConfig(adminService, dashboardService, capacity, cfg)
+	h.monitorRouter = keys.MonitorGroupRouter()
+	return h
+}
+
+// MonitorFallbackRoutes uses the same resolver as live traffic. model is
+// optional: without it the dashboard shows primary-model/default route state.
+func (h *GroupHandler) MonitorFallbackRoutes(c *gin.Context) {
+	groups, err := h.adminService.GetAllGroups(c.Request.Context())
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	out := make([]*service.MonitorGroupRoute, 0)
+	if h.monitorRouter == nil {
+		response.Success(c, out)
+		return
+	}
+	for i := range groups {
+		if groups[i].GroupType != service.GroupTypeFallback {
+			continue
+		}
+		route, err := h.monitorRouter.Resolve(c.Request.Context(), &groups[i], strings.TrimSpace(c.Query("model")))
+		if err != nil {
+			response.ErrorFrom(c, err)
+			return
+		}
+		out = append(out, route)
+	}
+	response.Success(c, out)
 }
 
 func (h *GroupHandler) isSimpleMode() bool {
@@ -189,6 +223,8 @@ type CreateGroupRequest struct {
 	Description               string                        `json:"description"`
 	I18n                      service.GroupI18n             `json:"i18n"` // 名称与描述的界面语言译文
 	Platform                  string                        `json:"platform" binding:"omitempty,group_platform"`
+	GroupType                 string                        `json:"group_type" binding:"omitempty,oneof=business fallback"`
+	FallbackGroupIDs          []int64                       `json:"fallback_group_ids"`
 	RateMultiplier            float64                       `json:"rate_multiplier"`
 	IsExclusive               bool                          `json:"is_exclusive"`
 	SubscriptionType          string                        `json:"subscription_type" binding:"omitempty,oneof=standard subscription"`
@@ -265,6 +301,8 @@ type UpdateGroupRequest struct {
 	Description               *string                        `json:"description"`
 	I18n                      *service.GroupI18n             `json:"i18n"` // 缺省不修改，传入则整体替换
 	Platform                  string                         `json:"platform" binding:"omitempty,group_platform"`
+	GroupType                 *string                        `json:"group_type" binding:"omitempty,oneof=business fallback"`
+	FallbackGroupIDs          *[]int64                       `json:"fallback_group_ids"`
 	RateMultiplier            *float64                       `json:"rate_multiplier"`
 	IsExclusive               *bool                          `json:"is_exclusive"`
 	Status                    string                         `json:"status" binding:"omitempty,oneof=active inactive"`
@@ -673,6 +711,8 @@ func (h *GroupHandler) Create(c *gin.Context) {
 		Description:                     req.Description,
 		I18n:                            req.I18n,
 		Platform:                        req.Platform,
+		GroupType:                       req.GroupType,
+		FallbackGroupIDs:                req.FallbackGroupIDs,
 		RateMultiplier:                  req.RateMultiplier,
 		IsExclusive:                     req.IsExclusive,
 		SubscriptionType:                req.SubscriptionType,
@@ -820,6 +860,8 @@ func (h *GroupHandler) Update(c *gin.Context) {
 		Description:                     req.Description,
 		I18n:                            req.I18n,
 		Platform:                        req.Platform,
+		GroupType:                       req.GroupType,
+		FallbackGroupIDs:                req.FallbackGroupIDs,
 		RateMultiplier:                  req.RateMultiplier,
 		IsExclusive:                     req.IsExclusive,
 		Status:                          req.Status,

@@ -30,6 +30,10 @@ func (h *GroupHandler) ScopedAdminKeyGroupModels(c *gin.Context) {
 	base := "/api/v1/admin/groups/:id"
 	path := c.FullPath()
 	fullRead := slices.Contains(p.Policy.GlobalPermissions, "groups.read")
+	if path == "/api/v1/admin/groups/fallback-routes" && !fullRead {
+		c.AbortWithStatusJSON(403, gin.H{"error": "group route visibility requires groups.read"})
+		return
+	}
 	if c.Request.Method == http.MethodGet && (path == "/api/v1/admin/groups" || path == "/api/v1/admin/groups/all") {
 		if fullRead {
 			return

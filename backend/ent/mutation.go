@@ -22098,6 +22098,9 @@ type GroupMutation struct {
 	status                                  *string
 	duplicate_operation_id                  *string
 	platform                                *string
+	group_type                              *string
+	fallback_group_ids                      *[]int64
+	appendfallback_group_ids                []int64
 	subscription_type                       *string
 	daily_limit_usd                         *float64
 	adddaily_limit_usd                      *float64
@@ -22918,6 +22921,93 @@ func (m *GroupMutation) OldPlatform(ctx context.Context) (v string, err error) {
 // ResetPlatform resets all changes to the "platform" field.
 func (m *GroupMutation) ResetPlatform() {
 	m.platform = nil
+}
+
+// SetGroupType sets the "group_type" field.
+func (m *GroupMutation) SetGroupType(s string) {
+	m.group_type = &s
+}
+
+// GroupType returns the value of the "group_type" field in the mutation.
+func (m *GroupMutation) GroupType() (r string, exists bool) {
+	v := m.group_type
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldGroupType returns the old "group_type" field's value of the Group entity.
+// If the Group object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *GroupMutation) OldGroupType(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldGroupType is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldGroupType requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldGroupType: %w", err)
+	}
+	return oldValue.GroupType, nil
+}
+
+// ResetGroupType resets all changes to the "group_type" field.
+func (m *GroupMutation) ResetGroupType() {
+	m.group_type = nil
+}
+
+// SetFallbackGroupIds sets the "fallback_group_ids" field.
+func (m *GroupMutation) SetFallbackGroupIds(i []int64) {
+	m.fallback_group_ids = &i
+	m.appendfallback_group_ids = nil
+}
+
+// FallbackGroupIds returns the value of the "fallback_group_ids" field in the mutation.
+func (m *GroupMutation) FallbackGroupIds() (r []int64, exists bool) {
+	v := m.fallback_group_ids
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFallbackGroupIds returns the old "fallback_group_ids" field's value of the Group entity.
+// If the Group object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *GroupMutation) OldFallbackGroupIds(ctx context.Context) (v []int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFallbackGroupIds is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFallbackGroupIds requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFallbackGroupIds: %w", err)
+	}
+	return oldValue.FallbackGroupIds, nil
+}
+
+// AppendFallbackGroupIds adds i to the "fallback_group_ids" field.
+func (m *GroupMutation) AppendFallbackGroupIds(i []int64) {
+	m.appendfallback_group_ids = append(m.appendfallback_group_ids, i...)
+}
+
+// AppendedFallbackGroupIds returns the list of values that were appended to the "fallback_group_ids" field in this mutation.
+func (m *GroupMutation) AppendedFallbackGroupIds() ([]int64, bool) {
+	if len(m.appendfallback_group_ids) == 0 {
+		return nil, false
+	}
+	return m.appendfallback_group_ids, true
+}
+
+// ResetFallbackGroupIds resets all changes to the "fallback_group_ids" field.
+func (m *GroupMutation) ResetFallbackGroupIds() {
+	m.fallback_group_ids = nil
+	m.appendfallback_group_ids = nil
 }
 
 // SetSubscriptionType sets the "subscription_type" field.
@@ -25995,7 +26085,7 @@ func (m *GroupMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *GroupMutation) Fields() []string {
-	fields := make([]string, 0, 68)
+	fields := make([]string, 0, 70)
 	if m.created_at != nil {
 		fields = append(fields, group.FieldCreatedAt)
 	}
@@ -26040,6 +26130,12 @@ func (m *GroupMutation) Fields() []string {
 	}
 	if m.platform != nil {
 		fields = append(fields, group.FieldPlatform)
+	}
+	if m.group_type != nil {
+		fields = append(fields, group.FieldGroupType)
+	}
+	if m.fallback_group_ids != nil {
+		fields = append(fields, group.FieldFallbackGroupIds)
 	}
 	if m.subscription_type != nil {
 		fields = append(fields, group.FieldSubscriptionType)
@@ -26238,6 +26334,10 @@ func (m *GroupMutation) Field(name string) (ent.Value, bool) {
 		return m.DuplicateOperationID()
 	case group.FieldPlatform:
 		return m.Platform()
+	case group.FieldGroupType:
+		return m.GroupType()
+	case group.FieldFallbackGroupIds:
+		return m.FallbackGroupIds()
 	case group.FieldSubscriptionType:
 		return m.SubscriptionType()
 	case group.FieldDailyLimitUsd:
@@ -26383,6 +26483,10 @@ func (m *GroupMutation) OldField(ctx context.Context, name string) (ent.Value, e
 		return m.OldDuplicateOperationID(ctx)
 	case group.FieldPlatform:
 		return m.OldPlatform(ctx)
+	case group.FieldGroupType:
+		return m.OldGroupType(ctx)
+	case group.FieldFallbackGroupIds:
+		return m.OldFallbackGroupIds(ctx)
 	case group.FieldSubscriptionType:
 		return m.OldSubscriptionType(ctx)
 	case group.FieldDailyLimitUsd:
@@ -26602,6 +26706,20 @@ func (m *GroupMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetPlatform(v)
+		return nil
+	case group.FieldGroupType:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetGroupType(v)
+		return nil
+	case group.FieldFallbackGroupIds:
+		v, ok := value.([]int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFallbackGroupIds(v)
 		return nil
 	case group.FieldSubscriptionType:
 		v, ok := value.(string)
@@ -27529,6 +27647,12 @@ func (m *GroupMutation) ResetField(name string) error {
 		return nil
 	case group.FieldPlatform:
 		m.ResetPlatform()
+		return nil
+	case group.FieldGroupType:
+		m.ResetGroupType()
+		return nil
+	case group.FieldFallbackGroupIds:
+		m.ResetFallbackGroupIds()
 		return nil
 	case group.FieldSubscriptionType:
 		m.ResetSubscriptionType()

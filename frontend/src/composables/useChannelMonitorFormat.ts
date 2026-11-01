@@ -56,14 +56,15 @@ export function useChannelMonitorFormat() {
   function statusBadgeClass(s: MonitorStatus | ''): string {
     switch (s) {
       case STATUS_OPERATIONAL:
-        return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300'
+        return 'monitor-status monitor-status--operational'
       case STATUS_DEGRADED:
-        return 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300'
+        return 'monitor-status monitor-status--degraded'
       case STATUS_FAILED:
-        return 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300'
+        return 'monitor-status monitor-status--failed'
       case STATUS_ERROR:
+        return 'monitor-status monitor-status--error'
       default:
-        return NEUTRAL_BADGE
+        return 'monitor-status monitor-status--unknown'
     }
   }
 

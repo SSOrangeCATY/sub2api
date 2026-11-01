@@ -847,6 +847,26 @@ export default {
 
     // Groups
     groups: {
+      monitorFallback: {
+        health: { operational: 'Operational', degraded: 'Degraded', unknown: 'Unknown (attempt allowed)', failed: 'Failed', error: 'Probe error' },
+        "type": "Group type",
+        "business": "Business group",
+        "fallback": "Fallback group (monitored routing)",
+        "hint": "Order independent business groups. Skip confirmed failures; allow healthy, degraded and unknown groups. New requests prefer the primary after recovery. The entry is never probed or scheduled.",
+        "billing": "Uses target prices, multiplier, RPM and usage attribution. Entry access delegates access to configured standard targets. Subscription, composite and client-specific targets are unsupported.",
+        "required": "Add at least one monitored business group",
+        "add": "Add business group in priority order",
+        "up": "Move up",
+        "down": "Move down",
+        "remove": "Remove group",
+        "routes": "Fallback groups · Current route",
+        "refresh": "Refresh routes",
+        "model": "Request model (empty for default)",
+        "statusHint": "Uses the traffic resolver. V1 reads independent business probes; V2 uses the last 5 minutes of error rates. Insufficient or stale data allows attempts. Passive monitoring retries the primary after evidence expires without claiming verified recovery.",
+        "unavailable": "All candidates unavailable",
+        "empty": "No fallback groups configured",
+        "loadFailed": "Unable to load fallback configuration or status. Retry."
+      },
       title: 'Group Management',
       description: 'Manage API key groups and rate multipliers',
       searchGroups: 'Search groups...',
