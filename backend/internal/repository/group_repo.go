@@ -54,7 +54,9 @@ func lockGroupsForBinding(ctx context.Context, exec sqlExecutor, groupIDs []int6
 		SELECT id FROM groups
 		WHERE id = ANY($1) AND deleted_at IS NULL`
 	if businessOnly {
-		query += ` AND group_type = 'business'`
+		query = `/* account_group_live_group_lock */
+		SELECT id, group_type FROM groups
+		WHERE id = ANY($1) AND deleted_at IS NULL`
 	}
 	query += `
 		ORDER BY id
@@ -65,17 +67,26 @@ func lockGroupsForBinding(ctx context.Context, exec sqlExecutor, groupIDs []int6
 	}
 	defer func() { _ = rows.Close() }()
 	locked := 0
+	bindable := true
 	for rows.Next() {
+		if businessOnly {
+			var id int64
+			var groupType string
+			if err := rows.Scan(&id, &groupType); err != nil {
+				return err
+			}
+			bindable = bindable && groupType == service.GroupTypeBusiness
+		}
 		locked++
 	}
 	if err := rows.Err(); err != nil {
 		return err
 	}
 	if locked != len(unique) {
-		if businessOnly {
-			return infraerrors.BadRequest("GROUP_NOT_ACCOUNT_BINDABLE", "accounts can only be bound to existing business groups; fallback entries route to business groups")
-		}
 		return service.ErrGroupNotFound
+	}
+	if !bindable {
+		return infraerrors.BadRequest("GROUP_NOT_ACCOUNT_BINDABLE", "accounts can only be bound to existing business groups; fallback entries route to business groups")
 	}
 	return nil
 }
@@ -205,6 +216,8 @@ func createGroupRecord(ctx context.Context, client *dbent.Client, groupIn *servi
 		return translatePersistenceError(err, nil, service.ErrGroupExists)
 	}
 	groupIn.ID = created.ID
+	groupIn.GroupType = created.GroupType
+	groupIn.FallbackGroupIDs = created.FallbackGroupIds
 	groupIn.CreatedAt = created.CreatedAt
 	groupIn.UpdatedAt = created.UpdatedAt
 	return nil
