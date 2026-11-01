@@ -20,7 +20,7 @@ func resolveAuthenticatedMonitorFallback(c *gin.Context, keys *service.APIKeySer
 		return key, nil
 	}
 	if monitorFallbackStatefulPath(c.Request.URL.Path) {
-		return nil, infraerrors.BadRequest("FALLBACK_STATEFUL_ENDPOINT_UNSUPPORTED", "use a business-group key for videos, provider tasks, batch images and Gemini cached contents; these resources must remain bound to their original group")
+		return nil, infraerrors.BadRequest("FALLBACK_STATEFUL_ENDPOINT_UNSUPPORTED", "use a business-group key for videos, provider tasks, batch images, Live sessions and Gemini cached contents; these resources must remain bound to their original group")
 	}
 	if c.Request.Method == http.MethodGet && (strings.HasSuffix(c.Request.URL.Path, "/usage") || strings.HasSuffix(c.Request.URL.Path, "/sub2api/billing")) {
 		return key, nil
@@ -53,7 +53,7 @@ func resolveAuthenticatedMonitorFallback(c *gin.Context, keys *service.APIKeySer
 }
 
 func monitorFallbackStatefulPath(path string) bool {
-	for _, segment := range []string{"/videos", "/contents/generations/tasks", "/cachedContents", "/images/batches"} {
+	for _, segment := range []string{"/videos", "/contents/generations/tasks", "/cachedContents", "/images/batches", "/live", "/realtime/calls"} {
 		if i := strings.Index(path, segment); i >= 0 && (i+len(segment) == len(path) || path[i+len(segment)] == '/') {
 			return true
 		}

@@ -71,12 +71,15 @@ func TestMonitorFallbackWSDefersRoutingUntilFirstModel(t *testing.T) {
 }
 
 func TestMonitorFallbackStatefulEndpointsRejectedBeforeUpstream(t *testing.T) {
-	for _, path := range []string{"/videos", "/v1/videos/generations/id/content", "/v3/contents/generations/tasks", "/v1beta/cachedContents/cache-id", "/v1/images/batches/id/cancel"} {
-		c, _ := gin.CreateTestContext(httptest.NewRecorder())
-		c.Request = httptest.NewRequest(http.MethodPost, path, strings.NewReader(`{}`))
-		_, err := resolveAuthenticatedMonitorFallback(c, nil, &service.APIKey{Group: &service.Group{GroupType: service.GroupTypeFallback}})
-		require.ErrorContains(t, err, "business-group key")
+	for _, path := range []string{"/videos", "/v1/videos/generations/id/content", "/v3/contents/generations/tasks", "/v1beta/cachedContents/cache-id", "/v1/images/batches/id/cancel", "/live", "/v1/live", "/live/call-id", "/v1/live/call-id", "/backend-api/codex/realtime/calls"} {
+		for _, method := range []string{http.MethodPost, http.MethodGet} {
+			c, _ := gin.CreateTestContext(httptest.NewRecorder())
+			c.Request = httptest.NewRequest(method, path, strings.NewReader(`{}`))
+			_, err := resolveAuthenticatedMonitorFallback(c, nil, &service.APIKey{Group: &service.Group{GroupType: service.GroupTypeFallback}})
+			require.ErrorContains(t, err, "business-group key")
+		}
 	}
 	require.False(t, monitorFallbackStatefulPath("/v1/images/tasks/id"))
 	require.False(t, monitorFallbackStatefulPath("/v1/responses"))
+	require.False(t, monitorFallbackStatefulPath("/v1/liveness"))
 }
