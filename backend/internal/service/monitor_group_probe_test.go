@@ -5,6 +5,7 @@ package service
 import (
 	"context"
 	"github.com/stretchr/testify/require"
+	"strings"
 	"testing"
 	"time"
 )
@@ -34,14 +35,40 @@ func (r *independentMonitorRepo) ListLatestForMonitorIDs(context.Context, []int6
 
 type independentProbeKeyRepo struct {
 	APIKeyRepository
-	key *APIKey
+	key  *APIKey
+	keys map[string]*APIKey
 }
 
-func (r *independentProbeKeyRepo) GetByKey(context.Context, string) (*APIKey, error) {
+func (r *independentProbeKeyRepo) GetByKey(_ context.Context, plain string) (*APIKey, error) {
+	if r.keys != nil {
+		if key := r.keys[plain]; key != nil {
+			return key, nil
+		}
+		return nil, ErrAPIKeyNotFound
+	}
 	if r.key == nil {
 		return nil, ErrAPIKeyNotFound
 	}
 	return r.key, nil
+}
+func TestMonitorGroupIndependentProbeValidatesHeaderCredentials(t *testing.T) {
+	repo := &independentProbeKeyRepo{keys: map[string]*APIKey{
+		"business": {Group: &Group{Name: "A", GroupType: GroupTypeBusiness}},
+		"fallback": {Group: &Group{Name: "entry", GroupType: GroupTypeFallback}},
+		"other":    {Group: &Group{Name: "B", GroupType: GroupTypeBusiness}},
+	}}
+	svc := &ChannelMonitorService{localKeys: repo}
+	for _, name := range []string{"Authorization", "authorization", "x-api-key", "X-Goog-Api-Key"} {
+		for _, credential := range []string{"fallback", "other"} {
+			value := credential
+			if strings.EqualFold(name, "Authorization") {
+				value = "Bearer " + credential
+			}
+			require.Error(t, svc.validateIndependentProbe(context.Background(), "business", "A", map[string]string{name: value}))
+		}
+	}
+	require.NoError(t, svc.validateIndependentProbe(context.Background(), "business", "A", map[string]string{"Authorization": "Bearer business"}))
+	require.NoError(t, svc.validateIndependentProbe(context.Background(), "external", "A", map[string]string{"x-api-key": "external"}))
 }
 func TestMonitorGroupIndependentProbeRejectsEntryAndMismatchedGroup(t *testing.T) {
 	repo := &independentProbeKeyRepo{key: &APIKey{Group: &Group{Name: "A", GroupType: GroupTypeFallback}}}
@@ -97,6 +124,20 @@ func TestMonitorGroupSkipsEmptyPool(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, route.Target)
 	require.Equal(t, "no_schedulable_accounts", route.Candidates[0].Reason)
+}
+
+func TestMonitorGroupIgnoresReplacementBodyForDifferentModel(t *testing.T) {
+	groups := &mockGroupRepoForGateway{groups: map[int64]*Group{1: {ID: 1, Name: "A", Platform: PlatformOpenAI}}}
+	m := &ChannelMonitor{ID: 11, GroupName: "A", Provider: MonitorProviderOpenAI, Enabled: true, PrimaryModel: "requested", IntervalSeconds: 30, BodyOverrideMode: MonitorBodyOverrideModeReplace, BodyOverride: map[string]any{"model": "other"}}
+	monitors := &independentMonitorRepo{monitors: []*ChannelMonitor{m}, latest: map[int64][]*ChannelMonitorLatest{11: {{Model: "requested", Status: "operational", CheckedAt: time.Now()}}}}
+	reader := &monitorGroupHealthReader{groups: groups, monitors: monitors}
+	health, err := reader.GetGroupHealth(context.Background(), 1, "requested")
+	require.NoError(t, err)
+	require.Equal(t, GroupHealthUnknown, health.Status)
+	m.BodyOverride["model"] = "requested"
+	health, err = reader.GetGroupHealth(context.Background(), 1, "requested")
+	require.NoError(t, err)
+	require.Equal(t, GroupHealthOperational, health.Status)
 }
 
 func TestMonitorGroupPoolPrecheckDoesNotRejectChannelModelAlias(t *testing.T) {

@@ -185,7 +185,7 @@ func (s *ChannelMonitorService) Create(ctx context.Context, p ChannelMonitorCrea
 		AccountID:        cloneInt64Pointer(p.AccountID),
 	}
 	if checkMode != MonitorCheckModeQuota {
-		if err := s.validateIndependentProbe(ctx, p.APIKey, m.GroupName); err != nil {
+		if err := s.validateIndependentProbe(ctx, p.APIKey, m.GroupName, m.ExtraHeaders); err != nil {
 			return nil, err
 		}
 	}
@@ -457,7 +457,7 @@ func (s *ChannelMonitorService) Update(ctx context.Context, id int64, p ChannelM
 				return nil, ErrChannelMonitorAPIKeyDecryptFailed
 			}
 		}
-		if err := s.validateIndependentProbe(ctx, probeKey, existing.GroupName); err != nil {
+		if err := s.validateIndependentProbe(ctx, probeKey, existing.GroupName, existing.ExtraHeaders); err != nil {
 			return nil, err
 		}
 	}
@@ -634,7 +634,7 @@ func (s *ChannelMonitorService) RunCheck(ctx context.Context, id int64) ([]*Chec
 	}
 	checkMode := defaultCheckMode(m.CheckMode)
 	if checkMode != MonitorCheckModeQuota {
-		if err := s.validateIndependentProbe(ctx, m.APIKey, m.GroupName); err != nil {
+		if err := s.validateIndependentProbe(ctx, m.APIKey, m.GroupName, m.ExtraHeaders); err != nil {
 			return nil, err
 		}
 	}

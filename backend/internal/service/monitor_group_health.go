@@ -75,6 +75,14 @@ func (r *monitorGroupHealthReader) GetGroupHealth(ctx context.Context, groupID i
 	snapshots := make([]GroupHealthSnapshot, 0, len(matched))
 	for _, m := range matched {
 		entry := latestForMonitorModel(latest[m.ID], m.PrimaryModel, m.ExtraModels, model)
+		// Replacement request bodies may execute a different model than the
+		// monitor's label. Such evidence cannot establish this model's health.
+		if entry != nil && m.BodyOverrideMode == MonitorBodyOverrideModeReplace && m.Provider != MonitorProviderGemini {
+			executed, _ := m.BodyOverride["model"].(string)
+			if strings.TrimSpace(executed) != strings.TrimSpace(entry.Model) {
+				entry = nil
+			}
+		}
 		snapshot := GroupHealthSnapshot{Status: GroupHealthUnknown}
 		if entry != nil && !monitorLatestExpired(entry.CheckedAt, m.IntervalSeconds+m.JitterSeconds) {
 			checked := entry.CheckedAt
