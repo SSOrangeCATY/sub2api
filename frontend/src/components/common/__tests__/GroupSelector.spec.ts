@@ -12,7 +12,8 @@ vi.mock('vue-i18n', async () => {
 
 const groups = [
   { id: 1, name: 'Basic', platform: 'anthropic', status: 'active' },
-  { id: 2, name: 'Composite', platform: 'composite', status: 'active' }
+  { id: 2, name: 'Composite', platform: 'composite', status: 'active' },
+  { id: 3, name: 'Fallback entry', platform: 'anthropic', group_type: 'fallback', status: 'active' }
 ] as any
 
 const mountSelector = (modelValue: number[] = []) => mount(GroupSelector, {
@@ -38,6 +39,12 @@ describe('GroupSelector simple-mode binding policy', () => {
   it('cleans hidden historical composite IDs while preserving visible selections', () => {
     authState.isSimpleMode = true
     const wrapper = mountSelector([1, 2])
+    expect(wrapper.emitted('update:modelValue')).toEqual([[[1]]])
+  })
+
+  it('never offers fallback entry groups for account binding and clears stale bindings', () => {
+    const wrapper = mountSelector([1, 3])
+    expect(wrapper.text()).not.toContain('Fallback entry')
     expect(wrapper.emitted('update:modelValue')).toEqual([[[1]]])
   })
 })

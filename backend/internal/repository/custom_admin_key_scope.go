@@ -109,7 +109,7 @@ func (r *accountRepository) scopedAdminBindGroups(ctx context.Context, accountID
 	if len(added) == 0 && len(removed) == 0 {
 		return nil
 	}
-	if err := lockLiveGroups(ctx, r.client, added); err != nil {
+	if err := lockBusinessGroups(ctx, r.client, added); err != nil {
 		return err
 	}
 	if len(removed) > 0 {

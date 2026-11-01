@@ -184,6 +184,8 @@ func groupFromServiceBase(g *service.Group) Group {
 		Description:                     g.Description,
 		I18n:                            g.I18n,
 		Platform:                        g.Platform,
+		GroupType:                       g.GroupType,
+		FallbackGroupIDs:                g.FallbackGroupIDs,
 		RateMultiplier:                  g.RateMultiplier,
 		IsExclusive:                     g.IsExclusive,
 		Status:                          g.Status,

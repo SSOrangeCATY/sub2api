@@ -231,7 +231,7 @@ func (r *accountRepository) CreateWithAccountGroups(ctx context.Context, account
 	for i := range groups {
 		groupIDs = append(groupIDs, groups[i].GroupID)
 	}
-	if err := lockLiveGroups(ctx, txClient, groupIDs); err != nil {
+	if err := lockBusinessGroups(ctx, txClient, groupIDs); err != nil {
 		return err
 	}
 
@@ -1908,7 +1908,7 @@ func (r *accountRepository) AddToGroup(ctx context.Context, accountID, groupID i
 		defer func() { _ = tx.Rollback() }()
 		client = tx.Client()
 	}
-	if err := lockLiveGroups(ctx, client, []int64{groupID}); err != nil {
+	if err := lockBusinessGroups(ctx, client, []int64{groupID}); err != nil {
 		return err
 	}
 	_, err = client.AccountGroup.Create().
@@ -1990,7 +1990,7 @@ func (r *accountRepository) BindGroups(ctx context.Context, accountID int64, gro
 		// 已处于外部事务中（ErrTxStarted），复用当前 client
 		txClient = r.client
 	}
-	if err := lockLiveGroups(ctx, txClient, groupIDs); err != nil {
+	if err := lockBusinessGroups(ctx, txClient, groupIDs); err != nil {
 		return err
 	}
 

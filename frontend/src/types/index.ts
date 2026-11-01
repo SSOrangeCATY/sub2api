@@ -577,6 +577,8 @@ export type GroupI18n = Record<string, GroupLocaleText>
 
 // 用户侧接口返回的 name / description 已由后端按请求语言（Accept-Language）选好
 export interface Group {
+  group_type?: "business" | "fallback"
+  fallback_group_ids?: number[]
   id: number
   name: string
   description: string | null
@@ -806,6 +808,8 @@ export interface UpdateApiKeyRequest {
 }
 
 export interface CreateGroupRequest {
+  group_type?: "business" | "fallback"
+  fallback_group_ids?: number[]
   name: string
   description?: string | null
   i18n?: GroupI18n
@@ -873,6 +877,8 @@ export interface CreateGroupRequest {
 }
 
 export interface UpdateGroupRequest {
+  group_type?: "business" | "fallback"
+  fallback_group_ids?: number[]
   name?: string
   description?: string | null
   i18n?: GroupI18n

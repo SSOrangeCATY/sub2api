@@ -145,6 +145,7 @@ func RegisterUserRoutes(
 		// 渠道监控（用户只读）
 		monitors := authenticated.Group("/channel-monitors")
 		{
+			monitors.GET("/fallback-routes", panelRateLimiter.Heavy(), h.ChannelMonitorV2.FallbackRoutes)
 			monitors.GET("", h.ChannelMonitor.List)
 			monitors.GET("/:id/status", h.ChannelMonitor.GetStatus)
 		}

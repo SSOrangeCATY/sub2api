@@ -10,7 +10,9 @@ import (
 	"strings"
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
+	"github.com/Wei-Shaw/sub2api/ent/accountgroup"
 	"github.com/Wei-Shaw/sub2api/ent/group"
+	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -33,6 +35,14 @@ type groupRepository struct {
 // protocol as guarded group deletion. FOR SHARE conflicts with the deleter's
 // FOR UPDATE lock, and READ COMMITTED rechecks deleted_at after any wait.
 func lockLiveGroups(ctx context.Context, exec sqlExecutor, groupIDs []int64) error {
+	return lockGroupsForBinding(ctx, exec, groupIDs, false)
+}
+
+func lockBusinessGroups(ctx context.Context, exec sqlExecutor, groupIDs []int64) error {
+	return lockGroupsForBinding(ctx, exec, groupIDs, true)
+}
+
+func lockGroupsForBinding(ctx context.Context, exec sqlExecutor, groupIDs []int64, businessOnly bool) error {
 	if len(groupIDs) == 0 {
 		return nil
 	}
@@ -40,11 +50,16 @@ func lockLiveGroups(ctx context.Context, exec sqlExecutor, groupIDs []int64) err
 	for _, id := range groupIDs {
 		unique[id] = struct{}{}
 	}
-	rows, err := exec.QueryContext(ctx, `/* account_group_live_group_lock */
+	query := `/* account_group_live_group_lock */
 		SELECT id FROM groups
-		WHERE id = ANY($1) AND deleted_at IS NULL
+		WHERE id = ANY($1) AND deleted_at IS NULL`
+	if businessOnly {
+		query += ` AND group_type = 'business'`
+	}
+	query += `
 		ORDER BY id
-		FOR SHARE`, pq.Array(groupIDs))
+		FOR SHARE`
+	rows, err := exec.QueryContext(ctx, query, pq.Array(groupIDs))
 	if err != nil {
 		return err
 	}
@@ -57,6 +72,9 @@ func lockLiveGroups(ctx context.Context, exec sqlExecutor, groupIDs []int64) err
 		return err
 	}
 	if locked != len(unique) {
+		if businessOnly {
+			return infraerrors.BadRequest("GROUP_NOT_ACCOUNT_BINDABLE", "accounts can only be bound to existing business groups; fallback entries route to business groups")
+		}
 		return service.ErrGroupNotFound
 	}
 	return nil
@@ -94,10 +112,20 @@ func createGroupRecord(ctx context.Context, client *dbent.Client, groupIn *servi
 	if err != nil {
 		return fmt.Errorf("marshal group model pricing: %w", err)
 	}
+	groupType := strings.TrimSpace(groupIn.GroupType)
+	if groupType == "" {
+		groupType = service.GroupTypeBusiness
+	}
+	fallbackIDs := groupIn.FallbackGroupIDs
+	if fallbackIDs == nil {
+		fallbackIDs = []int64{}
+	}
 	builder := client.Group.Create().
 		SetName(groupIn.Name).
 		SetDescription(groupIn.Description).
 		SetPlatform(groupIn.Platform).
+		SetGroupType(groupType).
+		SetFallbackGroupIds(fallbackIDs).
 		SetRateMultiplier(groupIn.RateMultiplier).
 		SetSortOrder(groupIn.SortOrder).
 		SetIsExclusive(groupIn.IsExclusive).
@@ -283,14 +311,50 @@ func (r *groupRepository) GetByIDLite(ctx context.Context, id int64) (*service.G
 }
 
 func (r *groupRepository) Update(ctx context.Context, groupIn *service.Group) error {
+	client := r.client
+	var entryTx *dbent.Tx
+	if groupIn.GroupType == service.GroupTypeFallback {
+		var err error
+		entryTx, err = client.Tx(ctx)
+		if err != nil && !errors.Is(err, dbent.ErrTxStarted) {
+			return err
+		}
+		if entryTx != nil {
+			defer func() { _ = entryTx.Rollback() }()
+			client = entryTx.Client()
+		}
+		// Serialize conversion with all account bind paths (FOR SHARE).
+		rows, err := client.QueryContext(ctx, `SELECT id FROM groups WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`, groupIn.ID)
+		if err != nil {
+			return err
+		}
+		exists := rows.Next()
+		rowErr := rows.Err()
+		_ = rows.Close()
+		if rowErr != nil {
+			return rowErr
+		}
+		if !exists {
+			return service.ErrGroupNotFound
+		}
+		count, err := client.AccountGroup.Query().Where(accountgroup.GroupIDEQ(groupIn.ID)).Count(ctx)
+		if err != nil {
+			return err
+		}
+		if count > 0 {
+			return infraerrors.BadRequest("FALLBACK_ENTRY_HAS_ACCOUNTS", "unbind accounts before converting a business group into a fallback entry")
+		}
+	}
 	modelPricing, err := json.Marshal(groupIn.ModelPricing)
 	if err != nil {
 		return fmt.Errorf("marshal group model pricing: %w", err)
 	}
-	builder := r.client.Group.UpdateOneID(groupIn.ID).
+	builder := client.Group.UpdateOneID(groupIn.ID).
 		SetName(groupIn.Name).
 		SetDescription(groupIn.Description).
 		SetPlatform(groupIn.Platform).
+		SetGroupType(groupIn.GroupType).
+		SetFallbackGroupIds(groupIn.FallbackGroupIDs).
 		SetRateMultiplier(groupIn.RateMultiplier).
 		SetIsExclusive(groupIn.IsExclusive).
 		SetStatus(groupIn.Status).
@@ -446,6 +510,11 @@ func (r *groupRepository) Update(ctx context.Context, groupIn *service.Group) er
 	updated, err := builder.Save(ctx)
 	if err != nil {
 		return translatePersistenceError(err, service.ErrGroupNotFound, service.ErrGroupExists)
+	}
+	if entryTx != nil {
+		if err := entryTx.Commit(); err != nil {
+			return err
+		}
 	}
 	groupIn.UpdatedAt = updated.UpdatedAt
 	if err := enqueueSchedulerOutbox(ctx, r.sql, service.SchedulerOutboxEventGroupChanged, nil, &groupIn.ID, nil); err != nil {
@@ -1122,7 +1191,7 @@ func (r *groupRepository) BindAccountsToGroup(ctx context.Context, groupID int64
 		defer func() { _ = tx.Rollback() }()
 		exec = tx.Client()
 	}
-	if err := lockLiveGroups(ctx, exec, []int64{groupID}); err != nil {
+	if err := lockBusinessGroups(ctx, exec, []int64{groupID}); err != nil {
 		return err
 	}
 

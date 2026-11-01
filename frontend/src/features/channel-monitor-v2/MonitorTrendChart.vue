@@ -18,7 +18,7 @@
         <span class="badge badge-gray shrink-0">{{ bucketLabel }}</span>
         <button
           type="button"
-          class="inline-flex shrink-0 items-center rounded-lg border border-gray-200 bg-white px-2 py-1 text-[11px] font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50 dark:border-dark-700 dark:bg-dark-900 dark:text-gray-300 dark:hover:bg-dark-800"
+          class="btn btn-secondary btn-sm shrink-0"
           :disabled="!zoomed"
           @click="resetChartZoom"
         >
@@ -121,6 +121,10 @@ const chartData = computed(() => {
       {
         label: t('channelMonitorV2.chart.errorDataset'),
         ...efLineStyle(0, p),
+        borderColor: p.ink,
+        pointBackgroundColor: p.ink,
+        pointBorderColor: p.ink,
+        backgroundColor: p.ink,
         data: errorRates,
         yAxisID: 'yPct',
         cubicInterpolationMode: 'monotone' as const,
@@ -128,6 +132,10 @@ const chartData = computed(() => {
       {
         label: t('channelMonitorV2.chart.cacheDataset'),
         ...efLineStyle(1, p),
+        borderColor: p.ink2,
+        pointBackgroundColor: p.ink2,
+        pointBorderColor: p.ink2,
+        backgroundColor: p.ink2,
         data: cacheRates,
         yAxisID: 'yPct',
         cubicInterpolationMode: 'monotone' as const,
@@ -135,6 +143,10 @@ const chartData = computed(() => {
       {
         label: t('channelMonitorV2.chart.ttftDataset'),
         ...efLineStyle(2, p),
+        borderColor: p.ink,
+        pointBackgroundColor: p.panel,
+        pointBorderColor: p.ink,
+        backgroundColor: p.ink,
         data: ttftP50,
         yAxisID: 'yTtft',
         cubicInterpolationMode: 'monotone' as const,

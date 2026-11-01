@@ -70,6 +70,7 @@ type channelMonitorRuntimeReader interface {
 
 // ChannelMonitorService 渠道监控管理服务。
 type ChannelMonitorService struct {
+	localKeys APIKeyRepository
 	repo      ChannelMonitorRepository
 	encryptor SecretEncryptor
 	// settings is optional; when nil, RunCheck fails closed for active probes
@@ -182,6 +183,11 @@ func (s *ChannelMonitorService) Create(ctx context.Context, p ChannelMonitorCrea
 		BodyOverride:     p.BodyOverride,
 		CheckMode:        checkMode,
 		AccountID:        cloneInt64Pointer(p.AccountID),
+	}
+	if checkMode != MonitorCheckModeQuota {
+		if err := s.validateIndependentProbe(ctx, p.APIKey, m.GroupName); err != nil {
+			return nil, err
+		}
 	}
 	if err := s.repo.Create(ctx, m); err != nil {
 		return nil, fmt.Errorf("create channel monitor: %w", err)
@@ -443,6 +449,18 @@ func (s *ChannelMonitorService) Update(ctx context.Context, id int64, p ChannelM
 	if err := s.validateProbeAPIKey(existing, newPlainAPIKey); err != nil {
 		return nil, err
 	}
+	probeKey := newPlainAPIKey
+	if defaultCheckMode(existing.CheckMode) != MonitorCheckModeQuota {
+		if !apiKeyUpdated && s.localKeys != nil {
+			probeKey, err = s.encryptor.Decrypt(existing.APIKey)
+			if err != nil {
+				return nil, ErrChannelMonitorAPIKeyDecryptFailed
+			}
+		}
+		if err := s.validateIndependentProbe(ctx, probeKey, existing.GroupName); err != nil {
+			return nil, err
+		}
+	}
 	if p.Provider != nil || p.CheckMode != nil || p.AccountID != nil {
 		if err := s.revalidateLinkedAccount(ctx, existing); err != nil {
 			return nil, err
@@ -615,6 +633,11 @@ func (s *ChannelMonitorService) RunCheck(ctx context.Context, id int64) ([]*Chec
 		return nil, err
 	}
 	checkMode := defaultCheckMode(m.CheckMode)
+	if checkMode != MonitorCheckModeQuota {
+		if err := s.validateIndependentProbe(ctx, m.APIKey, m.GroupName); err != nil {
+			return nil, err
+		}
+	}
 	if checkMode != MonitorCheckModeQuota && m.APIKeyDecryptFailed {
 		return nil, ErrChannelMonitorAPIKeyDecryptFailed
 	}

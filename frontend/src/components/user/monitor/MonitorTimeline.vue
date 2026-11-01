@@ -1,7 +1,7 @@
 <template>
-  <div class="mt-4 pt-3 border-t border-gray-100 dark:border-dark-700/60">
+  <div class="monitor-timeline">
     <div
-      class="flex justify-between text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-2"
+      class="monitor-timeline__heading"
     >
       <span>{{ t('monitorCommon.history60pts', { n: length }) }}</span>
       <span class="tabular-nums">{{ t('monitorCommon.nextUpdateIn', { n: countdownSeconds }) }}</span>
@@ -9,27 +9,41 @@
 
     <div
       v-if="maintenance"
-      class="flex h-5 w-full items-center justify-center rounded border border-dashed border-gray-300 dark:border-dark-600 text-[10px] uppercase tracking-widest text-gray-400"
+      class="monitor-timeline__maintenance"
     >
       {{ t('monitorCommon.maintenancePaused') }}
     </div>
-    <div v-else class="flex items-end gap-[2px] h-5 w-full">
+    <div v-else class="monitor-timeline__bars" :aria-label="t('monitorCommon.timelineLegend')" role="group">
       <div
         v-for="(bar, idx) in displayBars"
         :key="idx"
-        class="flex-1 min-w-0 rounded-sm"
-        :class="bar.colorClass"
-        :style="{ height: bar.heightPct + '%' }"
-        :title="bar.title"
-      ></div>
+        class="monitor-timeline__slot"
+        :aria-hidden="bar.status === 'empty' ? true : undefined"
+      >
+        <div
+          v-if="bar.status !== 'empty'"
+          class="monitor-timeline__bar"
+          :data-status="bar.status"
+          :style="{ height: bar.heightPct + '%' }"
+          :title="bar.title"
+          :aria-label="bar.title"
+          role="img"
+        ></div>
+      </div>
     </div>
 
     <div
-      class="mt-1 flex justify-between text-[9px] uppercase tracking-widest text-gray-400"
+      class="monitor-timeline__axis"
     >
       <span>{{ t('monitorCommon.past') }}</span>
       <span>{{ t('monitorCommon.now') }}</span>
     </div>
+    <ul v-if="!maintenance" class="monitor-timeline__legend" :aria-label="t('monitorCommon.timelineLegend')">
+      <li v-for="item in legend" :key="item.status">
+        <span class="monitor-timeline__swatch" :data-status="item.status" aria-hidden="true"></span>
+        <span>{{ item.label }}</span><b>{{ item.count }}</b>
+      </li>
+    </ul>
   </div>
 </template>
 
@@ -54,28 +68,27 @@ const { t } = useI18n()
 const { statusLabel, formatLatency, formatRelativeTime } = useChannelMonitorFormat()
 
 interface Bar {
-  colorClass: string
+  status: string
   heightPct: number
   title: string
 }
 
-// 4 级高度 + 颜色双重编码：高=好+绿，短=坏+红，灰=未测试。
-// 长绿(正常) > 中黄(降级) > 短红(失败/系统错误) > 很短灰(未测试)。
+// History uses solid green/yellow/deep red, with height and labels as extra cues.
+// Missing records retain their time slots without rendering a bar or legend item.
 const STATUS_HEIGHT: Record<string, number> = {
   operational: 100,
   degraded: 65,
   failed: 35,
   error: 35,
-  empty: 15,
+  empty: 0,
 }
 
-const STATUS_COLOR: Record<string, string> = {
-  operational: 'bg-emerald-500',
-  degraded: 'bg-amber-500',
-  failed: 'bg-red-500',
-  error: 'bg-red-500',
-  empty: 'bg-gray-300 dark:bg-dark-600',
-}
+const normalizedStatus = (status: string) => Object.prototype.hasOwnProperty.call(STATUS_HEIGHT, status) ? status : 'empty'
+const legend = computed(() => ['operational', 'degraded', 'failed', 'error'].map(status => ({
+  status,
+  label: statusLabel(status as MonitorTimelinePoint['status']),
+  count: displayBars.value.filter(bar => bar.status === status).length,
+})))
 
 const displayBars = computed<Bar[]>(() => {
   // Real points come newest-first; convert to oldest-first so the rightmost
@@ -90,23 +103,22 @@ const displayBars = computed<Bar[]>(() => {
 
   for (let i = 0; i < padCount; i += 1) {
     bars.push({
-      colorClass: STATUS_COLOR.empty,
+      status: 'empty',
       heightPct: STATUS_HEIGHT.empty,
-      title: '',
+      title: t('monitorCommon.timelineNoData'),
     })
   }
 
   for (const point of real) {
-    const status = point.status as keyof typeof STATUS_HEIGHT
-    const colorClass = STATUS_COLOR[status] ?? STATUS_COLOR.empty
+    const status = normalizedStatus(point.status)
     const heightPct = STATUS_HEIGHT[status] ?? STATUS_HEIGHT.empty
     const latency = formatLatency(point.latency_ms)
     const relative = formatRelativeTime(point.checked_at)
-    const label = statusLabel(point.status)
+    const label = status === 'empty' ? t('monitorCommon.timelineNoData') : statusLabel(point.status)
     bars.push({
-      colorClass,
+      status,
       heightPct,
-      title: `${relative} · ${label} · ${latency}ms`,
+      title: `${relative} / ${label} / ${latency}${point.latency_ms == null ? '' : ' ms'}`,
     })
   }
 

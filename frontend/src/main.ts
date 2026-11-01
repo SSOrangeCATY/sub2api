@@ -12,6 +12,7 @@ import './styles/endfield/fonts.css'
 import './styles/endfield/endfield.css'
 import './styles/endfield/bridge.css'
 import './styles/endfield/product.css'
+import './styles/endfield/monitor.css'
 
 function initIOSViewportZoomFix() {
   // iOS Safari 在输入框字号小于 16px 时聚焦会自动放大页面，且失焦后不会恢复。

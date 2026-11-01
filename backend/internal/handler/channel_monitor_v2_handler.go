@@ -16,6 +16,11 @@ import (
 type ChannelMonitorV2Handler struct {
 	service       *service.ChannelMonitorV2Service
 	apiKeyService channelMonitorV2GroupAuthorizer
+	monitorRouter channelMonitorFallbackResolver
+}
+
+type channelMonitorFallbackResolver interface {
+	Resolve(context.Context, *service.Group, string) (*service.MonitorGroupRoute, error)
 }
 
 type channelMonitorV2GroupAuthorizer interface {
@@ -23,7 +28,47 @@ type channelMonitorV2GroupAuthorizer interface {
 }
 
 func NewChannelMonitorV2Handler(svc *service.ChannelMonitorV2Service, apiKeyService *service.APIKeyService) *ChannelMonitorV2Handler {
-	return &ChannelMonitorV2Handler{service: svc, apiKeyService: apiKeyService}
+	h := &ChannelMonitorV2Handler{service: svc, apiKeyService: apiKeyService}
+	if apiKeyService != nil {
+		h.monitorRouter = apiKeyService.MonitorGroupRouter()
+	}
+	return h
+}
+
+// FallbackRoutes exposes only entries available to this user. The currently
+// delegated target is shown without disclosing the rest of the admin chain.
+func (h *ChannelMonitorV2Handler) FallbackRoutes(c *gin.Context) {
+	subject, ok := middleware.GetAuthSubjectFromContext(c)
+	if !ok || subject.UserID <= 0 {
+		response.Unauthorized(c, "user not found in context")
+		return
+	}
+	if h.apiKeyService == nil {
+		response.Error(c, 503, "fallback group authorization unavailable")
+		return
+	}
+	groups, err := h.apiKeyService.GetAvailableGroups(c.Request.Context(), subject.UserID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	out := make([]*service.MonitorGroupRoute, 0)
+	if h.monitorRouter != nil {
+		model := strings.TrimSpace(c.Query("model"))
+		for i := range groups {
+			if groups[i].GroupType != service.GroupTypeFallback || (model != "" && !groups[i].ModelAllowlist.Allows(model)) {
+				continue
+			}
+			route, err := h.monitorRouter.Resolve(c.Request.Context(), &groups[i], model)
+			if err != nil {
+				response.ErrorFrom(c, err)
+				return
+			}
+			route.Candidates = nil
+			out = append(out, route)
+		}
+	}
+	response.Success(c, out)
 }
 
 // channelMonitorV2IsAdmin is true when the request already passed admin auth
