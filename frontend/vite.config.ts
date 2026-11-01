@@ -140,6 +140,12 @@ export default defineConfig(({ mode }) => {
               return 'vendor-stripe'
             }
 
+            // The SDK injects remote scripts when its module is evaluated. Keep it
+            // behind the payment route's dynamic import, out of the shared entry.
+            if (id.includes('/@airwallex/components-sdk/')) {
+              return 'vendor-airwallex'
+            }
+
             // 其他小型第三方库合并
             return 'vendor-misc'
           }

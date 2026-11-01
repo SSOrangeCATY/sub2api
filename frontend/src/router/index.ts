@@ -803,6 +803,7 @@ function isBackendModePublicRouteAllowed(path: string, hasPendingAuthSession: bo
 }
 
 router.beforeEach(async (to, _from, next) => {
+  routePrefetch?.cancelPendingPrefetch()
   // 开始导航加载状态
   navigationLoading.startNavigation()
 

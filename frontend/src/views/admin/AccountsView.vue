@@ -454,7 +454,7 @@
       </template>
       <template #pagination><Pagination v-if="pagination.total > 0" :page="pagination.page" :total="pagination.total" :page-size="pagination.page_size" @update:page="handlePageChange" @update:pageSize="handlePageSizeChange" /></template>
     </TablePageLayout>
-    <CreateAccountModal :show="showCreate" :proxies="proxies" :groups="groups" @close="showCreate = false" @created="reload" />
+    <CreateAccountModal :show="showCreate" :proxies="proxies" :groups="groups" @close="showCreate = false" @created="reload" @enriched="handleCreatedAccountEnriched" />
     <EditAccountModal :show="showEdit" :account="edAcc" :proxies="proxies" :groups="groups" @close="showEdit = false" @updated="handleAccountUpdated" />
     <ReAuthAccountModal :show="showReAuth" :account="reAuthAcc" @close="closeReAuthModal" @reauthorized="handleAccountUpdated" />
     <AccountTestModal :show="showTest" :account="testingAcc" @close="closeTestModal" />
@@ -734,6 +734,8 @@ const todayStatsLoading = ref(false)
 const todayStatsError = ref<string | null>(null)
 const todayStatsReqSeq = ref(0)
 const pendingTodayStatsRefresh = ref(false)
+const pendingCreatedAccountEnrichments = new Set<number>()
+let accountViewDisposed = false
 const usageManualRefreshToken = ref(0)
 
 const desktopViewportQuery = '(min-width: 768px)'
@@ -1191,7 +1193,11 @@ const load = async (options: AccountLoadOptions = {}) => {
   pendingTodayStatsRefresh.value = false
   requestParams.lite = '1'
   await baseLoad()
-  if (options.refreshTodayStats !== false) await refreshTodayStatsBatch()
+  if (options.refreshTodayStats !== false) {
+    // The account table is useful as soon as the list response arrives. Stats
+    // are independent and can fill in without extending the loading state.
+    void refreshTodayStatsBatch()
+  }
 }
 
 const reload = async () => {
@@ -1200,7 +1206,7 @@ const reload = async () => {
   resetAutoRefreshCache()
   pendingTodayStatsRefresh.value = false
   await baseReload()
-  await refreshTodayStatsBatch()
+  void refreshTodayStatsBatch()
 }
 
 const buildUpstreamBillingRateFilters = () => {
@@ -1371,12 +1377,14 @@ const handleSort = (key: string, order: AccountSortOrder) => {
 watch(loading, (isLoading, wasLoading) => {
   if (wasLoading && !isLoading) {
     upstreamBillingNow.value = Date.now()
+    for (const id of [...pendingCreatedAccountEnrichments]) {
+      pendingCreatedAccountEnrichments.delete(id)
+      void handleCreatedAccountEnriched(id)
+    }
   }
   if (wasLoading && !isLoading && pendingTodayStatsRefresh.value) {
     pendingTodayStatsRefresh.value = false
-    refreshTodayStatsBatch().catch((error) => {
-      console.error('Failed to refresh account today stats after table load:', error)
-    })
+    void refreshTodayStatsBatch()
   }
 })
 
@@ -2294,6 +2302,39 @@ const handleAccountUpdated = (updatedAccount: Account) => {
   patchAccountInList(updatedAccount)
   enterAutoRefreshSilentWindow()
 }
+const handleCreatedAccountEnriched = async (accountID: number) => {
+  if (accountViewDisposed) return
+  if (loading.value || (showEdit.value && edAcc.value?.id === accountID)) {
+    pendingCreatedAccountEnrichments.add(accountID)
+    return
+  }
+  const currentRow = accounts.value.find(account => account.id === accountID)
+  if (!currentRow) return
+  try {
+    const updated = await adminAPI.accounts.getById(accountID)
+    if (accountViewDisposed) return
+    if (loading.value || (showEdit.value && edAcc.value?.id === accountID)) {
+      pendingCreatedAccountEnrichments.add(accountID)
+      return
+    }
+    // A newer edit or list response wins over this background read.
+    if (accounts.value.find(account => account.id === accountID) !== currentRow) {
+      hasPendingListSync.value = true
+      return
+    }
+    patchAccountInList(updated)
+  } catch {
+    // Creation is already persisted; allow manual synchronization if enrichment cannot be read.
+    hasPendingListSync.value = true
+  }
+}
+watch(showEdit, (open) => {
+  if (open || loading.value) return
+  for (const id of [...pendingCreatedAccountEnrichments]) {
+    pendingCreatedAccountEnrichments.delete(id)
+    void handleCreatedAccountEnriched(id)
+  }
+})
 const formatExportTimestamp = () => {
   const now = new Date()
   const pad2 = (value: number) => String(value).padStart(2, '0')
@@ -2603,6 +2644,8 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  accountViewDisposed = true
+  pendingCreatedAccountEnrichments.clear()
   upstreamBillingRateAbortController?.abort()
   if (usageBatchFlushTimer !== null) {
     clearTimeout(usageBatchFlushTimer)

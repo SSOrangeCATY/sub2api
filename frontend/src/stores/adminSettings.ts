@@ -6,6 +6,7 @@ import type { CustomMenuItem } from '@/types'
 export const useAdminSettingsStore = defineStore('adminSettings', () => {
   const loaded = ref(false)
   const loading = ref(false)
+  let settingsRequest: Promise<void> | null = null
 
   const readCachedBool = (key: string, defaultValue: boolean): boolean => {
     try {
@@ -51,10 +52,14 @@ export const useAdminSettingsStore = defineStore('adminSettings', () => {
   const paymentEnabled = ref(readCachedBool('payment_enabled_cached', false))
   const customMenuItems = ref<CustomMenuItem[]>([])
 
-  async function fetch(force = false): Promise<void> {
-    if (loaded.value && !force) return
-    if (loading.value) return
+  function fetch(force = false): Promise<void> {
+    if (settingsRequest) return settingsRequest
+    if (loaded.value && !force) return Promise.resolve()
+    settingsRequest = loadSettings().finally(() => { settingsRequest = null })
+    return settingsRequest
+  }
 
+  async function loadSettings(): Promise<void> {
     loading.value = true
     try {
       const [settings, paymentConfigResp] = await Promise.all([

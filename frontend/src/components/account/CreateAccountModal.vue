@@ -4137,6 +4137,7 @@ import { useGeminiOAuth } from '@/composables/useGeminiOAuth'
 import { useAntigravityOAuth } from '@/composables/useAntigravityOAuth'
 import { useGrokOAuth } from '@/composables/useGrokOAuth'
 import type {
+  Account,
   Proxy,
   AdminGroup,
   AccountPlatform,
@@ -4322,6 +4323,7 @@ const props = defineProps<Props>()
 const emit = defineEmits<{
   close: []
   created: []
+  enriched: [accountID: number]
 }>()
 
 const appStore = useAppStore()
@@ -5553,40 +5555,52 @@ const ensureAntigravityMixedChannelConfirmed = async (onConfirm: () => Promise<v
   }
 }
 
+const runPostCreateTasks = async (account: Account, payload: CreateAccountRequest) => {
+  let enriched = false
+  const modelMapping = payload.credentials.model_mapping
+  const hasConcreteMappedTarget = payload.type === 'apikey' &&
+    typeof modelMapping === 'object' &&
+    modelMapping !== null &&
+    Object.values(modelMapping).some((target) =>
+      typeof target === 'string' && target.trim() !== '' && !target.includes('*')
+    )
+  if (upstreamModelsPreviewed.value || hasConcreteMappedTarget) {
+    try {
+      const result = await adminAPI.accounts.syncUpstreamModels(account.id)
+      enriched = true
+      const warnings = result.warnings ?? []
+      if (warnings.some(warning => warning.code === 'upstream_model_metadata_incomplete')) {
+        appStore.showWarning(t('admin.accounts.syncUpstreamModelsMetadataIncomplete'))
+      } else if (warnings.some(warning => warning.code === 'upstream_model_metadata_partial')) {
+        appStore.showWarning(t('admin.accounts.syncUpstreamModelsMetadataPartial'))
+      }
+    } catch {
+      appStore.showWarning(t('admin.accounts.syncUpstreamModelsFailed'))
+    }
+  }
+  if (
+    payload.type === 'apikey' &&
+    payload.upstream_billing_probe_enabled === true
+  ) {
+    try {
+      await adminAPI.accounts.probeUpstreamBilling(account.id)
+      enriched = true
+    } catch {
+      appStore.showWarning(t('admin.accounts.upstreamBilling.probeFailed'))
+    }
+  }
+  if (enriched) emit('enriched', account.id)
+}
+
 const submitCreateAccount = async (payload: CreateAccountRequest) => {
   submitting.value = true
   try {
     const account = await adminAPI.accounts.create(withAntigravityConfirmFlag(payload))
-    const modelMapping = payload.credentials.model_mapping
-    const hasConcreteMappedTarget = payload.type === 'apikey' &&
-      typeof modelMapping === 'object' &&
-      modelMapping !== null &&
-      Object.values(modelMapping).some((target) =>
-        typeof target === 'string' && target.trim() !== '' && !target.includes('*')
-      )
-    if (upstreamModelsPreviewed.value || hasConcreteMappedTarget) {
-      try {
-        const result = await adminAPI.accounts.syncUpstreamModels(account.id)
-        const warnings = result.warnings ?? []
-        if (warnings.some(warning => warning.code === 'upstream_model_metadata_incomplete')) {
-          appStore.showWarning(t('admin.accounts.syncUpstreamModelsMetadataIncomplete'))
-        } else if (warnings.some(warning => warning.code === 'upstream_model_metadata_partial')) {
-          appStore.showWarning(t('admin.accounts.syncUpstreamModelsMetadataPartial'))
-        }
-      } catch {
-        appStore.showWarning(t('admin.accounts.syncUpstreamModelsFailed'))
-      }
-    }
-    if (
-      payload.type === 'apikey' &&
-      payload.upstream_billing_probe_enabled === true
-    ) {
-      try {
-        await adminAPI.accounts.probeUpstreamBilling(account.id)
-      } catch {
-        appStore.showWarning(t('admin.accounts.upstreamBilling.probeFailed'))
-      }
-    }
+
+    // Account creation is complete once the account row is persisted. Model
+    // metadata and billing probes call upstream services and must not keep the
+    // modal open or delay the list refresh.
+    void runPostCreateTasks(account, payload)
     appStore.showSuccess(t('admin.accounts.accountCreated'))
     emit('created')
     handleClose()
