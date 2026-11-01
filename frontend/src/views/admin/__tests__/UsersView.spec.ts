@@ -209,6 +209,22 @@ describe('admin UsersView', () => {
     vi.useRealTimers()
   })
 
+  it('renders user rows before attribute definitions arrive and fills attributes afterward', async () => {
+    vi.useFakeTimers();
+    let finishDefinitions!: (value: unknown[]) => void;
+    listEnabledDefinitions.mockReturnValueOnce(new Promise(resolve => { finishDefinitions = resolve; }));
+    const wrapper = mountBulkDeleteView();
+    await flushPromises();
+    expect(listUsers).toHaveBeenCalledOnce();
+    expect(wrapper.get('[data-test="row-order"]').text()).toBe('scoped@example.com');
+    await vi.advanceTimersByTimeAsync(50);
+    expect(getBatchUserAttributes).not.toHaveBeenCalled();
+    finishDefinitions([{ id: 7, name: 'Region', type: 'text', enabled: true }]);
+    await flushPromises();
+    expect(getBatchUserAttributes).toHaveBeenCalledWith([42]);
+    wrapper.unmount();
+  });
+
   it('cancels bulk deletion without deleting or clearing selected users', async () => {
     const wrapper = mountBulkDeleteView()
     await flushPromises()

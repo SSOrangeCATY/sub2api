@@ -25,7 +25,7 @@
   </section>
 </template>
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { adminAPI } from '@/api/admin'
 import type { AdminGroup, GroupPlatform } from '@/types'
@@ -35,10 +35,12 @@ const { t } = useI18n()
 const candidates = ref<AdminGroup[]>([])
 const loading = ref(false)
 const error = ref('')
+const loaded = ref(false)
 const eligible = computed(() => candidates.value.filter(g => g.id !== props.currentId && g.status === 'active' && g.platform === props.platform && (g.group_type ?? 'business') === 'business' && g.subscription_type !== 'subscription' && !g.claude_code_only && !g.fallback_group_id_on_invalid_request && !(g.fallback_group_ids?.length)))
 async function load() {
+  if (loading.value || loaded.value) return
   loading.value = true
-  try { candidates.value = await adminAPI.groups.getAll(); error.value = '' }
+  try { candidates.value = await adminAPI.groups.getAll(); loaded.value = true; error.value = '' }
   catch { error.value = t('admin.groups.monitorFallback.loadFailed') }
   finally { loading.value = false }
 }
@@ -71,5 +73,7 @@ watch(() => props.platform, () => {
     if (next.length !== props.groupIds.length) emit('update:groupIds', next)
   }
 })
-onMounted(load)
+watch(() => props.groupType, (type) => {
+  if (type === 'fallback') void load()
+}, { immediate: true })
 </script>

@@ -1364,6 +1364,7 @@ const closePlatformQuotaModal = () => {
 }
 let abortController: AbortController | null = null
 let secondaryDataSeq = 0
+let attributeDefinitionsRequest: Promise<void> | null = null
 
 const loadUsersSecondaryData = async (
   userIds: number[],
@@ -1390,10 +1391,13 @@ const loadUsersSecondaryData = async (
     )
   }
 
-  if (attributeDefinitions.value.length > 0 && hasVisibleAttributeColumns.value) {
+  if (attributeDefinitionsRequest || hasVisibleAttributeColumns.value) {
     tasks.push(
       (async () => {
         try {
+          await attributeDefinitionsRequest
+          if (signal?.aborted || (typeof expectedSeq === 'number' && expectedSeq !== secondaryDataSeq)) return
+          if (!hasVisibleAttributeColumns.value) return
           const attrResponse = await adminAPI.userAttributes.getBatchUserAttributes(userIds)
           if (signal?.aborted) return
           if (typeof expectedSeq === 'number' && expectedSeq !== secondaryDataSeq) return
@@ -1888,8 +1892,9 @@ const handleScroll = () => {
   closeActionMenu()
 }
 
-onMounted(async () => {
-  await loadAttributeDefinitions()
+onMounted(() => {
+  // Attribute definitions enrich the table; they must not delay its primary rows.
+  attributeDefinitionsRequest = loadAttributeDefinitions()
   loadSavedFilters()
   loadSavedColumns()
   loadUsers()

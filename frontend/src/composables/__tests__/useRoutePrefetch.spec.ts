@@ -212,14 +212,55 @@ describe('useRoutePrefetch', () => {
 
       triggerPrefetch(route)
 
-      // 等待超时执行
-      await new Promise((resolve) => setTimeout(resolve, 2100))
+      // Each adjacent module gets a separate idle slot.
+      await new Promise((resolve) => setTimeout(resolve, 4200))
 
       expect(prefetchedRoutes.value.has('/dashboard')).toBe(true)
     })
   })
 
   describe('预加载失败处理', () => {
+    it('retries a failed module without reimporting successful targets', async () => {
+      vi.useFakeTimers()
+      const first = vi.fn().mockResolvedValue({})
+      const second = vi.fn().mockRejectedValueOnce(new Error('chunk unavailable')).mockResolvedValue({})
+      const router = { getRoutes: () => [
+        { path: '/admin/accounts', components: { default: first } },
+        { path: '/admin/users', components: { default: second } },
+      ] } as unknown as Router
+      const { triggerPrefetch, prefetchedRoutes } = useRoutePrefetch(router)
+      triggerPrefetch(createMockRoute('/admin/dashboard'))
+      await vi.runAllTimersAsync()
+      expect(prefetchedRoutes.value.size).toBe(0)
+      triggerPrefetch(createMockRoute('/admin/dashboard'))
+      await vi.runAllTimersAsync()
+      expect(first).toHaveBeenCalledOnce()
+      expect(second).toHaveBeenCalledTimes(2)
+      expect(prefetchedRoutes.value.has('/admin/dashboard')).toBe(true)
+      vi.useRealTimers()
+    })
+
+    it('stops subsequent imports if navigation starts during an import', async () => {
+      vi.useFakeTimers()
+      let finish!: () => void
+      const first = vi.fn(() => new Promise<void>(resolve => { finish = resolve }))
+      const second = vi.fn().mockResolvedValue({})
+      const router = { getRoutes: () => [
+        { path: '/admin/accounts', components: { default: first } },
+        { path: '/admin/users', components: { default: second } },
+      ] } as unknown as Router
+      const { triggerPrefetch, cancelPendingPrefetch, prefetchedRoutes } = useRoutePrefetch(router)
+      triggerPrefetch(createMockRoute('/admin/dashboard'))
+      await vi.advanceTimersByTimeAsync(0)
+      expect(first).toHaveBeenCalledOnce()
+      expect(second).not.toHaveBeenCalled()
+      cancelPendingPrefetch()
+      finish()
+      await vi.runAllTimersAsync()
+      expect(second).not.toHaveBeenCalled()
+      expect(prefetchedRoutes.value.size).toBe(0)
+      vi.useRealTimers()
+    })
     it('预加载失败时应该静默处理不影响页面功能', async () => {
       const { triggerPrefetch } = useRoutePrefetch(mockRouter)
       const route = createMockRoute('/admin/dashboard')

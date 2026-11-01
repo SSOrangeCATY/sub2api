@@ -73,6 +73,9 @@ export function useRoutePrefetch(router?: Router) {
 
   // 已预加载的路由集合
   const prefetchedRoutes = ref<Set<string>>(new Set())
+  const loadedTargets = new Set<string>()
+  const inFlight = new Map<string, Promise<boolean>>()
+  let generation = 0
 
   /**
    * 从路由配置中获取组件的 import 函数
@@ -103,14 +106,16 @@ export function useRoutePrefetch(router?: Router) {
   /**
    * 执行单个组件的预加载
    */
-  const prefetchComponent = async (importFn: ComponentImportFn): Promise<void> => {
+  const prefetchComponent = async (importFn: ComponentImportFn): Promise<boolean> => {
     try {
       await importFn()
+      return true
     } catch (error) {
       // 静默处理预加载错误
       if (import.meta.env.DEV) {
         console.debug('[Prefetch] Failed to prefetch component:', error)
       }
+      return false
     }
   }
 
@@ -118,6 +123,7 @@ export function useRoutePrefetch(router?: Router) {
    * 取消挂起的预加载任务
    */
   const cancelPendingPrefetch = (): void => {
+    generation += 1
     if (pendingPrefetchHandle.value !== null) {
       cancelScheduledCallback(pendingPrefetchHandle.value)
       pendingPrefetchHandle.value = null
@@ -133,30 +139,40 @@ export function useRoutePrefetch(router?: Router) {
     const prefetchPaths = getPrefetchPaths(route)
     if (prefetchPaths.length === 0) return
 
-    pendingPrefetchHandle.value = scheduleIdleCallback(
-      () => {
+    if (prefetchedRoutes.value.has(route.path)) return
+    const taskGeneration = generation
+    const targets = prefetchPaths.filter(path => getComponentImporter(path))
+    if (targets.length === 0) return
+    let succeeded = true
+    const scheduleNext = (index: number): void => {
+      if (taskGeneration !== generation) return
+      if (index >= targets.length) {
+        if (succeeded) prefetchedRoutes.value.add(route.path)
+        return
+      }
+      // Yield between modules so navigation and form input get priority.
+      pendingPrefetchHandle.value = scheduleIdleCallback(async () => {
         pendingPrefetchHandle.value = null
-
-        const routePath = route.path
-        if (prefetchedRoutes.value.has(routePath)) return
-
-        // 获取需要预加载的组件 import 函数
-        const importFns: ComponentImportFn[] = []
-        for (const path of prefetchPaths) {
-          const importFn = getComponentImporter(path)
-          if (importFn) {
-            importFns.push(importFn)
+        if (taskGeneration !== generation) return
+        const path = targets[index]!
+        if (!loadedTargets.has(path)) {
+          let request = inFlight.get(path)
+          if (!request) {
+            const importFn = getComponentImporter(path)
+            if (!importFn) return
+            request = prefetchComponent(importFn)
+            inFlight.set(path, request)
           }
+          const loaded = await request
+          if (inFlight.get(path) === request) inFlight.delete(path)
+          if (taskGeneration !== generation) return
+          if (loaded) loadedTargets.add(path)
+          else succeeded = false
         }
-
-        if (importFns.length > 0) {
-          Promise.all(importFns.map(prefetchComponent)).then(() => {
-            prefetchedRoutes.value.add(routePath)
-          })
-        }
-      },
-      { timeout: 2000 }
-    )
+        scheduleNext(index + 1)
+      }, { timeout: 2000 })
+    }
+    scheduleNext(0)
   }
 
   /**
@@ -165,6 +181,7 @@ export function useRoutePrefetch(router?: Router) {
   const resetPrefetchState = (): void => {
     cancelPendingPrefetch()
     prefetchedRoutes.value.clear()
+    loadedTargets.clear()
   }
 
   /**

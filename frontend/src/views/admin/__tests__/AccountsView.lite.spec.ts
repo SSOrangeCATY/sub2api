@@ -197,6 +197,38 @@ describe('admin AccountsView lite account list', () => {
     wrapper.unmount()
   })
 
+  it('defers background creation enrichment while an edit is open', async () => {
+    const wrapper = mountView()
+    await flushPromises()
+    await wrapper.findAll('button').find(button => button.text().includes('common.edit'))!.trigger('click')
+    await flushPromises()
+    wrapper.findComponent({ name: 'CreateAccountModal' }).vm.$emit('enriched', 42)
+    await flushPromises()
+    expect(getById).toHaveBeenCalledOnce()
+    expect(wrapper.get('[data-test="edit-account"]').text()).toBe('compact row')
+    getById.mockResolvedValue({ ...fullAccount, name: 'enriched account' })
+    wrapper.getComponent(EditAccountModalStub).vm.$emit('close')
+    await flushPromises()
+    expect(getById).toHaveBeenCalledTimes(2)
+    expect(wrapper.get('[data-account-name]').attributes('data-account-name')).toBe('enriched account')
+    wrapper.unmount()
+  })
+
+  it('keeps a newer edit when an older enrichment read completes afterward', async () => {
+    const wrapper = mountView()
+    await flushPromises()
+    let finishRead!: (value: typeof fullAccount) => void
+    getById.mockReturnValueOnce(new Promise(resolve => { finishRead = resolve }))
+    wrapper.findComponent({ name: 'CreateAccountModal' }).vm.$emit('enriched', 42)
+    await flushPromises()
+    wrapper.getComponent(EditAccountModalStub).vm.$emit('updated', { ...fullAccount, name: 'newer saved name' })
+    await flushPromises()
+    finishRead({ ...fullAccount, name: 'stale enriched name' })
+    await flushPromises()
+    expect(wrapper.get('[data-account-name]').attributes('data-account-name')).toBe('newer saved name')
+    wrapper.unmount()
+  })
+
   it('keeps the action menu open during internal scrolling but closes it on table scrolling', async () => {
     const wrapper = mountView(false)
     await flushPromises()
