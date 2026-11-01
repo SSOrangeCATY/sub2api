@@ -249,5 +249,9 @@ func (r *cachedGroupHealthReader) GetGroupHealth(ctx context.Context, id int64, 
 	if err != nil {
 		return GroupHealthSnapshot{}, err
 	}
-	return value.(GroupHealthSnapshot), nil
+	snapshot, ok := value.(GroupHealthSnapshot)
+	if !ok {
+		return GroupHealthSnapshot{Status: GroupHealthUnknown}, nil
+	}
+	return snapshot, nil
 }

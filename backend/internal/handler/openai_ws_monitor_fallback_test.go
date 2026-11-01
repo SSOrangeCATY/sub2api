@@ -35,7 +35,9 @@ func TestMonitorGroupWSTurnRefreshesTargetPricesAndRequiresReconnectOnSwitch(t *
 	turns.set(1, conn)
 	turns.set(2, key)
 	billingCtx := withOpenAIWSTurnBillingGroup(ctx, turns.forTurn(2, conn))
-	require.Equal(t, 0.35, billingCtx.Value(ctxkey.Group).(*service.Group).RateMultiplier)
+	billingGroup, ok := billingCtx.Value(ctxkey.Group).(*service.Group)
+	require.True(t, ok)
+	require.Equal(t, 0.35, billingGroup.RateMultiplier)
 	require.Equal(t, 0.075, turns.forTurn(1, conn).Group.RateMultiplier)
 	require.Equal(t, 0.075, conn.Group.RateMultiplier)
 	resolver.key = &service.APIKey{ID: 1, Group: &service.Group{ID: 3}}
