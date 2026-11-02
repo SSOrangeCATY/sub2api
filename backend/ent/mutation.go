@@ -22099,6 +22099,8 @@ type GroupMutation struct {
 	duplicate_operation_id                  *string
 	platform                                *string
 	group_type                              *string
+	fallback_rate_multiplier                *float64
+	addfallback_rate_multiplier             *float64
 	fallback_group_ids                      *[]int64
 	appendfallback_group_ids                []int64
 	subscription_type                       *string
@@ -22957,6 +22959,76 @@ func (m *GroupMutation) OldGroupType(ctx context.Context) (v string, err error) 
 // ResetGroupType resets all changes to the "group_type" field.
 func (m *GroupMutation) ResetGroupType() {
 	m.group_type = nil
+}
+
+// SetFallbackRateMultiplier sets the "fallback_rate_multiplier" field.
+func (m *GroupMutation) SetFallbackRateMultiplier(f float64) {
+	m.fallback_rate_multiplier = &f
+	m.addfallback_rate_multiplier = nil
+}
+
+// FallbackRateMultiplier returns the value of the "fallback_rate_multiplier" field in the mutation.
+func (m *GroupMutation) FallbackRateMultiplier() (r float64, exists bool) {
+	v := m.fallback_rate_multiplier
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFallbackRateMultiplier returns the old "fallback_rate_multiplier" field's value of the Group entity.
+// If the Group object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *GroupMutation) OldFallbackRateMultiplier(ctx context.Context) (v *float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFallbackRateMultiplier is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFallbackRateMultiplier requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFallbackRateMultiplier: %w", err)
+	}
+	return oldValue.FallbackRateMultiplier, nil
+}
+
+// AddFallbackRateMultiplier adds f to the "fallback_rate_multiplier" field.
+func (m *GroupMutation) AddFallbackRateMultiplier(f float64) {
+	if m.addfallback_rate_multiplier != nil {
+		*m.addfallback_rate_multiplier += f
+	} else {
+		m.addfallback_rate_multiplier = &f
+	}
+}
+
+// AddedFallbackRateMultiplier returns the value that was added to the "fallback_rate_multiplier" field in this mutation.
+func (m *GroupMutation) AddedFallbackRateMultiplier() (r float64, exists bool) {
+	v := m.addfallback_rate_multiplier
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearFallbackRateMultiplier clears the value of the "fallback_rate_multiplier" field.
+func (m *GroupMutation) ClearFallbackRateMultiplier() {
+	m.fallback_rate_multiplier = nil
+	m.addfallback_rate_multiplier = nil
+	m.clearedFields[group.FieldFallbackRateMultiplier] = struct{}{}
+}
+
+// FallbackRateMultiplierCleared returns if the "fallback_rate_multiplier" field was cleared in this mutation.
+func (m *GroupMutation) FallbackRateMultiplierCleared() bool {
+	_, ok := m.clearedFields[group.FieldFallbackRateMultiplier]
+	return ok
+}
+
+// ResetFallbackRateMultiplier resets all changes to the "fallback_rate_multiplier" field.
+func (m *GroupMutation) ResetFallbackRateMultiplier() {
+	m.fallback_rate_multiplier = nil
+	m.addfallback_rate_multiplier = nil
+	delete(m.clearedFields, group.FieldFallbackRateMultiplier)
 }
 
 // SetFallbackGroupIds sets the "fallback_group_ids" field.
@@ -26085,7 +26157,7 @@ func (m *GroupMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *GroupMutation) Fields() []string {
-	fields := make([]string, 0, 70)
+	fields := make([]string, 0, 71)
 	if m.created_at != nil {
 		fields = append(fields, group.FieldCreatedAt)
 	}
@@ -26133,6 +26205,9 @@ func (m *GroupMutation) Fields() []string {
 	}
 	if m.group_type != nil {
 		fields = append(fields, group.FieldGroupType)
+	}
+	if m.fallback_rate_multiplier != nil {
+		fields = append(fields, group.FieldFallbackRateMultiplier)
 	}
 	if m.fallback_group_ids != nil {
 		fields = append(fields, group.FieldFallbackGroupIds)
@@ -26336,6 +26411,8 @@ func (m *GroupMutation) Field(name string) (ent.Value, bool) {
 		return m.Platform()
 	case group.FieldGroupType:
 		return m.GroupType()
+	case group.FieldFallbackRateMultiplier:
+		return m.FallbackRateMultiplier()
 	case group.FieldFallbackGroupIds:
 		return m.FallbackGroupIds()
 	case group.FieldSubscriptionType:
@@ -26485,6 +26562,8 @@ func (m *GroupMutation) OldField(ctx context.Context, name string) (ent.Value, e
 		return m.OldPlatform(ctx)
 	case group.FieldGroupType:
 		return m.OldGroupType(ctx)
+	case group.FieldFallbackRateMultiplier:
+		return m.OldFallbackRateMultiplier(ctx)
 	case group.FieldFallbackGroupIds:
 		return m.OldFallbackGroupIds(ctx)
 	case group.FieldSubscriptionType:
@@ -26713,6 +26792,13 @@ func (m *GroupMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetGroupType(v)
+		return nil
+	case group.FieldFallbackRateMultiplier:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFallbackRateMultiplier(v)
 		return nil
 	case group.FieldFallbackGroupIds:
 		v, ok := value.([]int64)
@@ -27106,6 +27192,9 @@ func (m *GroupMutation) AddedFields() []string {
 	if m.addpeak_rate_multiplier != nil {
 		fields = append(fields, group.FieldPeakRateMultiplier)
 	}
+	if m.addfallback_rate_multiplier != nil {
+		fields = append(fields, group.FieldFallbackRateMultiplier)
+	}
 	if m.adddaily_limit_usd != nil {
 		fields = append(fields, group.FieldDailyLimitUsd)
 	}
@@ -27193,6 +27282,8 @@ func (m *GroupMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedRateMultiplier()
 	case group.FieldPeakRateMultiplier:
 		return m.AddedPeakRateMultiplier()
+	case group.FieldFallbackRateMultiplier:
+		return m.AddedFallbackRateMultiplier()
 	case group.FieldDailyLimitUsd:
 		return m.AddedDailyLimitUsd()
 	case group.FieldWeeklyLimitUsd:
@@ -27265,6 +27356,13 @@ func (m *GroupMutation) AddField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddPeakRateMultiplier(v)
+		return nil
+	case group.FieldFallbackRateMultiplier:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddFallbackRateMultiplier(v)
 		return nil
 	case group.FieldDailyLimitUsd:
 		v, ok := value.(float64)
@@ -27458,6 +27556,9 @@ func (m *GroupMutation) ClearedFields() []string {
 	if m.FieldCleared(group.FieldDuplicateOperationID) {
 		fields = append(fields, group.FieldDuplicateOperationID)
 	}
+	if m.FieldCleared(group.FieldFallbackRateMultiplier) {
+		fields = append(fields, group.FieldFallbackRateMultiplier)
+	}
 	if m.FieldCleared(group.FieldDailyLimitUsd) {
 		fields = append(fields, group.FieldDailyLimitUsd)
 	}
@@ -27537,6 +27638,9 @@ func (m *GroupMutation) ClearField(name string) error {
 		return nil
 	case group.FieldDuplicateOperationID:
 		m.ClearDuplicateOperationID()
+		return nil
+	case group.FieldFallbackRateMultiplier:
+		m.ClearFallbackRateMultiplier()
 		return nil
 	case group.FieldDailyLimitUsd:
 		m.ClearDailyLimitUsd()
@@ -27650,6 +27754,9 @@ func (m *GroupMutation) ResetField(name string) error {
 		return nil
 	case group.FieldGroupType:
 		m.ResetGroupType()
+		return nil
+	case group.FieldFallbackRateMultiplier:
+		m.ResetFallbackRateMultiplier()
 		return nil
 	case group.FieldFallbackGroupIds:
 		m.ResetFallbackGroupIds()

@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
@@ -56,6 +57,18 @@ func (h *GatewayHandler) KeyBillingInfo(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"object": "sub2api.key_billing", "schema_version": 2, "billing_scope": "selected_account_cost", "billing_identity": service.BillingIdentityPurchase, "dynamic_rate": true, "cost_basis": "account_stats_cost_or_total_cost_times_account_rate", "observed_at": timezone.Now().UTC()})
 		return
 	}
+	if apiKey.Group.GroupType == service.GroupTypeFallback {
+		if h.apiKeyService == nil {
+			h.errorResponse(c, http.StatusServiceUnavailable, "api_error", "Fallback routing information is unavailable")
+			return
+		}
+		routed, _, err := h.apiKeyService.ResolveMonitorFallbackKey(c.Request.Context(), apiKey, strings.TrimSpace(c.Query("model")))
+		if err != nil {
+			h.errorResponse(c, http.StatusServiceUnavailable, "api_error", "No available fallback route for billing information")
+			return
+		}
+		apiKey = routed
+	}
 	resolvedRate, ok := h.resolveKeyBillingRate(c, apiKey)
 	if !ok {
 		h.errorResponse(c, http.StatusInternalServerError, "api_error", "Billing information is unavailable")
@@ -68,6 +81,9 @@ func (h *GatewayHandler) KeyBillingInfo(c *gin.Context) {
 
 func (h *GatewayHandler) resolveKeyBillingRate(c *gin.Context, apiKey *service.APIKey) (float64, bool) {
 	groupRate := apiKey.Group.RateMultiplier
+	if apiKey.Group.MonitorFallbackRouted {
+		return groupRate, true
+	}
 	switch apiKey.Group.Platform {
 	case service.PlatformOpenAI, service.PlatformGrok:
 		if h.openAIGatewayService == nil {

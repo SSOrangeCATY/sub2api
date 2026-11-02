@@ -240,6 +240,7 @@ type CreateGroupInput struct {
 	I18n                      GroupI18n // 名称与描述的界面语言译文
 	Platform                  string
 	GroupType                 string
+	FallbackRateMultiplier    *float64
 	FallbackGroupIDs          []int64
 	RateMultiplier            float64
 	IsExclusive               bool
@@ -324,6 +325,7 @@ type UpdateGroupInput struct {
 	I18n                      *GroupI18n // nil 表示不修改；非 nil 整体替换
 	Platform                  string
 	GroupType                 *string
+	FallbackRateMultiplier    *float64 // nil: unchanged; -1: clear
 	FallbackGroupIDs          *[]int64
 	RateMultiplier            *float64 // 使用指针以支持设置为0
 	IsExclusive               *bool

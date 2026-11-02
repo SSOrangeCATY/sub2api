@@ -497,7 +497,7 @@ func (d inflightEstimateDeps) rates(ctx context.Context, apiKey *APIKey) (text, 
 	}
 	if apiKey != nil && apiKey.GroupID != nil && apiKey.Group != nil {
 		rate = apiKey.Group.RateMultiplier
-		if d.userGroupRate != nil && apiKey.User != nil {
+		if d.userGroupRate != nil && apiKey.User != nil && !apiKey.Group.MonitorFallbackRouted {
 			rate = d.userGroupRate(ctx, apiKey.User.ID, *apiKey.GroupID, rate)
 		}
 	}

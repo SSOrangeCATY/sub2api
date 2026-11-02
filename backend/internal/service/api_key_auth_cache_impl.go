@@ -14,7 +14,7 @@ import (
 	"github.com/dgraph-io/ristretto"
 )
 
-const apiKeyAuthSnapshotVersion = 27 // v27: independent procurement billing identity
+const apiKeyAuthSnapshotVersion = 28 // v28: optional monitored fallback multiplier
 
 type apiKeyAuthCacheConfig struct {
 	l1Size        int
@@ -419,6 +419,7 @@ func (s *APIKeyService) snapshotFromAPIKey(ctx context.Context, apiKey *APIKey) 
 			FallbackGroupID:                 apiKey.Group.FallbackGroupID,
 			GroupType:                       apiKey.Group.GroupType,
 			FallbackGroupIDs:                append([]int64(nil), apiKey.Group.FallbackGroupIDs...),
+			FallbackRateMultiplier:          apiKey.Group.FallbackRateMultiplier,
 			FallbackGroupIDOnInvalidRequest: apiKey.Group.FallbackGroupIDOnInvalidRequest,
 			ModelRouting:                    apiKey.Group.ModelRouting,
 			ModelRoutingEnabled:             apiKey.Group.ModelRoutingEnabled,
@@ -525,6 +526,7 @@ func (s *APIKeyService) snapshotToAPIKey(key string, snapshot *APIKeyAuthSnapsho
 			FallbackGroupID:                 snapshot.Group.FallbackGroupID,
 			GroupType:                       snapshot.Group.GroupType,
 			FallbackGroupIDs:                append([]int64(nil), snapshot.Group.FallbackGroupIDs...),
+			FallbackRateMultiplier:          snapshot.Group.FallbackRateMultiplier,
 			FallbackGroupIDOnInvalidRequest: snapshot.Group.FallbackGroupIDOnInvalidRequest,
 			ModelRouting:                    snapshot.Group.ModelRouting,
 			ModelRoutingEnabled:             snapshot.Group.ModelRoutingEnabled,

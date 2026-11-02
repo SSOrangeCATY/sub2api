@@ -47,6 +47,9 @@ interface Props {
   peakStart?: string
   peakEnd?: string
   peakRateMultiplier?: number
+  fallbackRateMultiplier?: number | null
+  fallbackEffectiveRateMultiplier?: number | null
+  isFallback?: boolean
   showRate?: boolean
   /** Allow full group names to wrap in layouts that have room for multiple lines. */
   truncate?: boolean
@@ -66,7 +69,10 @@ const props = withDefaults(defineProps<Props>(), {
   daysRemaining: null,
   userRateMultiplier: null,
   peakRateEnabled: false,
-  alwaysShowRate: false
+  alwaysShowRate: false,
+  fallbackRateMultiplier: null,
+  fallbackEffectiveRateMultiplier: null,
+  isFallback: false
 })
 
 const { t } = useI18n()
@@ -76,7 +82,7 @@ const isSubscription = computed(() => props.subscriptionType === 'subscription')
 // 是否有专属倍率（且与默认倍率不同）
 const hasCustomRate = computed(() => {
   return (
-    props.userRateMultiplier !== null &&
+    !props.isFallback && props.userRateMultiplier !== null &&
     props.userRateMultiplier !== undefined &&
     props.rateMultiplier !== undefined &&
     props.userRateMultiplier !== props.rateMultiplier
@@ -86,8 +92,10 @@ const hasCustomRate = computed(() => {
 const appStore = useAppStore()
 
 const hasPeakRate = computed(() => {
-  return Boolean(!props.purchasePricing && props.showRate && props.peakRateEnabled && props.peakStart && props.peakEnd)
+  return Boolean(!props.purchasePricing && !props.isFallback && props.showRate && props.peakRateEnabled && props.peakStart && props.peakEnd)
 })
+
+const displayedRate = computed(() => props.fallbackRateMultiplier ?? props.fallbackEffectiveRateMultiplier ?? props.rateMultiplier)
 
 const peakRateText = computed(() => {
   return formatPeakRateWindow(
@@ -112,12 +120,13 @@ const showLabel = computed(() => {
   // 订阅类型：显示天数或"订阅"
   if (isSubscription.value) return true
   // 标准类型：显示倍率（包括专属倍率）
-  return props.rateMultiplier !== undefined || hasCustomRate.value
+  return props.isFallback || props.rateMultiplier !== undefined || hasCustomRate.value
 })
 
 // Label text
 const labelText = computed(() => {
-  const rateLabel = props.rateMultiplier !== undefined ? `${props.rateMultiplier}x` : ''
+  const rateLabel = displayedRate.value !== undefined && displayedRate.value !== null ? `${displayedRate.value}x` : ''
+  if (props.isFallback && props.fallbackRateMultiplier == null && props.fallbackEffectiveRateMultiplier == null) return t('admin.groups.monitorFallback.followTarget')
   if (isSubscription.value && !props.alwaysShowRate) {
     // 如果有剩余天数，显示天数
     if (props.daysRemaining !== null && props.daysRemaining !== undefined) {

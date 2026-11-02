@@ -852,14 +852,16 @@ func (s *GatewayService) recordUsageCore(ctx context.Context, input *recordUsage
 			// Anthropic's input_tokens excludes cache_read and cache_creation (billed separately);
 			// OpenAI gateway uses actualInputTokens which also excludes cache_read for the same reason.
 			UsageTokens{
-				InputTokens:         result.Usage.InputTokens,
-				OutputTokens:        result.Usage.OutputTokens,
-				CacheCreationTokens: result.Usage.CacheCreationInputTokens,
-				CacheReadTokens:     result.Usage.CacheReadInputTokens,
-				ImageOutputTokens:   result.Usage.ImageOutputTokens,
+				InputTokens:           result.Usage.InputTokens,
+				OutputTokens:          result.Usage.OutputTokens,
+				CacheCreationTokens:   result.Usage.CacheCreationInputTokens,
+				CacheReadTokens:       result.Usage.CacheReadInputTokens,
+				CacheCreation5mTokens: result.Usage.CacheCreation5mTokens,
+				CacheCreation1hTokens: result.Usage.CacheCreation1hTokens,
+				ImageOutputTokens:     result.Usage.ImageOutputTokens,
 			},
 			cost.TotalCost-cacheStorageCost, pricingAt,
-			accountStatsLongContextPricingEnabled(nil),
+			accountStatsLongContextPricingEnabled(nil), cost.SearchCost,
 		)
 		addCacheStorageToAccountStatsCost(usageLog, cacheStorageCost)
 	}
@@ -919,7 +921,7 @@ func (s *GatewayService) recordUsageMultipliers(ctx context.Context, apiKey *API
 	}
 	if apiKey.GroupID != nil && apiKey.Group != nil {
 		multiplier = apiKey.Group.RateMultiplier
-		if user != nil && !user.UsesPurchasePricing() {
+		if user != nil && !user.UsesPurchasePricing() && !apiKey.Group.MonitorFallbackRouted {
 			multiplier = s.ResolveUserGroupRateMultiplier(ctx, user.ID, *apiKey.GroupID, multiplier)
 		}
 	}
@@ -1008,7 +1010,7 @@ func (s *GatewayService) QuoteUsageCost(ctx context.Context, input *RecordUsageI
 		if input.APIKey.GroupID != nil && !isCacheStorageOnlyResult(input.Result) {
 			storage := s.cacheStorageCost(input.Result, billingModel)
 			applyAccountStatsCost(ctx, log, s.channelService, s.billingService, input.Account.ID, *input.APIKey.GroupID, input.Result.UpstreamModel, input.Result.Model,
-				UsageTokens{InputTokens: input.Result.Usage.InputTokens, OutputTokens: input.Result.Usage.OutputTokens, CacheCreationTokens: input.Result.Usage.CacheCreationInputTokens, CacheReadTokens: input.Result.Usage.CacheReadInputTokens, ImageOutputTokens: input.Result.Usage.ImageOutputTokens}, cost.TotalCost-storage, pricingAt, true)
+				UsageTokens{InputTokens: input.Result.Usage.InputTokens, OutputTokens: input.Result.Usage.OutputTokens, CacheCreationTokens: input.Result.Usage.CacheCreationInputTokens, CacheReadTokens: input.Result.Usage.CacheReadInputTokens, CacheCreation5mTokens: input.Result.Usage.CacheCreation5mTokens, CacheCreation1hTokens: input.Result.Usage.CacheCreation1hTokens, ImageOutputTokens: input.Result.Usage.ImageOutputTokens}, cost.TotalCost-storage, pricingAt, true, cost.SearchCost)
 			addCacheStorageToAccountStatsCost(log, storage)
 		}
 		if err := applyPurchasePricing(user, cost, log, input.Account.BillingRateMultiplier()); err != nil {
@@ -1087,6 +1089,7 @@ func (s *GatewayService) calculateRecordUsageCost(
 			}
 			tokenCost.TotalCost += searchCost.TotalCost
 			tokenCost.ActualCost += searchCost.ActualCost
+			tokenCost.SearchCost += searchCost.TotalCost
 		}
 	}
 	// 显式缓存存储费同为叠加 surcharge，与 token 费用使用同一计费模型与倍率。

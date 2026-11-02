@@ -97,6 +97,7 @@
       </template>
 
       <template #table>
+        <MonitorFallbackRoutes v-if="groups.some(group => group.group_type === 'fallback')" audience="user" :purchase-pricing="purchasePricing" @routes="fallbackRoutes = $event" />
         <DataTable
           :columns="columns"
           :data="apiKeys"
@@ -168,6 +169,9 @@
                   :platform="row.group.platform"
                   :subscription-type="row.group.subscription_type"
                   :rate-multiplier="row.group.rate_multiplier"
+                  :is-fallback="row.group.group_type === 'fallback'"
+                  :fallback-rate-multiplier="row.group.fallback_rate_multiplier"
+                  :fallback-effective-rate-multiplier="routedRate(row.group.id)"
                   :user-rate-multiplier="userGroupRates[row.group.id]"
                   :peak-rate-enabled="row.group.peak_rate_enabled"
                   :peak-start="row.group.peak_start"
@@ -554,6 +558,9 @@
                 :platform="(option as unknown as GroupOption).platform"
                 :subscription-type="(option as unknown as GroupOption).subscriptionType"
                 :rate-multiplier="(option as unknown as GroupOption).rate"
+                :is-fallback="(option as unknown as GroupOption).isFallback"
+                :fallback-rate-multiplier="(option as unknown as GroupOption).fallbackRate"
+                :fallback-effective-rate-multiplier="(option as unknown as GroupOption).effectiveRate"
                 :user-rate-multiplier="(option as unknown as GroupOption).userRate"
                 :peak-rate-enabled="(option as unknown as GroupOption).peakRateEnabled"
                 :peak-start="(option as unknown as GroupOption).peakStart"
@@ -568,6 +575,9 @@
                 :platform="(option as unknown as GroupOption).platform"
                 :subscription-type="(option as unknown as GroupOption).subscriptionType"
                 :rate-multiplier="(option as unknown as GroupOption).rate"
+                :is-fallback="(option as unknown as GroupOption).isFallback"
+                :fallback-rate-multiplier="(option as unknown as GroupOption).fallbackRate"
+                :fallback-effective-rate-multiplier="(option as unknown as GroupOption).effectiveRate"
                 :user-rate-multiplier="(option as unknown as GroupOption).userRate"
                 :peak-rate-enabled="(option as unknown as GroupOption).peakRateEnabled"
                 :peak-start="(option as unknown as GroupOption).peakStart"
@@ -1176,6 +1186,9 @@
               :platform="option.platform"
               :subscription-type="option.subscriptionType"
               :rate-multiplier="option.rate"
+              :is-fallback="option.isFallback"
+              :fallback-rate-multiplier="option.fallbackRate"
+              :fallback-effective-rate-multiplier="option.effectiveRate"
               :user-rate-multiplier="option.userRate"
               :peak-rate-enabled="option.peakRateEnabled"
               :peak-start="option.peakStart"
@@ -1224,6 +1237,7 @@ import BulkEditKeysModal from '@/components/keys/BulkEditKeysModal.vue'
 	import EndpointPopover from '@/components/keys/EndpointPopover.vue'
 	import GroupBadge from '@/components/common/GroupBadge.vue'
 	import GroupOptionItem from '@/components/common/GroupOptionItem.vue'
+import MonitorFallbackRoutes from '@/components/admin/group/MonitorFallbackRoutes.vue'
 	import type { ApiKey, Group, PublicSettings, SubscriptionType, GroupPlatform, UpdateApiKeyRequest } from '@/types'
 import type { Column } from '@/components/common/types'
 import type { BatchApiKeyUsageStats } from '@/api/usage'
@@ -1245,7 +1259,13 @@ const formatDateTimeLocal = (isoDate: string): string => {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
+const fallbackRoutes = ref<Array<{ entry_group_id: number; effective_rate_multiplier?: number | null }>>([])
+const routedRate = (id: number) => fallbackRoutes.value.find(route => route.entry_group_id === id)?.effective_rate_multiplier
+
 interface GroupOption {
+  isFallback: boolean
+  fallbackRate: number | null
+  effectiveRate: number | null | undefined
   value: number
   label: string
   description: string | null
@@ -1519,6 +1539,9 @@ const groupOptions = computed(() =>
     value: group.id,
     label: group.name,
     description: group.description,
+    isFallback: group.group_type === 'fallback',
+    fallbackRate: group.fallback_rate_multiplier ?? null,
+    effectiveRate: routedRate(group.id),
     rate: group.rate_multiplier,
     userRate: userGroupRates.value[group.id] ?? null,
     peakRateEnabled: group.peak_rate_enabled,

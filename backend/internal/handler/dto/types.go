@@ -92,14 +92,15 @@ type APIKey struct {
 }
 
 type Group struct {
-	ID             int64   `json:"id"`
-	Name           string  `json:"name"`
-	Description    string  `json:"description"`
-	Platform       string  `json:"platform"`
-	GroupType      string  `json:"group_type"`
-	RateMultiplier float64 `json:"rate_multiplier"`
-	IsExclusive    bool    `json:"is_exclusive"`
-	Status         string  `json:"status"`
+	ID                     int64    `json:"id"`
+	Name                   string   `json:"name"`
+	Description            string   `json:"description"`
+	Platform               string   `json:"platform"`
+	GroupType              string   `json:"group_type"`
+	FallbackRateMultiplier *float64 `json:"fallback_rate_multiplier,omitempty"`
+	RateMultiplier         float64  `json:"rate_multiplier"`
+	IsExclusive            bool     `json:"is_exclusive"`
+	Status                 string   `json:"status"`
 
 	// I18n 名称与描述的各语言译文。只有管理端输出；用户侧接口经 Localized 把
 	// name/description 换成请求语言的版本后清空本字段。

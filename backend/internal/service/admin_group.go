@@ -399,6 +399,9 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 	if s.cfg != nil && s.cfg.RunMode == config.RunModeSimple {
 		normalizeCreateGroupInputForSimpleMode(input)
 	}
+	if input.FallbackRateMultiplier != nil && (strings.TrimSpace(input.GroupType) != GroupTypeFallback || !validFallbackRate(*input.FallbackRateMultiplier)) {
+		return nil, infraerrors.BadRequest("INVALID_FALLBACK_RATE", "fallback rate must be finite and greater than zero, for fallback groups only")
+	}
 	if input.RateMultiplier <= 0 {
 		return nil, errors.New("rate_multiplier must be > 0")
 	}
@@ -598,6 +601,7 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 		GroupType:                       groupType,
 		FallbackGroupIDs:                monitorFallbackIDs,
 		RateMultiplier:                  input.RateMultiplier,
+		FallbackRateMultiplier:          input.FallbackRateMultiplier,
 		IsExclusive:                     input.IsExclusive,
 		Status:                          StatusActive,
 		SubscriptionType:                subscriptionType,
@@ -910,6 +914,19 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 			return nil, err
 		}
 		group.FallbackGroupIDs = validatedMonitorFallbackIDs
+	}
+	if input.FallbackRateMultiplier != nil {
+		if *input.FallbackRateMultiplier == -1 {
+			group.FallbackRateMultiplier = nil
+		} else if group.GroupType != GroupTypeFallback || !validFallbackRate(*input.FallbackRateMultiplier) {
+			return nil, infraerrors.BadRequest("INVALID_FALLBACK_RATE", "fallback rate must be finite and greater than zero, for fallback groups only")
+		} else {
+			v := *input.FallbackRateMultiplier
+			group.FallbackRateMultiplier = &v
+		}
+	}
+	if group.GroupType != GroupTypeFallback {
+		group.FallbackRateMultiplier = nil
 	}
 	if input.RateMultiplier != nil {
 		if *input.RateMultiplier <= 0 {

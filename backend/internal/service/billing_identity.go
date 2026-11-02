@@ -28,6 +28,10 @@ func (d inflightEstimateDeps) estimatePurchase(ctx context.Context, key *APIKey,
 	}
 	primary, _, upstream := inflightBillingModelCandidates(ctx, d, key, req.Model)
 	input, output := tokenCounts(inflightReservationCfg(d.cfg), req.BodyBytes, req.MaxTokens)
+	searchCost := 0.0
+	if req.SearchCalls > 0 {
+		searchCost = d.billing.CalculateSearchCost(req.SearchCalls, groupSearchPricePer1kFromAPIKey(key), 1).TotalCost
+	}
 	now := time.Now()
 	best := 0.0
 	for i := range accounts {
@@ -56,8 +60,8 @@ func (d inflightEstimateDeps) estimatePurchase(ctx context.Context, key *APIKey,
 				if count <= 0 {
 					count = 1
 				}
-				if stats := d.accountStatsEstimate(ctx, account.ID, *key.GroupID, model, UsageTokens{InputTokens: input, OutputTokens: output}, count, base, now, accountStatsLongContextPricingEnabled(openAILongContextBillingGate(account))); stats != nil {
-					base = *stats
+				if stats := d.accountStatsEstimate(ctx, account.ID, *key.GroupID, model, UsageTokens{InputTokens: input, OutputTokens: output}, count, base-searchCost, now, accountStatsLongContextPricingEnabled(openAILongContextBillingGate(account))); stats != nil {
+					base = *stats + searchCost
 					knownCost = base >= 0 && !math.IsNaN(base) && !math.IsInf(base, 0)
 				}
 			}

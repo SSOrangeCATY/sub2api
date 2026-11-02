@@ -309,3 +309,75 @@ func TestGatewayHandlerKeyBillingInfoSharesBillingResolverCacheByPlatform(t *tes
 		})
 	}
 }
+
+type keyBillingFallbackGroups struct {
+	service.GroupRepository
+	groups map[int64]*service.Group
+}
+
+func (r *keyBillingFallbackGroups) GetByIDLite(_ context.Context, id int64) (*service.Group, error) {
+	if group := r.groups[id]; group != nil {
+		return group, nil
+	}
+	return nil, service.ErrGroupNotFound
+}
+
+type keyBillingFallbackMonitors struct {
+	service.ChannelMonitorRepository
+}
+
+func (*keyBillingFallbackMonitors) ListEnabled(context.Context) ([]*service.ChannelMonitor, error) {
+	return nil, nil
+}
+
+func TestGatewayHandlerKeyBillingFallbackUsesLiveRateAndPreservesPurchase(t *testing.T) {
+	entry := &service.Group{ID: 10, GroupType: service.GroupTypeFallback, Platform: service.PlatformOpenAI, Status: service.StatusActive, FallbackGroupIDs: []int64{1, 2}, RateMultiplier: 0.075}
+	a := &service.Group{ID: 1, Platform: service.PlatformOpenAI, Status: service.StatusActive, RateMultiplier: 0.35}
+	b := &service.Group{ID: 2, Platform: service.PlatformOpenAI, Status: service.StatusActive, RateMultiplier: 0.3}
+	groups := &keyBillingFallbackGroups{groups: map[int64]*service.Group{10: entry, 1: a, 2: b}}
+	oldRate := 0.9
+	repo := &keyBillingUserGroupRateRepo{rate: &oldRate}
+	h := newKeyBillingHandler(repo)
+	h.apiKeyService = service.ProvideAPIKeyService(nil, nil, groups, nil, nil, nil, nil, nil, nil, &keyBillingFallbackMonitors{}, nil, nil, nil)
+	key := &service.APIKey{UserID: 11, User: &service.User{ID: 11}, GroupID: &entry.ID, Group: entry}
+	require.Equal(t, oldRate, h.openAIGatewayService.ResolveUserGroupRateMultiplier(context.Background(), 11, a.ID, a.RateMultiplier))
+	check := func(want float64) {
+		t.Helper()
+		c, w := newKeyBillingContext(key)
+		h.KeyBillingInfo(c)
+		require.Equal(t, http.StatusOK, w.Code)
+		require.Equal(t, "no-store", w.Header().Get("Cache-Control"))
+		var got keyBillingInfoResponse
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &got))
+		require.Equal(t, want, got.GroupRateMultiplier)
+		require.Equal(t, want, got.EffectiveRateMultiplier)
+		require.Nil(t, got.UserRateMultiplier)
+	}
+	check(0.35)
+	fixed := 0.2
+	entry.FallbackRateMultiplier = &fixed
+	check(0.2)
+	a.Status = "inactive"
+	check(0.2)
+	entry.FallbackRateMultiplier = nil
+	check(0.3)
+	b.RateMultiplier = 0.4
+	check(0.4)
+	require.Equal(t, 1, repo.lookupCalls)
+	b.Status = "inactive"
+	c, w := newKeyBillingContext(key)
+	h.KeyBillingInfo(c)
+	require.Equal(t, http.StatusServiceUnavailable, w.Code)
+	require.NotContains(t, w.Body.String(), "effective_rate_multiplier")
+	key.User.BillingIdentity = service.BillingIdentityPurchase
+	c, w = newKeyBillingContext(key)
+	h.KeyBillingInfo(c)
+	require.Equal(t, http.StatusOK, w.Code)
+	var purchase map[string]any
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &purchase))
+	require.Equal(t, true, purchase["dynamic_rate"])
+	require.Equal(t, "selected_account_cost", purchase["billing_scope"])
+	require.NotContains(t, purchase, "effective_rate_multiplier")
+	require.Equal(t, int64(10), *key.GroupID)
+	require.Equal(t, 0.075, key.Group.RateMultiplier)
+}

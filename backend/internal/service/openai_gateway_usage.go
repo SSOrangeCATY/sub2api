@@ -202,7 +202,7 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 	}
 	if apiKey.GroupID != nil && apiKey.Group != nil {
 		multiplier = apiKey.Group.RateMultiplier
-		if !user.UsesPurchasePricing() {
+		if !user.UsesPurchasePricing() && !apiKey.Group.MonitorFallbackRouted {
 			multiplier = s.ResolveUserGroupRateMultiplier(ctx, user.ID, *apiKey.GroupID, multiplier)
 		}
 	}
@@ -491,7 +491,7 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 		applyAccountStatsCost(ctx, usageLog, s.channelService, s.billingService,
 			account.ID, *apiKey.GroupID, result.UpstreamModel, result.Model,
 			tokens, cost.TotalCost, pricingAt,
-			accountStatsLongContextPricingEnabled(longContextBillingGate) && !modelLongContextExempt,
+			accountStatsLongContextPricingEnabled(longContextBillingGate) && !modelLongContextExempt, cost.SearchCost,
 		)
 	}
 
@@ -705,6 +705,7 @@ func (s *OpenAIGatewayService) calculateOpenAIRecordUsageCost(
 	// Additive: tokens + search surcharge.
 	tokenCost.TotalCost += searchCost.TotalCost
 	tokenCost.ActualCost += searchCost.ActualCost
+	tokenCost.SearchCost += searchCost.TotalCost
 	return tokenCost, nil
 }
 
