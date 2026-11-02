@@ -17,15 +17,17 @@ type MonitorGroupRouteCandidate struct {
 	Reason    string            `json:"reason"`
 }
 type MonitorGroupRoute struct {
-	EntryGroupID    int64                        `json:"entry_group_id"`
-	EntryGroupName  string                       `json:"entry_group_name"`
-	TargetGroupID   *int64                       `json:"target_group_id"`
-	TargetGroupName string                       `json:"target_group_name"`
-	TargetHealth    GroupHealthStatus            `json:"target_health"`
-	Status          string                       `json:"status"`
-	Model           string                       `json:"model"`
-	Candidates      []MonitorGroupRouteCandidate `json:"candidates"`
-	Target          *Group                       `json:"-"`
+	EntryGroupID            int64                        `json:"entry_group_id"`
+	EntryGroupName          string                       `json:"entry_group_name"`
+	TargetGroupID           *int64                       `json:"target_group_id"`
+	TargetGroupName         string                       `json:"target_group_name"`
+	TargetHealth            GroupHealthStatus            `json:"target_health"`
+	Status                  string                       `json:"status"`
+	Model                   string                       `json:"model"`
+	Candidates              []MonitorGroupRouteCandidate `json:"candidates"`
+	EffectiveRateMultiplier *float64                     `json:"effective_rate_multiplier"`
+	RateSource              string                       `json:"rate_source"`
+	Target                  *Group                       `json:"-"`
 }
 type MonitorGroupRouter struct {
 	groups   GroupRepository
@@ -44,6 +46,9 @@ func (r *MonitorGroupRouter) Resolve(ctx context.Context, entry *Group, model st
 		route.TargetGroupName = entry.Name
 		route.Target = entry
 		route.Status = "direct"
+		rate := entry.RateMultiplier
+		route.EffectiveRateMultiplier = &rate
+		route.RateSource = "target"
 		return route, nil
 	}
 	if entry.Status != StatusActive {
@@ -121,6 +126,13 @@ func (r *MonitorGroupRouter) Resolve(ctx context.Context, entry *Group, model st
 		route.TargetGroupName = group.Name
 		route.TargetHealth = candidate.Status
 		route.Status = "routed"
+		rate := group.RateMultiplier
+		route.RateSource = "target"
+		if entry.FallbackRateMultiplier != nil {
+			rate = *entry.FallbackRateMultiplier
+			route.RateSource = "entry"
+		}
+		route.EffectiveRateMultiplier = &rate
 		return route, nil
 	}
 	return route, nil
@@ -128,7 +140,8 @@ func (r *MonitorGroupRouter) Resolve(ctx context.Context, entry *Group, model st
 func (s *APIKeyService) MonitorGroupRouter() *MonitorGroupRouter { return s.monitorGroupRouter }
 
 // ResolveMonitorFallbackKey clones the authenticated key. Explicit admin chains
-// delegate access; all prices, quotas, RPM, sticky sessions and logs use target.
+// delegate access; quotas, RPM, pricing cards, sticky sessions and logs use target.
+// Only an explicit entry override replaces the target's base text multiplier.
 func (s *APIKeyService) ResolveMonitorFallbackKey(ctx context.Context, key *APIKey, model string) (*APIKey, *MonitorGroupRoute, error) {
 	if key == nil || key.Group == nil || key.Group.GroupType != GroupTypeFallback {
 		return key, nil, nil
@@ -155,7 +168,13 @@ func (s *APIKeyService) ResolveMonitorFallbackKey(ctx context.Context, key *APIK
 	}
 	copy := *key
 	copy.GroupID = route.TargetGroupID
-	copy.Group = route.Target
+	billingGroup := *route.Target
+	billingGroup.MonitorFallbackRouted = true
+	billingGroup.FallbackRateMultiplier = entry.FallbackRateMultiplier
+	if entry.FallbackRateMultiplier != nil {
+		billingGroup.RateMultiplier = *entry.FallbackRateMultiplier
+	}
+	copy.Group = &billingGroup
 	if key.User != nil {
 		user := *key.User
 		user.UserGroupRPMOverride = nil

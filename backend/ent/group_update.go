@@ -243,6 +243,33 @@ func (_u *GroupUpdate) SetNillableGroupType(v *string) *GroupUpdate {
 	return _u
 }
 
+// SetFallbackRateMultiplier sets the "fallback_rate_multiplier" field.
+func (_u *GroupUpdate) SetFallbackRateMultiplier(v float64) *GroupUpdate {
+	_u.mutation.ResetFallbackRateMultiplier()
+	_u.mutation.SetFallbackRateMultiplier(v)
+	return _u
+}
+
+// SetNillableFallbackRateMultiplier sets the "fallback_rate_multiplier" field if the given value is not nil.
+func (_u *GroupUpdate) SetNillableFallbackRateMultiplier(v *float64) *GroupUpdate {
+	if v != nil {
+		_u.SetFallbackRateMultiplier(*v)
+	}
+	return _u
+}
+
+// AddFallbackRateMultiplier adds value to the "fallback_rate_multiplier" field.
+func (_u *GroupUpdate) AddFallbackRateMultiplier(v float64) *GroupUpdate {
+	_u.mutation.AddFallbackRateMultiplier(v)
+	return _u
+}
+
+// ClearFallbackRateMultiplier clears the value of the "fallback_rate_multiplier" field.
+func (_u *GroupUpdate) ClearFallbackRateMultiplier() *GroupUpdate {
+	_u.mutation.ClearFallbackRateMultiplier()
+	return _u
+}
+
 // SetFallbackGroupIds sets the "fallback_group_ids" field.
 func (_u *GroupUpdate) SetFallbackGroupIds(v []int64) *GroupUpdate {
 	_u.mutation.SetFallbackGroupIds(v)
@@ -1671,6 +1698,15 @@ func (_u *GroupUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if value, ok := _u.mutation.GroupType(); ok {
 		_spec.SetField(group.FieldGroupType, field.TypeString, value)
 	}
+	if value, ok := _u.mutation.FallbackRateMultiplier(); ok {
+		_spec.SetField(group.FieldFallbackRateMultiplier, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.AddedFallbackRateMultiplier(); ok {
+		_spec.AddField(group.FieldFallbackRateMultiplier, field.TypeFloat64, value)
+	}
+	if _u.mutation.FallbackRateMultiplierCleared() {
+		_spec.ClearField(group.FieldFallbackRateMultiplier, field.TypeFloat64)
+	}
 	if value, ok := _u.mutation.FallbackGroupIds(); ok {
 		_spec.SetField(group.FieldFallbackGroupIds, field.TypeJSON, value)
 	}
@@ -2502,6 +2538,33 @@ func (_u *GroupUpdateOne) SetNillableGroupType(v *string) *GroupUpdateOne {
 	if v != nil {
 		_u.SetGroupType(*v)
 	}
+	return _u
+}
+
+// SetFallbackRateMultiplier sets the "fallback_rate_multiplier" field.
+func (_u *GroupUpdateOne) SetFallbackRateMultiplier(v float64) *GroupUpdateOne {
+	_u.mutation.ResetFallbackRateMultiplier()
+	_u.mutation.SetFallbackRateMultiplier(v)
+	return _u
+}
+
+// SetNillableFallbackRateMultiplier sets the "fallback_rate_multiplier" field if the given value is not nil.
+func (_u *GroupUpdateOne) SetNillableFallbackRateMultiplier(v *float64) *GroupUpdateOne {
+	if v != nil {
+		_u.SetFallbackRateMultiplier(*v)
+	}
+	return _u
+}
+
+// AddFallbackRateMultiplier adds value to the "fallback_rate_multiplier" field.
+func (_u *GroupUpdateOne) AddFallbackRateMultiplier(v float64) *GroupUpdateOne {
+	_u.mutation.AddFallbackRateMultiplier(v)
+	return _u
+}
+
+// ClearFallbackRateMultiplier clears the value of the "fallback_rate_multiplier" field.
+func (_u *GroupUpdateOne) ClearFallbackRateMultiplier() *GroupUpdateOne {
+	_u.mutation.ClearFallbackRateMultiplier()
 	return _u
 }
 
@@ -3962,6 +4025,15 @@ func (_u *GroupUpdateOne) sqlSave(ctx context.Context) (_node *Group, err error)
 	}
 	if value, ok := _u.mutation.GroupType(); ok {
 		_spec.SetField(group.FieldGroupType, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.FallbackRateMultiplier(); ok {
+		_spec.SetField(group.FieldFallbackRateMultiplier, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.AddedFallbackRateMultiplier(); ok {
+		_spec.AddField(group.FieldFallbackRateMultiplier, field.TypeFloat64, value)
+	}
+	if _u.mutation.FallbackRateMultiplierCleared() {
+		_spec.ClearField(group.FieldFallbackRateMultiplier, field.TypeFloat64)
 	}
 	if value, ok := _u.mutation.FallbackGroupIds(); ok {
 		_spec.SetField(group.FieldFallbackGroupIds, field.TypeJSON, value)

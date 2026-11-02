@@ -87,4 +87,19 @@ describe('UserEditModal concurrency', () => {
     expect(showError).toHaveBeenCalledWith('admin.users.concurrencyNonNegative')
     expect(update).not.toHaveBeenCalled()
   })
+
+  it('submits purchase identity when selected without modifying role', async () => {
+    const wrapper = mountModal(1)
+    wrapper.findAllComponents({ name: 'Select' })[1].vm.$emit('update:modelValue', 'purchase')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    expect(update).toHaveBeenCalledWith(7, expect.objectContaining({ billing_identity: 'purchase', role: 'user' }))
+  })
+
+  it('omits unchanged identity from routine edits', async () => {
+    const wrapper = mountModal(1)
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    expect(update.mock.calls[0][1]).not.toHaveProperty('billing_identity')
+  })
 })

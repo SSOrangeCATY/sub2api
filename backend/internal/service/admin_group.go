@@ -399,6 +399,9 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 	if s.cfg != nil && s.cfg.RunMode == config.RunModeSimple {
 		normalizeCreateGroupInputForSimpleMode(input)
 	}
+	if input.FallbackRateMultiplier != nil && (strings.TrimSpace(input.GroupType) != GroupTypeFallback || !validFallbackRate(*input.FallbackRateMultiplier)) {
+		return nil, infraerrors.BadRequest("INVALID_FALLBACK_RATE", "fallback rate must be finite and greater than zero, for fallback groups only")
+	}
 	if input.RateMultiplier <= 0 {
 		return nil, errors.New("rate_multiplier must be > 0")
 	}
@@ -598,6 +601,7 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 		GroupType:                       groupType,
 		FallbackGroupIDs:                monitorFallbackIDs,
 		RateMultiplier:                  input.RateMultiplier,
+		FallbackRateMultiplier:          input.FallbackRateMultiplier,
 		IsExclusive:                     input.IsExclusive,
 		Status:                          StatusActive,
 		SubscriptionType:                subscriptionType,
@@ -910,6 +914,19 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 			return nil, err
 		}
 		group.FallbackGroupIDs = validatedMonitorFallbackIDs
+	}
+	if input.FallbackRateMultiplier != nil {
+		if *input.FallbackRateMultiplier == -1 {
+			group.FallbackRateMultiplier = nil
+		} else if group.GroupType != GroupTypeFallback || !validFallbackRate(*input.FallbackRateMultiplier) {
+			return nil, infraerrors.BadRequest("INVALID_FALLBACK_RATE", "fallback rate must be finite and greater than zero, for fallback groups only")
+		} else {
+			v := *input.FallbackRateMultiplier
+			group.FallbackRateMultiplier = &v
+		}
+	}
+	if group.GroupType != GroupTypeFallback {
+		group.FallbackRateMultiplier = nil
 	}
 	if input.RateMultiplier != nil {
 		if *input.RateMultiplier <= 0 {
@@ -1401,22 +1418,20 @@ func (s *adminServiceImpl) ClearGroupRateMultipliers(ctx context.Context, groupI
 	if s.userGroupRateRepo == nil {
 		return nil
 	}
-	return s.userGroupRateRepo.DeleteByGroupID(ctx, groupID)
+	err := s.userGroupRateRepo.SyncGroupRateMultipliers(ctx, groupID, nil)
+	if err == nil {
+		if resetter, ok := s.authCacheInvalidator.(interface{ InvalidatePersonalRateCaches(context.Context) }); ok {
+			resetter.InvalidatePersonalRateCaches(ctx)
+		}
+	}
+	return err
 }
 
 func (s *adminServiceImpl) BatchSetGroupRateMultipliers(ctx context.Context, groupID int64, entries []GroupRateMultiplierInput) error {
 	if err := s.ValidateSimpleModeGroupOperation(AdminGroupOperationMultiplier); err != nil {
 		return err
 	}
-	if s.userGroupRateRepo == nil {
-		return nil
-	}
-	for _, e := range entries {
-		if e.RateMultiplier <= 0 {
-			return fmt.Errorf("rate_multiplier must be > 0 (user_id=%d)", e.UserID)
-		}
-	}
-	return s.userGroupRateRepo.SyncGroupRateMultipliers(ctx, groupID, entries)
+	return infraerrors.BadRequest("PERSONAL_RATES_RETIRED", "use billing identity instead of personal rate overrides")
 }
 
 func (s *adminServiceImpl) ClearGroupRPMOverrides(ctx context.Context, groupID int64) error {

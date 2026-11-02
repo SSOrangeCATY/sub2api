@@ -69,7 +69,8 @@ export async function list(
   pageSize: number = 20,
   filters?: {
     status?: 'active' | 'disabled'
-    role?: 'admin' | 'user'
+    billing_identity?: 'standard' | 'purchase'
+  role?: 'admin' | 'user'
     search?: string
     group_name?: string         // fuzzy filter by allowed group name
     api_key_group_id?: number   // filter users by the group their API keys are bound to
@@ -404,7 +405,13 @@ export async function resetPlatformQuotaWindow(
   return data
 }
 
+export async function migrateBillingIdentity(): Promise<{ backup_id: number; migrated_users: number; cleared_rates: number }> {
+  const { data } = await apiClient.post('/admin/users/billing-identity/migrate', { confirm: true })
+  return data
+}
+
 export const usersAPI = {
+  migrateBillingIdentity,
   list,
   getById,
   create,

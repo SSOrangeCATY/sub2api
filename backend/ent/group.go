@@ -52,6 +52,8 @@ type Group struct {
 	Platform string `json:"platform,omitempty"`
 	// 分组类型：business 业务分组，fallback 兜底分组
 	GroupType string `json:"group_type,omitempty"`
+	// 兜底入口显式倍率；NULL 跟随实际路由业务分组
+	FallbackRateMultiplier *float64 `json:"fallback_rate_multiplier,omitempty"`
 	// 按优先级排列的兜底分组 ID 列表
 	FallbackGroupIds []int64 `json:"fallback_group_ids,omitempty"`
 	// SubscriptionType holds the value of the "subscription_type" field.
@@ -270,7 +272,7 @@ func (*Group) scanValues(columns []string) ([]any, error) {
 			values[i] = new([]byte)
 		case group.FieldPeakRateEnabled, group.FieldIsExclusive, group.FieldAllowImageGeneration, group.FieldAllowBatchImageGeneration, group.FieldImageCountBilling, group.FieldImageRateIndependent, group.FieldVideoRateIndependent, group.FieldLongContextPricingEnabled, group.FieldClaudeCodeOnly, group.FieldModelRoutingEnabled, group.FieldMcpXMLInject, group.FieldAllowMessagesDispatch, group.FieldAllowLive, group.FieldForceOpenaiFast, group.FieldFreeOpenaiFast, group.FieldRequireOauthOnly, group.FieldRequirePrivacySet, group.FieldProfitControlEnabled:
 			values[i] = new(sql.NullBool)
-		case group.FieldRateMultiplier, group.FieldPeakRateMultiplier, group.FieldDailyLimitUsd, group.FieldWeeklyLimitUsd, group.FieldMonthlyLimitUsd, group.FieldImageRateMultiplier, group.FieldImagePrice1k, group.FieldImagePrice2k, group.FieldImagePrice4k, group.FieldBatchImageDiscountMultiplier, group.FieldBatchImageHoldMultiplier, group.FieldVideoRateMultiplier, group.FieldVideoPrice480p, group.FieldVideoPrice720p, group.FieldVideoPrice1080p, group.FieldWebSearchPricePerCall, group.FieldSearchPricePer1k, group.FieldAudioRealtimePricePerMin, group.FieldAudioTtsPricePerMillionChars, group.FieldAudioSttPricePerHour, group.FieldProfitMinMargin, group.FieldProfitSafetyBuffer:
+		case group.FieldRateMultiplier, group.FieldPeakRateMultiplier, group.FieldFallbackRateMultiplier, group.FieldDailyLimitUsd, group.FieldWeeklyLimitUsd, group.FieldMonthlyLimitUsd, group.FieldImageRateMultiplier, group.FieldImagePrice1k, group.FieldImagePrice2k, group.FieldImagePrice4k, group.FieldBatchImageDiscountMultiplier, group.FieldBatchImageHoldMultiplier, group.FieldVideoRateMultiplier, group.FieldVideoPrice480p, group.FieldVideoPrice720p, group.FieldVideoPrice1080p, group.FieldWebSearchPricePerCall, group.FieldSearchPricePer1k, group.FieldAudioRealtimePricePerMin, group.FieldAudioTtsPricePerMillionChars, group.FieldAudioSttPricePerHour, group.FieldProfitMinMargin, group.FieldProfitSafetyBuffer:
 			values[i] = new(sql.NullFloat64)
 		case group.FieldID, group.FieldDefaultValidityDays, group.FieldFallbackGroupID, group.FieldFallbackGroupIDOnInvalidRequest, group.FieldSortOrder, group.FieldRpmLimit:
 			values[i] = new(sql.NullInt64)
@@ -399,6 +401,13 @@ func (_m *Group) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field group_type", values[i])
 			} else if value.Valid {
 				_m.GroupType = value.String
+			}
+		case group.FieldFallbackRateMultiplier:
+			if value, ok := values[i].(*sql.NullFloat64); !ok {
+				return fmt.Errorf("unexpected type %T for field fallback_rate_multiplier", values[i])
+			} else if value.Valid {
+				_m.FallbackRateMultiplier = new(float64)
+				*_m.FallbackRateMultiplier = value.Float64
 			}
 		case group.FieldFallbackGroupIds:
 			if value, ok := values[i].(*[]byte); !ok {
@@ -887,6 +896,11 @@ func (_m *Group) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("group_type=")
 	builder.WriteString(_m.GroupType)
+	builder.WriteString(", ")
+	if v := _m.FallbackRateMultiplier; v != nil {
+		builder.WriteString("fallback_rate_multiplier=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
 	builder.WriteString(", ")
 	builder.WriteString("fallback_group_ids=")
 	builder.WriteString(fmt.Sprintf("%v", _m.FallbackGroupIds))

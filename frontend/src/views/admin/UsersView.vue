@@ -263,6 +263,7 @@
               {{ t('admin.users.bulkDelete.action', { count: selectedCount }) }}
             </button>
 
+            <button class="btn btn-secondary" data-test="migrate-billing-identity" :disabled="migratingIdentity" @click="showIdentityMigration = true">{{ t('admin.users.billingIdentity.migrate') }}</button>
             <!-- Create User Button (full width on mobile, auto width on desktop) -->
             <button @click="showCreateModal = true" class="btn btn-primary flex-1 md:flex-initial">
               <Icon name="plus" size="md" class="mr-2" />
@@ -336,10 +337,11 @@
             </div>
           </template>
 
-          <template #cell-role="{ value }">
+          <template #cell-role="{ value, row }">
             <span :class="['badge', value === 'admin' ? 'badge-purple' : 'badge-gray']">
               {{ t('admin.users.roles.' + value) }}
             </span>
+            <span v-if="row.billing_identity === 'purchase'" class="badge ml-1" :title="t('admin.users.billingIdentity.hint')">{{ t('admin.users.billingIdentity.purchase') }}</span>
           </template>
 
           <template #cell-groups="{ row }">
@@ -758,6 +760,7 @@
       </div>
     </Teleport>
 
+    <ConfirmDialog :show="showIdentityMigration" :title="t('admin.users.billingIdentity.migrate')" :message="t('admin.users.billingIdentity.confirm')" :loading="migratingIdentity" @confirm="migrateBillingIdentity" @cancel="showIdentityMigration = false" />
     <ConfirmDialog :show="showDeleteDialog" :title="t('admin.users.deleteUser')" :message="t('admin.users.deleteConfirm', { email: deletingUser?.email })" :danger="true" @confirm="confirmDelete" @cancel="showDeleteDialog = false" />
     <ConfirmDialog
       :show="bulkDeleteIds.length > 0"
@@ -1339,6 +1342,19 @@ const pagination = reactive({
   pages: 0
 })
 
+const showIdentityMigration = ref(false)
+const migratingIdentity = ref(false)
+const migrateBillingIdentity = async () => {
+  if (migratingIdentity.value) return
+  migratingIdentity.value = true
+  try {
+    const result = await adminAPI.users.migrateBillingIdentity()
+    appStore.showSuccess(t('admin.users.billingIdentity.migrated', { users: result.migrated_users, rates: result.cleared_rates }))
+    showIdentityMigration.value = false
+    await loadUsers()
+  } catch (error: any) { appStore.showError(error?.message || t('common.error')) }
+  finally { migratingIdentity.value = false }
+}
 const showCreateModal = ref(false)
 const showEditModal = ref(false)
 const showBulkEditModal = ref(false)

@@ -29,6 +29,8 @@ FRONTEND_CRITICAL_VITEST := \
 	src/components/common/__tests__/MonitorControls.spec.ts \
 	src/components/common/__tests__/GroupSelector.spec.ts \
 	src/components/admin/group/__tests__/MonitorFallback.spec.ts \
+	src/components/admin/group/__tests__/FallbackRateField.spec.ts \
+	src/components/common/__tests__/FallbackRateDisplay.spec.ts \
 	src/views/admin/__tests__/GroupsView.duplicate.spec.ts \
 	src/components/user/profile/__tests__/ProfileInfoCard.spec.ts \
 	src/components/user/profile/__tests__/ProfileIdentityBindingsSection.spec.ts \

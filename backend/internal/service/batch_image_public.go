@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -76,9 +77,10 @@ type BatchImageReferenceInput struct {
 }
 
 type BatchImageOwner struct {
-	UserID   int64
-	APIKeyID int64
-	GroupID  *int64
+	BillingIdentity string
+	UserID          int64
+	APIKeyID        int64
+	GroupID         *int64
 }
 
 type BatchImagePublicService struct {
@@ -89,6 +91,7 @@ type BatchImagePublicService struct {
 	Queue             BatchImageQueue
 	ProviderRegistry  *BatchImageProviderRegistry
 	Pricing           BatchImagePricingResolver
+	ChannelService    *ChannelService
 	BillingRepo       UsageBillingRepository
 	AuthCache         APIKeyAuthCacheInvalidator
 	Config            *config.Config
@@ -182,7 +185,7 @@ type BatchImageItemsQuery struct {
 	Cursor string
 }
 
-func NewBatchImagePublicService(repo BatchImageRepository, accountRepo AccountRepository, groupRepo GroupRepository, userGroupRateRepo UserGroupRateRepository, queue BatchImageQueue, pricing *BatchImageModelPricingResolver, billingRepo UsageBillingRepository, authCache APIKeyAuthCacheInvalidator, cfg *config.Config) *BatchImagePublicService {
+func NewBatchImagePublicService(repo BatchImageRepository, accountRepo AccountRepository, groupRepo GroupRepository, userGroupRateRepo UserGroupRateRepository, queue BatchImageQueue, pricing *BatchImageModelPricingResolver, billingRepo UsageBillingRepository, authCache APIKeyAuthCacheInvalidator, cfg *config.Config, channelService *ChannelService) *BatchImagePublicService {
 	return &BatchImagePublicService{
 		Repo:              repo,
 		AccountRepo:       accountRepo,
@@ -191,6 +194,7 @@ func NewBatchImagePublicService(repo BatchImageRepository, accountRepo AccountRe
 		Queue:             queue,
 		ProviderRegistry:  NewBatchImageProviderRegistryFromConfig(cfg),
 		Pricing:           pricing,
+		ChannelService:    channelService,
 		BillingRepo:       billingRepo,
 		AuthCache:         authCache,
 		Config:            cfg,
@@ -998,6 +1002,7 @@ func (s *BatchImagePublicService) ensureGroupAllowsBatchImage(ctx context.Contex
 }
 
 func (s *BatchImagePublicService) resolvePricingSnapshot(ctx context.Context, owner BatchImageOwner, req BatchImageSubmitRequest, provider string, account *Account) (*BatchImagePricingSnapshot, error) {
+	purchase := owner.BillingIdentity == BillingIdentityPurchase
 	unit := -1.0
 	groupMultiplier := 1.0
 	discountMultiplier := defaultBatchImageDiscountMultiplier
@@ -1018,7 +1023,7 @@ func (s *BatchImagePublicService) resolvePricingSnapshot(ctx context.Context, ow
 			groupDefaultMultiplier = 0
 		}
 		effectiveGroupMultiplier := groupDefaultMultiplier
-		if s.UserGroupRateRepo != nil {
+		if !purchase && s.UserGroupRateRepo != nil {
 			userRate, rateErr := s.UserGroupRateRepo.GetByUserAndGroup(ctx, owner.UserID, group.ID)
 			if rateErr != nil {
 				return nil, ErrBatchImageSettlementPricingMissing
@@ -1041,8 +1046,13 @@ func (s *BatchImagePublicService) resolvePricingSnapshot(ctx context.Context, ow
 		if group.BatchImageHoldMultiplier >= 0 {
 			holdMultiplier = group.BatchImageHoldMultiplier
 		}
-		if configuredUnit := group.GetImagePrice(req.ImageSize); configuredUnit != nil && *configuredUnit >= 0 {
+		if configuredUnit := group.GetImagePrice(req.ImageSize); !purchase && configuredUnit != nil && *configuredUnit >= 0 {
 			unit = *configuredUnit
+		}
+	}
+	if purchase && account != nil && owner.GroupID != nil && s.ChannelService != nil {
+		if stats := resolveAccountStatsCost(ctx, s.ChannelService, nil, account.ID, *owner.GroupID, req.Model, UsageTokens{}, 1, 0, "", time.Now(), true); stats != nil {
+			unit = *stats
 		}
 	}
 	if unit < 0 {
@@ -1054,6 +1064,14 @@ func (s *BatchImagePublicService) resolvePricingSnapshot(ctx context.Context, ow
 			return nil, ErrBatchImageSettlementPricingMissing
 		}
 		unit = resolvedUnit
+	}
+	if purchase {
+		if account == nil {
+			return nil, ErrBatchImageSettlementPricingMissing
+		}
+		groupMultiplier = 1
+		discountMultiplier = defaultBatchImageDiscountMultiplier
+		holdMultiplier = defaultBatchImageHoldMultiplier
 	}
 	// 定价不变式：hold 比例不得低于 discount 比例，否则成功率足够高时
 	// actualCost > holdAmount，结算永远失败、冻结余额无法解冻。
@@ -1072,7 +1090,15 @@ func (s *BatchImagePublicService) resolvePricingSnapshot(ctx context.Context, ow
 	if accountMultiplier < 0 {
 		accountMultiplier = 0
 	}
+	if unit < 0 || math.IsNaN(unit) || math.IsInf(unit, 0) || math.IsNaN(accountMultiplier) || math.IsInf(accountMultiplier, 0) {
+		return nil, ErrBatchImageSettlementPricingMissing
+	}
 	standardUnitPrice := unit * groupMultiplier * accountMultiplier
+	if purchase {
+		// The upstream batch discount belongs to procurement; no sales-group markup.
+		groupMultiplier = 1
+		standardUnitPrice = unit * accountMultiplier
+	}
 	billableUnitPrice := standardUnitPrice * discountMultiplier
 	holdUnitPrice := standardUnitPrice * holdMultiplier
 	return &BatchImagePricingSnapshot{

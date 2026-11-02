@@ -26,8 +26,10 @@
     <div class="flex shrink-0 items-center gap-2 pt-0.5">
       <div class="flex shrink-0 flex-col items-end gap-1">
         <!-- Rate pill (platform color) -->
-        <span v-if="rateMultiplier !== undefined" :class="['pt-group-option-rate inline-flex items-center whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold', ratePillClass]">
-          <template v-if="hasCustomRate">
+        <span v-if="purchasePricing || isFallback || rateMultiplier !== undefined" :class="['pt-group-option-rate inline-flex items-center whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold', ratePillClass]">
+          <template v-if="purchasePricing">{{ t('modelPlaza.purchaseDynamic') }}</template>
+          <template v-else-if="isFallback">{{ fallbackRateMultiplier != null || fallbackEffectiveRateMultiplier != null ? (fallbackRateMultiplier ?? fallbackEffectiveRateMultiplier) + 'x' : t('admin.groups.monitorFallback.followTarget') }}</template>
+          <template v-else-if="hasCustomRate">
             <span class="mr-1 line-through opacity-50">{{ rateMultiplier }}x</span>
             <span class="font-bold">{{ userRateMultiplier }}x</span>
           </template>
@@ -69,10 +71,14 @@ import { formatPeakRateWindow, serverTimezoneLabel } from '@/utils/peak-rate'
 const { t } = useI18n()
 
 interface Props {
+  purchasePricing?: boolean
   name: string
   platform: GroupPlatform
   subscriptionType?: SubscriptionType
   rateMultiplier?: number
+  isFallback?: boolean
+  fallbackRateMultiplier?: number | null
+  fallbackEffectiveRateMultiplier?: number | null
   userRateMultiplier?: number | null
   peakRateEnabled?: boolean
   peakStart?: string
@@ -94,7 +100,7 @@ const props = withDefaults(defineProps<Props>(), {
 // Whether user has a custom rate different from default
 const hasCustomRate = computed(() => {
   return (
-    props.userRateMultiplier !== null &&
+    !props.isFallback && props.userRateMultiplier !== null &&
     props.userRateMultiplier !== undefined &&
     props.rateMultiplier !== undefined &&
     props.userRateMultiplier !== props.rateMultiplier
@@ -104,7 +110,7 @@ const hasCustomRate = computed(() => {
 const appStore = useAppStore()
 
 const hasPeakRate = computed(() => {
-  return Boolean(props.peakRateEnabled && props.peakStart && props.peakEnd)
+  return Boolean(!props.purchasePricing && !props.isFallback && props.peakRateEnabled && props.peakStart && props.peakEnd)
 })
 
 const peakRateText = computed(() => {

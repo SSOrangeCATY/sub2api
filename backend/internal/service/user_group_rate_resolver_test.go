@@ -35,6 +35,27 @@ func TestNewUserGroupRateResolver_Defaults(t *testing.T) {
 	require.Equal(t, "service.gateway", resolver.logComponent)
 }
 
+func TestPersonalRateCacheResetReloadsAfterMigration(t *testing.T) {
+	generation := personalRateCacheGeneration.Load()
+	t.Cleanup(func() { personalRateCacheGeneration.Store(generation) })
+	for _, remote := range []bool{false, true} {
+		rate := 0.06
+		repo := &userGroupRateResolverRepoStub{rate: &rate}
+		resolver := newUserGroupRateResolver(repo, nil, time.Minute, nil, "service.test")
+		require.Equal(t, 0.06, resolver.Resolve(context.Background(), 101, 202, 0.35))
+		repo.rate = nil
+		require.Equal(t, 0.06, resolver.Resolve(context.Background(), 101, 202, 0.35))
+		cacheService := &APIKeyService{}
+		if remote {
+			cacheService.invalidateLocalAuthCache(personalRatesResetMessage)
+		} else {
+			cacheService.InvalidatePersonalRateCaches(context.Background())
+		}
+		require.Equal(t, 0.35, resolver.Resolve(context.Background(), 101, 202, 0.35))
+		require.Equal(t, 2, repo.calls)
+	}
+}
+
 func TestUserGroupRateResolverResolve_FallbackForNilResolverAndInvalidIDs(t *testing.T) {
 	var nilResolver *userGroupRateResolver
 	require.Equal(t, 1.4, nilResolver.Resolve(context.Background(), 101, 202, 1.4))

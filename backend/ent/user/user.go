@@ -27,6 +27,8 @@ const (
 	FieldPasswordHash = "password_hash"
 	// FieldRole holds the string denoting the role field in the database.
 	FieldRole = "role"
+	// FieldBillingIdentity holds the string denoting the billing_identity field in the database.
+	FieldBillingIdentity = "billing_identity"
 	// FieldBalance holds the string denoting the balance field in the database.
 	FieldBalance = "balance"
 	// FieldFrozenBalance holds the string denoting the frozen_balance field in the database.
@@ -202,6 +204,7 @@ var Columns = []string{
 	FieldEmail,
 	FieldPasswordHash,
 	FieldRole,
+	FieldBillingIdentity,
 	FieldBalance,
 	FieldFrozenBalance,
 	FieldConcurrency,
@@ -261,6 +264,10 @@ var (
 	DefaultRole string
 	// RoleValidator is a validator for the "role" field. It is called by the builders before save.
 	RoleValidator func(string) error
+	// DefaultBillingIdentity holds the default value on creation for the "billing_identity" field.
+	DefaultBillingIdentity string
+	// BillingIdentityValidator is a validator for the "billing_identity" field. It is called by the builders before save.
+	BillingIdentityValidator func(string) error
 	// DefaultBalance holds the default value on creation for the "balance" field.
 	DefaultBalance float64
 	// DefaultFrozenBalance holds the default value on creation for the "frozen_balance" field.
@@ -333,6 +340,11 @@ func ByPasswordHash(opts ...sql.OrderTermOption) OrderOption {
 // ByRole orders the results by the role field.
 func ByRole(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldRole, opts...).ToFunc()
+}
+
+// ByBillingIdentity orders the results by the billing_identity field.
+func ByBillingIdentity(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldBillingIdentity, opts...).ToFunc()
 }
 
 // ByBalance orders the results by the balance field.

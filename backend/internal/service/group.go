@@ -20,15 +20,22 @@ const (
 	GroupTypeFallback = "fallback"
 )
 
+func validFallbackRate(v float64) bool {
+	return v >= 0.0001 && v <= 999999.9999 && !math.IsNaN(v) && !math.IsInf(v, 0)
+}
+
 type Group struct {
-	ID               int64
-	Name             string
-	Description      string
-	I18n             GroupI18n // 名称与描述的界面语言译文；缺失的语言沿用 Name/Description
-	Platform         string
-	GroupType        string
-	FallbackGroupIDs []int64
-	RateMultiplier   float64
+	// Request-only flag: monitored fallback billing bypasses cached personal/default rates.
+	MonitorFallbackRouted  bool
+	ID                     int64
+	Name                   string
+	Description            string
+	I18n                   GroupI18n // 名称与描述的界面语言译文；缺失的语言沿用 Name/Description
+	Platform               string
+	GroupType              string
+	FallbackRateMultiplier *float64
+	FallbackGroupIDs       []int64
+	RateMultiplier         float64
 	// 高峰时段倍率：peak_rate_enabled 为 true 且当前时刻处于 [PeakStart, PeakEnd) 时，
 	// token 计费倍率额外乘以 PeakRateMultiplier。详见 PeakMultiplierAt。
 	PeakRateEnabled    bool

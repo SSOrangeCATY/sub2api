@@ -95,7 +95,7 @@
                   :key="`ex-${g.id}`"
                   class="inline-flex flex-wrap items-center gap-1"
                 >
-                  <GroupBadge
+                  <GroupBadge :purchase-pricing="purchasePricing"
                     :name="g.name"
                     :platform="g.platform as GroupPlatform"
                     :subscription-type="(g.subscription_type || 'standard') as SubscriptionType"
@@ -129,7 +129,7 @@
                   :key="`pub-${g.id}`"
                   class="inline-flex flex-wrap items-center gap-1"
                 >
-                  <GroupBadge
+                  <GroupBadge :purchase-pricing="purchasePricing"
                     :name="g.name"
                     :platform="g.platform as GroupPlatform"
                     :subscription-type="(g.subscription_type || 'standard') as SubscriptionType"
@@ -154,7 +154,7 @@
           <!-- 支持模型 -->
           <td class="align-top px-4 py-3">
             <div class="flex flex-wrap gap-1">
-              <SupportedModelChip
+              <SupportedModelChip :purchase-pricing="purchasePricing"
                 v-for="m in section.supported_models"
                 :key="`${section.platform}-${m.name}`"
                 :model="m"
@@ -233,7 +233,7 @@
                       :key="`mobile-ex-${g.id}`"
                       class="inline-flex max-w-full min-w-0 flex-wrap items-center gap-1"
                     >
-                      <GroupBadge
+                      <GroupBadge :purchase-pricing="purchasePricing"
                         class="max-w-full"
                         :name="g.name"
                         :platform="g.platform as GroupPlatform"
@@ -268,7 +268,7 @@
                       :key="`mobile-pub-${g.id}`"
                       class="inline-flex max-w-full min-w-0 flex-wrap items-center gap-1"
                     >
-                      <GroupBadge
+                      <GroupBadge :purchase-pricing="purchasePricing"
                         class="max-w-full"
                         :name="g.name"
                         :platform="g.platform as GroupPlatform"
@@ -296,7 +296,7 @@
                   {{ columns.supportedModels }}
                 </dt>
                 <dd class="flex min-w-0 flex-wrap gap-1">
-                  <SupportedModelChip
+                  <SupportedModelChip :purchase-pricing="purchasePricing"
                     v-for="m in section.supported_models"
                     :key="`mobile-${section.platform}-${m.name}`"
                     class="max-w-full [&>span]:max-w-full [&>span]:truncate"
@@ -332,6 +332,7 @@ import { useAppStore } from '@/stores/app'
 import { hasPeakRate as groupHasPeakRate, formatPeakRateWindow, serverTimezoneLabel } from '@/utils/peak-rate'
 
 const props = defineProps<{
+  purchasePricing?: boolean
   columns: {
     name: string
     description: string
@@ -366,7 +367,7 @@ function publicGroups(section: UserChannelPlatformSection): UserAvailableGroup[]
 const appStore = useAppStore()
 
 function hasPeakRate(group: UserAvailableGroup): boolean {
-  return groupHasPeakRate(group)
+  return !props.purchasePricing && groupHasPeakRate(group)
 }
 
 function peakRateLabel(group: UserAvailableGroup): string {

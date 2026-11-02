@@ -60,6 +60,7 @@ func NewUserHandler(
 
 // CreateUserRequest represents admin create user request
 type CreateUserRequest struct {
+	BillingIdentity      string   `json:"billing_identity" binding:"omitempty,oneof=standard purchase"`
 	Email                string   `json:"email" binding:"required,email"`
 	Password             string   `json:"password" binding:"required,min=6"`
 	Username             string   `json:"username"`
@@ -75,6 +76,7 @@ type CreateUserRequest struct {
 // UpdateUserRequest represents admin update user request
 // 使用指针类型来区分"未提供"和"设置为0"
 type UpdateUserRequest struct {
+	BillingIdentity      *string  `json:"billing_identity" binding:"omitempty,oneof=standard purchase"`
 	Email                string   `json:"email" binding:"omitempty,email"`
 	Password             string   `json:"password" binding:"omitempty,min=6"`
 	Username             *string  `json:"username"`
@@ -293,6 +295,11 @@ func (h *UserHandler) Create(c *gin.Context) {
 		return
 	}
 
+	if req.BillingIdentity == service.BillingIdentityPurchase && adminaccess.FromContext(c.Request.Context()) != nil {
+		response.Forbidden(c, "Full administrator required to change billing identity")
+		return
+	}
+
 	// 创建管理员账号属权限敏感操作：需最近完成 step-up 2FA 验证。
 	if req.Role == service.RoleAdmin {
 		if !middleware.EnforceStepUp(c, h.totpService, h.userService, h.settingService) {
@@ -301,6 +308,7 @@ func (h *UserHandler) Create(c *gin.Context) {
 	}
 
 	user, err := h.adminService.CreateUser(c.Request.Context(), &service.CreateUserInput{
+		BillingIdentity:      req.BillingIdentity,
 		Email:                req.Email,
 		Password:             req.Password,
 		Username:             req.Username,
@@ -358,8 +366,14 @@ func (h *UserHandler) Update(c *gin.Context) {
 		}
 	}
 
+	if req.BillingIdentity != nil && adminaccess.FromContext(c.Request.Context()) != nil {
+		response.Forbidden(c, "Full administrator required to change billing identity")
+		return
+	}
+
 	// 使用指针类型直接传递，nil 表示未提供该字段
 	user, err := h.adminService.UpdateUser(c.Request.Context(), userID, &service.UpdateUserInput{
+		BillingIdentity:      req.BillingIdentity,
 		Email:                req.Email,
 		Password:             req.Password,
 		Username:             req.Username,

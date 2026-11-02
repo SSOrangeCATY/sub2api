@@ -108,6 +108,20 @@ func (_u *UserUpdate) SetNillableRole(v *string) *UserUpdate {
 	return _u
 }
 
+// SetBillingIdentity sets the "billing_identity" field.
+func (_u *UserUpdate) SetBillingIdentity(v string) *UserUpdate {
+	_u.mutation.SetBillingIdentity(v)
+	return _u
+}
+
+// SetNillableBillingIdentity sets the "billing_identity" field if the given value is not nil.
+func (_u *UserUpdate) SetNillableBillingIdentity(v *string) *UserUpdate {
+	if v != nil {
+		_u.SetBillingIdentity(*v)
+	}
+	return _u
+}
+
 // SetBalance sets the "balance" field.
 func (_u *UserUpdate) SetBalance(v float64) *UserUpdate {
 	_u.mutation.ResetBalance()
@@ -978,6 +992,11 @@ func (_u *UserUpdate) check() error {
 			return &ValidationError{Name: "role", err: fmt.Errorf(`ent: validator failed for field "User.role": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.BillingIdentity(); ok {
+		if err := user.BillingIdentityValidator(v); err != nil {
+			return &ValidationError{Name: "billing_identity", err: fmt.Errorf(`ent: validator failed for field "User.billing_identity": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Status(); ok {
 		if err := user.StatusValidator(v); err != nil {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "User.status": %w`, err)}
@@ -1025,6 +1044,9 @@ func (_u *UserUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.Role(); ok {
 		_spec.SetField(user.FieldRole, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.BillingIdentity(); ok {
+		_spec.SetField(user.FieldBillingIdentity, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.Balance(); ok {
 		_spec.SetField(user.FieldBalance, field.TypeFloat64, value)
@@ -1797,6 +1819,20 @@ func (_u *UserUpdateOne) SetRole(v string) *UserUpdateOne {
 func (_u *UserUpdateOne) SetNillableRole(v *string) *UserUpdateOne {
 	if v != nil {
 		_u.SetRole(*v)
+	}
+	return _u
+}
+
+// SetBillingIdentity sets the "billing_identity" field.
+func (_u *UserUpdateOne) SetBillingIdentity(v string) *UserUpdateOne {
+	_u.mutation.SetBillingIdentity(v)
+	return _u
+}
+
+// SetNillableBillingIdentity sets the "billing_identity" field if the given value is not nil.
+func (_u *UserUpdateOne) SetNillableBillingIdentity(v *string) *UserUpdateOne {
+	if v != nil {
+		_u.SetBillingIdentity(*v)
 	}
 	return _u
 }
@@ -2684,6 +2720,11 @@ func (_u *UserUpdateOne) check() error {
 			return &ValidationError{Name: "role", err: fmt.Errorf(`ent: validator failed for field "User.role": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.BillingIdentity(); ok {
+		if err := user.BillingIdentityValidator(v); err != nil {
+			return &ValidationError{Name: "billing_identity", err: fmt.Errorf(`ent: validator failed for field "User.billing_identity": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Status(); ok {
 		if err := user.StatusValidator(v); err != nil {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "User.status": %w`, err)}
@@ -2748,6 +2789,9 @@ func (_u *UserUpdateOne) sqlSave(ctx context.Context) (_node *User, err error) {
 	}
 	if value, ok := _u.mutation.Role(); ok {
 		_spec.SetField(user.FieldRole, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.BillingIdentity(); ok {
+		_spec.SetField(user.FieldBillingIdentity, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.Balance(); ok {
 		_spec.SetField(user.FieldBalance, field.TypeFloat64, value)

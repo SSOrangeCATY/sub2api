@@ -78,6 +78,8 @@ vi.mock('@/api', () => ({
   },
 }))
 
+vi.mock('@/stores/auth', () => ({ useAuthStore: () => ({ user: { billing_identity: 'standard' } }) }))
+
 vi.mock('@/stores/app', () => ({
   useAppStore: () => ({
     showError,

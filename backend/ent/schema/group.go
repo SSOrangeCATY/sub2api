@@ -88,6 +88,9 @@ func (Group) Fields() []ent.Field {
 			MaxLen(20).
 			Default("business").
 			Comment("分组类型：business 业务分组，fallback 兜底分组"),
+		field.Float("fallback_rate_multiplier").Optional().Nillable().
+			SchemaType(map[string]string{dialect.Postgres: "decimal(10,4)"}).
+			Comment("兜底入口显式倍率；NULL 跟随实际路由业务分组"),
 		field.JSON("fallback_group_ids", []int64{}).
 			Default([]int64{}).
 			SchemaType(map[string]string{dialect.Postgres: "jsonb"}).

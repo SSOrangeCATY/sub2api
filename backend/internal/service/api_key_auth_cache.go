@@ -30,12 +30,13 @@ type APIKeyAuthSnapshot struct {
 
 // APIKeyAuthUserSnapshot 用户快照
 type APIKeyAuthUserSnapshot struct {
-	ID            int64   `json:"id"`
-	Status        string  `json:"status"`
-	Role          string  `json:"role"`
-	Balance       float64 `json:"balance"`
-	Concurrency   int     `json:"concurrency"`
-	AllowedGroups []int64 `json:"allowed_groups,omitempty"`
+	BillingIdentity string  `json:"billing_identity"`
+	ID              int64   `json:"id"`
+	Status          string  `json:"status"`
+	Role            string  `json:"role"`
+	Balance         float64 `json:"balance"`
+	Concurrency     int     `json:"concurrency"`
+	AllowedGroups   []int64 `json:"allowed_groups,omitempty"`
 
 	// Balance notification fields (required for CheckBalanceAfterDeduction)
 	Email                      string             `json:"email"`
@@ -58,6 +59,7 @@ type APIKeyAuthUserSnapshot struct {
 // APIKeyAuthGroupSnapshot 分组快照
 type APIKeyAuthGroupSnapshot struct {
 	GroupType                       string                        `json:"group_type"`
+	FallbackRateMultiplier          *float64                      `json:"fallback_rate_multiplier"`
 	FallbackGroupIDs                []int64                       `json:"fallback_group_ids"`
 	ID                              int64                         `json:"id"`
 	Name                            string                        `json:"name"`

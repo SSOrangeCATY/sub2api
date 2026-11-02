@@ -102,6 +102,20 @@ func (_c *UserCreate) SetNillableRole(v *string) *UserCreate {
 	return _c
 }
 
+// SetBillingIdentity sets the "billing_identity" field.
+func (_c *UserCreate) SetBillingIdentity(v string) *UserCreate {
+	_c.mutation.SetBillingIdentity(v)
+	return _c
+}
+
+// SetNillableBillingIdentity sets the "billing_identity" field if the given value is not nil.
+func (_c *UserCreate) SetNillableBillingIdentity(v *string) *UserCreate {
+	if v != nil {
+		_c.SetBillingIdentity(*v)
+	}
+	return _c
+}
+
 // SetBalance sets the "balance" field.
 func (_c *UserCreate) SetBalance(v float64) *UserCreate {
 	_c.mutation.SetBalance(v)
@@ -618,6 +632,10 @@ func (_c *UserCreate) defaults() error {
 		v := user.DefaultRole
 		_c.mutation.SetRole(v)
 	}
+	if _, ok := _c.mutation.BillingIdentity(); !ok {
+		v := user.DefaultBillingIdentity
+		_c.mutation.SetBillingIdentity(v)
+	}
 	if _, ok := _c.mutation.Balance(); !ok {
 		v := user.DefaultBalance
 		_c.mutation.SetBalance(v)
@@ -707,6 +725,14 @@ func (_c *UserCreate) check() error {
 	if v, ok := _c.mutation.Role(); ok {
 		if err := user.RoleValidator(v); err != nil {
 			return &ValidationError{Name: "role", err: fmt.Errorf(`ent: validator failed for field "User.role": %w`, err)}
+		}
+	}
+	if _, ok := _c.mutation.BillingIdentity(); !ok {
+		return &ValidationError{Name: "billing_identity", err: errors.New(`ent: missing required field "User.billing_identity"`)}
+	}
+	if v, ok := _c.mutation.BillingIdentity(); ok {
+		if err := user.BillingIdentityValidator(v); err != nil {
+			return &ValidationError{Name: "billing_identity", err: fmt.Errorf(`ent: validator failed for field "User.billing_identity": %w`, err)}
 		}
 	}
 	if _, ok := _c.mutation.Balance(); !ok {
@@ -816,6 +842,10 @@ func (_c *UserCreate) createSpec() (*User, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.Role(); ok {
 		_spec.SetField(user.FieldRole, field.TypeString, value)
 		_node.Role = value
+	}
+	if value, ok := _c.mutation.BillingIdentity(); ok {
+		_spec.SetField(user.FieldBillingIdentity, field.TypeString, value)
+		_node.BillingIdentity = value
 	}
 	if value, ok := _c.mutation.Balance(); ok {
 		_spec.SetField(user.FieldBalance, field.TypeFloat64, value)
@@ -1220,6 +1250,18 @@ func (u *UserUpsert) SetRole(v string) *UserUpsert {
 // UpdateRole sets the "role" field to the value that was provided on create.
 func (u *UserUpsert) UpdateRole() *UserUpsert {
 	u.SetExcluded(user.FieldRole)
+	return u
+}
+
+// SetBillingIdentity sets the "billing_identity" field.
+func (u *UserUpsert) SetBillingIdentity(v string) *UserUpsert {
+	u.Set(user.FieldBillingIdentity, v)
+	return u
+}
+
+// UpdateBillingIdentity sets the "billing_identity" field to the value that was provided on create.
+func (u *UserUpsert) UpdateBillingIdentity() *UserUpsert {
+	u.SetExcluded(user.FieldBillingIdentity)
 	return u
 }
 
@@ -1636,6 +1678,20 @@ func (u *UserUpsertOne) SetRole(v string) *UserUpsertOne {
 func (u *UserUpsertOne) UpdateRole() *UserUpsertOne {
 	return u.Update(func(s *UserUpsert) {
 		s.UpdateRole()
+	})
+}
+
+// SetBillingIdentity sets the "billing_identity" field.
+func (u *UserUpsertOne) SetBillingIdentity(v string) *UserUpsertOne {
+	return u.Update(func(s *UserUpsert) {
+		s.SetBillingIdentity(v)
+	})
+}
+
+// UpdateBillingIdentity sets the "billing_identity" field to the value that was provided on create.
+func (u *UserUpsertOne) UpdateBillingIdentity() *UserUpsertOne {
+	return u.Update(func(s *UserUpsert) {
+		s.UpdateBillingIdentity()
 	})
 }
 
@@ -2267,6 +2323,20 @@ func (u *UserUpsertBulk) SetRole(v string) *UserUpsertBulk {
 func (u *UserUpsertBulk) UpdateRole() *UserUpsertBulk {
 	return u.Update(func(s *UserUpsert) {
 		s.UpdateRole()
+	})
+}
+
+// SetBillingIdentity sets the "billing_identity" field.
+func (u *UserUpsertBulk) SetBillingIdentity(v string) *UserUpsertBulk {
+	return u.Update(func(s *UserUpsert) {
+		s.SetBillingIdentity(v)
+	})
+}
+
+// UpdateBillingIdentity sets the "billing_identity" field to the value that was provided on create.
+func (u *UserUpsertBulk) UpdateBillingIdentity() *UserUpsertBulk {
+	return u.Update(func(s *UserUpsert) {
+		s.UpdateBillingIdentity()
 	})
 }
 

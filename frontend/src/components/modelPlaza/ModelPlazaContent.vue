@@ -7,6 +7,7 @@
       <p class="mt-1.5 text-sm text-gray-500 dark:text-dark-400">{{ t('modelPlaza.description') }}</p>
     </div>
 
+    <p v-if="purchasePricing" class="border-l-2 border-gray-900 py-2 pl-3 text-sm text-gray-900 dark:border-yellow-300 dark:text-gray-100">{{ t('modelPlaza.purchaseHint') }}</p>
     <!-- 全局价格说明(管理员配置,Markdown) -->
     <div
       v-if="descriptionHtml"
@@ -43,6 +44,7 @@
         :group-id="selectedGroupId"
         :rate="selectedRate"
         :search="searchQuery"
+        :hide-rates="purchasePricing"
         @update:platform="selectedPlatform = $event"
         @update:group-id="selectedGroupId = $event"
         @update:rate="selectedRate = $event"
@@ -51,7 +53,7 @@
 
       <!-- 分组分节的模型清单(默认按生效倍率升序) -->
       <div v-if="filteredGroups.length > 0" class="space-y-5">
-        <PlazaGroupSection v-for="g in filteredGroups" :key="g.id" :group="g" />
+        <PlazaGroupSection v-for="g in filteredGroups" :key="g.id" :group="g" :purchase-pricing="purchasePricing" />
       </div>
       <div
         v-else
@@ -85,6 +87,7 @@ const props = defineProps<{
 
 const { t } = useI18n()
 const authStore = useAuthStore()
+const purchasePricing = computed(() => props.response?.billing_identity === 'purchase')
 const isAuthenticated = computed(() => authStore.isAuthenticated)
 
 const selectedPlatform = ref<string>('all')

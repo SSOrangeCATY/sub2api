@@ -1105,9 +1105,14 @@ func (s *APIKeyService) SearchAPIKeys(ctx context.Context, userID int64, keyword
 // 与 GetAvailableGroups 的区别：这里保留普通授权分组的「橱窗」语义，不检查
 // 分组是否活跃；有效订阅也授予对应分组的可见性。返回值恒非 nil。
 func (s *APIKeyService) GetUserGroupVisibility(ctx context.Context, userID int64) (map[int64]struct{}, bool, error) {
+	groups, restricted, _, err := s.GetUserGroupVisibilityWithIdentity(ctx, userID)
+	return groups, restricted, err
+}
+
+func (s *APIKeyService) GetUserGroupVisibilityWithIdentity(ctx context.Context, userID int64) (map[int64]struct{}, bool, string, error) {
 	user, err := s.userRepo.GetByID(ctx, userID)
 	if err != nil {
-		return nil, false, fmt.Errorf("get user: %w", err)
+		return nil, false, "", fmt.Errorf("get user: %w", err)
 	}
 	allowed := make(map[int64]struct{}, len(user.AllowedGroups))
 	for _, id := range user.AllowedGroups {
@@ -1115,12 +1120,12 @@ func (s *APIKeyService) GetUserGroupVisibility(ctx context.Context, userID int64
 	}
 	subscriptions, err := s.userSubRepo.ListActiveByUserID(ctx, userID)
 	if err != nil {
-		return nil, false, fmt.Errorf("list active subscriptions: %w", err)
+		return nil, false, "", fmt.Errorf("list active subscriptions: %w", err)
 	}
 	for _, sub := range subscriptions {
 		allowed[sub.GroupID] = struct{}{}
 	}
-	return allowed, user.RestrictPublicGroups, nil
+	return allowed, user.RestrictPublicGroups, user.BillingIdentity, nil
 }
 
 // GetUserGroupRates 获取用户的专属分组倍率配置
