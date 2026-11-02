@@ -146,6 +146,7 @@ func (r *userRepository) create(ctx context.Context, userIn *service.User, guard
 		SetNotes(userIn.Notes).
 		SetPasswordHash(userIn.PasswordHash).
 		SetRole(userIn.Role).
+		SetBillingIdentity(normalizeBillingIdentity(userIn.BillingIdentity)).
 		SetBalance(userIn.Balance).
 		SetConcurrency(userIn.Concurrency).
 		SetStatus(userIn.Status).
@@ -316,6 +317,9 @@ func (r *userRepository) Update(ctx context.Context, userIn *service.User, field
 	}
 	if fields.Status {
 		updateOp = updateOp.SetStatus(userIn.Status)
+	}
+	if fields.BillingIdentity {
+		updateOp = updateOp.SetBillingIdentity(userIn.BillingIdentity)
 	}
 	if fields.RestrictPublicGroups {
 		updateOp = updateOp.SetRestrictPublicGroups(userIn.RestrictPublicGroups)

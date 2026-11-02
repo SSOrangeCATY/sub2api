@@ -55,7 +55,8 @@
         </div>
 
         <div class="p-3">
-          <div v-if="!model.pricing" class="text-gray-500 dark:text-gray-400">
+          <div v-if="purchasePricing" class="text-gray-900 dark:text-gray-100">{{ t('modelPlaza.purchaseHint') }}</div>
+          <div v-else-if="!model.pricing" class="text-gray-500 dark:text-gray-400">
             {{ noPricingLabel }}
           </div>
 
@@ -192,6 +193,7 @@ import { platformBadgeClass, platformBorderClass, platformBadgeLightClass } from
 
 const props = withDefaults(
   defineProps<{
+    purchasePricing?: boolean
     model: UserSupportedModel
     /** i18n 前缀：管理端传 `admin.availableChannels.pricing`，用户端传 `availableChannels.pricing`。 */
     pricingKeyPrefix?: string

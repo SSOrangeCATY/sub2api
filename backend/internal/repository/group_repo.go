@@ -137,6 +137,7 @@ func createGroupRecord(ctx context.Context, client *dbent.Client, groupIn *servi
 		SetPlatform(groupIn.Platform).
 		SetGroupType(groupType).
 		SetFallbackGroupIds(fallbackIDs).
+		SetNillableFallbackRateMultiplier(groupIn.FallbackRateMultiplier).
 		SetRateMultiplier(groupIn.RateMultiplier).
 		SetSortOrder(groupIn.SortOrder).
 		SetIsExclusive(groupIn.IsExclusive).
@@ -434,6 +435,11 @@ func (r *groupRepository) Update(ctx context.Context, groupIn *service.Group) er
 		builder = builder.SetMonthlyLimitUsd(*groupIn.MonthlyLimitUSD)
 	} else {
 		builder = builder.ClearMonthlyLimitUsd()
+	}
+	if groupIn.FallbackRateMultiplier != nil {
+		builder = builder.SetFallbackRateMultiplier(*groupIn.FallbackRateMultiplier)
+	} else {
+		builder = builder.ClearFallbackRateMultiplier()
 	}
 	if groupIn.ImagePrice1K != nil {
 		builder = builder.SetImagePrice1k(*groupIn.ImagePrice1K)

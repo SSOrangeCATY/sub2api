@@ -657,6 +657,8 @@ export default {
 
   // Model Plaza (public group/model pricing showcase)
   modelPlaza: {
+    purchaseDynamic: 'Selected-account cost',
+    purchaseHint: 'Your purchase identity is billed at the cost of the account that handles the request, including fallback switches, without a group sales multiplier.',
     title: 'Model Plaza',
     description: 'Browse available models and pricing by group',
     loading: 'Loading...',

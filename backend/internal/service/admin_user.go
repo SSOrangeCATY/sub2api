@@ -118,6 +118,13 @@ func normalizeUserRole(role, fallback string) (string, error) {
 }
 
 func (s *adminServiceImpl) CreateUser(ctx context.Context, input *CreateUserInput) (*User, error) {
+	identity := input.BillingIdentity
+	if identity == "" {
+		identity = BillingIdentityStandard
+	}
+	if identity != BillingIdentityStandard && identity != BillingIdentityPurchase {
+		return nil, infraerrors.BadRequest("INVALID_BILLING_IDENTITY", "invalid billing identity")
+	}
 	balance := 0.0
 	if input.Balance != nil {
 		balance = *input.Balance
@@ -143,6 +150,7 @@ func (s *adminServiceImpl) CreateUser(ctx context.Context, input *CreateUserInpu
 		AllowedGroups: input.AllowedGroups,
 
 		RestrictPublicGroups: input.RestrictPublicGroups,
+		BillingIdentity:      identity,
 	}
 	if err := user.SetPassword(input.Password); err != nil {
 		return nil, err
@@ -195,11 +203,14 @@ func (s *adminServiceImpl) assignDefaultSubscriptions(ctx context.Context, userI
 }
 
 func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *UpdateUserInput) (*User, error) {
-	// 校验用户专属分组倍率：必须 > 0（nil 合法，表示清除专属倍率）
+	if input.BillingIdentity != nil && *input.BillingIdentity != BillingIdentityStandard && *input.BillingIdentity != BillingIdentityPurchase {
+		return nil, infraerrors.BadRequest("INVALID_BILLING_IDENTITY", "invalid billing identity")
+	}
+	// Legacy overrides may be cleared, but new overrides are retired.
 	if input.GroupRates != nil {
 		for groupID, rate := range input.GroupRates {
-			if rate != nil && *rate <= 0 {
-				return nil, fmt.Errorf("rate_multiplier must be > 0 (group_id=%d)", groupID)
+			if rate != nil {
+				return nil, infraerrors.BadRequest("PERSONAL_RATES_RETIRED", fmt.Sprintf("use billing identity instead of personal rate (group_id=%d)", groupID))
 			}
 		}
 	}
@@ -214,6 +225,7 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 		return nil, infraerrors.BadRequest("ADMIN_DISABLE_FORBIDDEN", "cannot disable admin user; change the role to user first")
 	}
 
+	oldIdentity := user.BillingIdentity
 	oldConcurrency := user.Concurrency
 	oldStatus := user.Status
 	oldRole := user.Role
@@ -223,6 +235,10 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 	// fields 与下面的 input.X 判空条件一一对应：管理员没提交的列不写回，
 	// 避免这份快照回滚并发的扣费、状态变更或批量限额调整。
 	var fields UserUpdateFields
+	if input.BillingIdentity != nil {
+		user.BillingIdentity = *input.BillingIdentity
+		fields.BillingIdentity = true
+	}
 
 	if input.Email != "" {
 		user.Email = input.Email
@@ -297,18 +313,23 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 			input.ActorAdminID, user.ID, oldRole, user.Role)
 	}
 
+	if user.BillingIdentity != oldIdentity {
+		logger.LegacyPrintf("service.admin", "audit: billing identity changed actor_admin_id=%d target_user_id=%d old_identity=%s new_identity=%s", input.ActorAdminID, user.ID, oldIdentity, user.BillingIdentity)
+	}
+	// Invalidate persisted permission and billing changes before legacy cleanup,
+	// which can fail independently after the user update has already committed.
+	if s.authCacheInvalidator != nil {
+		if user.BillingIdentity != oldIdentity || user.Concurrency != oldConcurrency || user.Status != oldStatus || user.Role != oldRole || user.RPMLimit != oldRPMLimit || user.RestrictPublicGroups != oldRestrictPublicGroups || !sameInt64Set(user.AllowedGroups, oldAllowedGroups) {
+			s.authCacheInvalidator.InvalidateAuthCacheByUserID(ctx, user.ID)
+		}
+	}
 	// 同步用户专属分组倍率
 	if input.GroupRates != nil && s.userGroupRateRepo != nil {
 		if err := s.userGroupRateRepo.SyncUserGroupRates(ctx, user.ID, input.GroupRates); err != nil {
-			logger.LegacyPrintf("service.admin", "failed to sync user group rates: user_id=%d err=%v", user.ID, err)
+			return nil, fmt.Errorf("sync user group rates: %w", err)
 		}
-	}
-
-	if s.authCacheInvalidator != nil {
-		// RPMLimit 直接参与 billing_cache_service.checkRPM 的三级级联，
-		// allowed_groups 参与 API Key 专属分组授权判断；不失效缓存会让修改在一个 L2 TTL 内失去效果。
-		if user.Concurrency != oldConcurrency || user.Status != oldStatus || user.Role != oldRole || user.RPMLimit != oldRPMLimit || user.RestrictPublicGroups != oldRestrictPublicGroups || !sameInt64Set(user.AllowedGroups, oldAllowedGroups) {
-			s.authCacheInvalidator.InvalidateAuthCacheByUserID(ctx, user.ID)
+		if resetter, ok := s.authCacheInvalidator.(interface{ InvalidatePersonalRateCaches(context.Context) }); ok {
+			resetter.InvalidatePersonalRateCaches(ctx)
 		}
 	}
 

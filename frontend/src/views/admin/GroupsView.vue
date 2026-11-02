@@ -115,7 +115,7 @@
       </template>
 
       <template #table>
-        <MonitorFallbackRoutes v-if="!authStore.isSimpleMode" />
+        <MonitorFallbackRoutes v-if="!authStore.isSimpleMode" @routes="fallbackRoutes = $event" />
         <DataTable
           :columns="columns"
           :data="groups"
@@ -262,8 +262,9 @@
             </div>
           </template>
 
-          <template #cell-rate_multiplier="{ value }">
-            <span class="text-sm text-gray-700 dark:text-gray-300"
+          <template #cell-rate_multiplier="{ value, row }">
+            <span v-if="row.group_type === 'fallback'" class="text-sm tabular-nums text-gray-700 dark:text-gray-300">{{ fallbackRateLabel(row) }}</span>
+            <span v-else class="text-sm text-gray-700 dark:text-gray-300"
               >{{ value }}x</span
             >
           </template>
@@ -421,17 +422,7 @@
                   t("admin.groups.compositeRoutes.action")
                 }}</span>
               </button>
-              <button
-                v-if="!authStore.isSimpleMode"
-                data-testid="group-rate-multipliers"
-                @click="handleRateMultipliers(row)"
-                class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-purple-600 dark:hover:bg-dark-700 dark:hover:text-purple-400"
-              >
-                <Icon name="dollar" size="sm" />
-                <span class="text-xs">{{
-                  t("admin.groups.rateMultipliers")
-                }}</span>
-              </button>
+
               <button
                 v-if="!authStore.isSimpleMode"
                 data-testid="group-rpm-overrides"
@@ -623,7 +614,8 @@
           <label class="input-label">{{
             t("admin.groups.form.rateMultiplier")
           }}</label>
-          <input
+          <FallbackRateField v-if="createForm.group_type === 'fallback'" v-model="createForm.fallback_rate_multiplier" id="create-fallback-rate" />
+          <input v-else
             v-model.number="createForm.rate_multiplier"
             type="number"
             step="0.001"
@@ -632,7 +624,7 @@
             class="input"
             data-tour="group-form-multiplier"
           />
-          <p class="input-hint">{{ t("admin.groups.rateMultiplierHint") }}</p>
+          <p v-if="createForm.group_type !== 'fallback'" class="input-hint">{{ t("admin.groups.rateMultiplierHint") }}</p>
         </div>
         <div>
           <label class="input-label">{{ t("admin.groups.form.rpmLimit") }}</label>
@@ -2285,7 +2277,8 @@
           <label class="input-label">{{
             t("admin.groups.form.rateMultiplier")
           }}</label>
-          <input
+          <FallbackRateField v-if="editForm.group_type === 'fallback'" v-model="editForm.fallback_rate_multiplier" id="edit-fallback-rate" />
+          <input v-else
             v-model.number="editForm.rate_multiplier"
             type="number"
             step="0.001"
@@ -4292,13 +4285,6 @@
       </template>
     </BaseDialog>
 
-    <!-- Group Rate Multipliers Modal -->
-    <GroupRateMultipliersModal
-      :show="showRateMultipliersModal"
-      :group="rateMultipliersGroup"
-      @close="showRateMultipliersModal = false"
-      @success="loadGroups"
-    />
 
     <!-- Group RPM Overrides Modal -->
     <GroupRPMOverridesModal
@@ -4349,7 +4335,7 @@ import Icon from "@/components/icons/Icon.vue";
 import GroupI18nField from "@/components/admin/group/GroupI18nField.vue";
 import MonitorFallbackFields from "@/components/admin/group/MonitorFallbackFields.vue";
 import MonitorFallbackRoutes from "@/components/admin/group/MonitorFallbackRoutes.vue";
-import GroupRateMultipliersModal from "@/components/admin/group/GroupRateMultipliersModal.vue";
+import FallbackRateField from "@/components/admin/group/FallbackRateField.vue";
 import GroupRPMOverridesModal from "@/components/admin/group/GroupRPMOverridesModal.vue";
 import GroupCapacityBadge from "@/components/common/GroupCapacityBadge.vue";
 import ReasoningEffortPolicyFields from "@/components/admin/group/ReasoningEffortPolicyFields.vue";
@@ -4890,8 +4876,6 @@ const sortSubmitting = ref(false);
 const editingGroup = ref<AdminGroup | null>(null);
 const deletingGroup = ref<AdminGroup | null>(null);
 const duplicatingGroupIds = reactive(new Set<number>());
-const showRateMultipliersModal = ref(false);
-const rateMultipliersGroup = ref<AdminGroup | null>(null);
 const showRPMOverridesModal = ref(false);
 const rpmOverridesGroup = ref<AdminGroup | null>(null);
 const sortableGroups = ref<AdminGroup[]>([]);
@@ -4989,7 +4973,14 @@ const submitEditAllowlistCustomEntry = () => {
   }
 };
 
+function fallbackRateLabel(group: AdminGroup): string {
+  const rate = group.fallback_rate_multiplier ?? fallbackRoutes.value.find(route => route.entry_group_id === group.id)?.effective_rate_multiplier;
+  const source = t(group.fallback_rate_multiplier != null ? "admin.groups.monitorFallback.entryRate" : "admin.groups.monitorFallback.followTarget");
+  return rate != null ? `${rate}x / ${source}` : source;
+}
+const fallbackRoutes = ref<Array<{ entry_group_id: number; effective_rate_multiplier?: number | null }>>([]);
 const createForm = reactive({
+  fallback_rate_multiplier: null as number | null,
   group_type: "business" as "business" | "fallback",
   fallback_group_ids: [] as number[],
   name: "",
@@ -5358,6 +5349,7 @@ const convertApiFormatToRoutingRules = async (
 };
 
 const editForm = reactive({
+  fallback_rate_multiplier: null as number | null,
   group_type: "business" as "business" | "fallback",
   fallback_group_ids: [] as number[],
   name: "",
@@ -5844,6 +5836,7 @@ const closeCreateModal = () => {
   createForm.group_type = "business";
   createForm.fallback_group_ids = [];
   createForm.rate_multiplier = 1.0;
+  createForm.fallback_rate_multiplier = null;
   createForm.is_exclusive = false;
   createForm.subscription_type = "standard";
   createForm.daily_limit_usd = null;
@@ -5992,6 +5985,7 @@ const handleCreateGroup = async () => {
     // 构建请求数据，包含模型路由配置
     const requestData = {
       ...createGroupForm,
+      fallback_rate_multiplier: createForm.group_type === "fallback" ? createForm.fallback_rate_multiplier : null,
       force_openai_fast: normalizeGroupOpenAIFast(
         createForm.platform,
         createForm.force_openai_fast,
@@ -6147,6 +6141,7 @@ const handleEdit = async (group: AdminGroup) => {
   );
   editForm.platform = group.platform;
   editForm.rate_multiplier = group.rate_multiplier;
+  editForm.fallback_rate_multiplier = group.fallback_rate_multiplier ?? null;
   editForm.is_exclusive = group.is_exclusive;
   editForm.status = group.status;
   editForm.subscription_type = group.subscription_type || "standard";
@@ -6350,6 +6345,7 @@ const handleUpdateGroup = async () => {
     // 转换 fallback_group_id: null -> 0 (后端使用 0 表示清除)
     const payload = {
       ...editForm,
+      fallback_rate_multiplier: editForm.group_type === "fallback" ? editForm.fallback_rate_multiplier : null,
       force_openai_fast: normalizeGroupOpenAIFast(
         editForm.platform,
         editForm.force_openai_fast,
@@ -6515,10 +6511,6 @@ const removeEditMessagesDispatchMapping = (row: MessagesDispatchMappingRow) => {
   }
 };
 
-const handleRateMultipliers = (group: AdminGroup) => {
-  rateMultipliersGroup.value = group;
-  showRateMultipliersModal.value = true;
-};
 
 const handleRPMOverrides = (group: AdminGroup) => {
   rpmOverridesGroup.value = group;

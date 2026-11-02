@@ -494,6 +494,13 @@ export default {
 
     // Users Management
     users: {
+      billingIdentity: {
+        label: '计费身份组', standard: '标准售价', purchase: '进货价',
+        hint: '进货价按实际承接账号的采购成本结算；兜底切换后随目标账号变化，不改变分组访问权限。',
+        migrate: '迁移至进货价身份组',
+        confirm: '将所有设有个人专属倍率的用户加入进货价身份组，并清除全站个人专属倍率。系统在同一事务中保留恢复备份，RPM 和分组访问权限不变。',
+        migrated: '已迁移 {users} 位用户，清除 {rates} 条专属倍率。'
+      },
       title: '用户管理',
       description: '管理用户账户和权限',
       createUser: '创建用户',
@@ -845,12 +852,17 @@ export default {
     // Groups Management
     groups: {
       monitorFallback: {
+        followTarget: '跟随当前路由分组',
+        entryRate: '兜底固定倍率',
+        rateHint: '留空使用实际路由业务分组的倍率；填写后优先使用此倍率。只替换分组倍率，不改变目标价卡与用量归属。进货价身份仍按账号采购成本计费。',
+        ratePlaceholder: '留空跟随路由',
+        clearRate: '清空固定倍率',
         health: { operational: '正常', degraded: '降级可用', unknown: '状态未知（尝试使用）', failed: '故障', error: '探测错误' },
         "type": "分组类型",
         "business": "业务分组",
         "fallback": "兜底分组（监听路由）",
         "hint": "按顺序选择独立业务分组。明确故障时跳过，正常/降级/未知时允许使用。主组恢复后新请求优先回切；入口自身不参与探测和调度。",
-        "billing": "使用目标业务组的定价、倍率、RPM 和用量归属；入口授权委托管理员配置的标准目标组。暂不支持订阅、合成平台和客户端专用目标。",
+        "billing": "使用目标业务组的定价、RPM 和用量归属；倍率默认跟随目标，可设置固定倍率覆盖。进货价身份按实际账号采购成本计费。暂不支持订阅、合成平台和客户端专用目标。",
         "required": "请至少添加一个监听的业务分组",
         "add": "按优先级添加业务分组",
         "up": "提高优先级",

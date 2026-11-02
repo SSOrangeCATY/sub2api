@@ -123,6 +123,107 @@ func TestMonitorGroupKeyCloneAndBillingTarget(t *testing.T) {
 	require.Equal(t, int64(10), route.EntryGroupID)
 }
 
+func TestMonitorGroupRateFollowsLiveTargetOrExplicitEntryOverride(t *testing.T) {
+	targetA := &Group{ID: 1, Name: "A", Platform: PlatformOpenAI, Status: StatusActive, RateMultiplier: 0.35}
+	targetB := &Group{ID: 2, Name: "B", Platform: PlatformOpenAI, Status: StatusActive, RateMultiplier: 0.3}
+	repo := &mockGroupRepoForGateway{groups: map[int64]*Group{1: targetA, 2: targetB}}
+	health := &monitorHealthStub{statuses: map[int64]GroupHealthStatus{1: GroupHealthOperational, 2: GroupHealthFailed}}
+	entry := &Group{ID: 10, GroupType: GroupTypeFallback, Platform: PlatformOpenAI, Status: StatusActive, FallbackGroupIDs: []int64{1, 2}, RateMultiplier: 0.075}
+	router := NewMonitorGroupRouter(repo, health)
+	keyService := &APIKeyService{groupRepo: repo, monitorGroupRouter: router}
+	repo.groups[10] = entry
+	key := &APIKey{ID: 20, GroupID: &entry.ID, Group: entry}
+
+	routed, route, err := keyService.ResolveMonitorFallbackKey(context.Background(), key, "model")
+	require.NoError(t, err)
+	require.Equal(t, int64(1), *routed.GroupID)
+	require.Equal(t, 0.35, routed.Group.RateMultiplier)
+	require.Equal(t, 0.35, *route.EffectiveRateMultiplier)
+	require.Equal(t, "target", route.RateSource)
+
+	health.statuses[1] = GroupHealthFailed
+	health.statuses[2] = GroupHealthOperational
+	routed, route, err = keyService.ResolveMonitorFallbackKey(context.Background(), key, "model")
+	require.NoError(t, err)
+	require.Equal(t, int64(2), *routed.GroupID)
+	require.Equal(t, 0.3, routed.Group.RateMultiplier)
+	require.Equal(t, 0.3, *route.EffectiveRateMultiplier)
+
+	entryRate := 0.2
+	entry.FallbackRateMultiplier = &entryRate
+	routed, route, err = keyService.ResolveMonitorFallbackKey(context.Background(), key, "model")
+	require.NoError(t, err)
+	require.Equal(t, 0.2, routed.Group.RateMultiplier)
+	require.Equal(t, 0.2, *route.EffectiveRateMultiplier)
+	require.Equal(t, "entry", route.RateSource)
+	require.Equal(t, 0.3, targetB.RateMultiplier)
+	require.Equal(t, 0.075, key.Group.RateMultiplier)
+	require.True(t, routed.Group.MonitorFallbackRouted)
+	entry.FallbackRateMultiplier = nil
+	targetB.RateMultiplier = 0.4
+	routed, route, err = keyService.ResolveMonitorFallbackKey(context.Background(), key, "model")
+	require.NoError(t, err)
+	require.Equal(t, 0.4, routed.Group.RateMultiplier)
+	require.Equal(t, 0.4, *route.EffectiveRateMultiplier)
+	health.statuses[2] = GroupHealthFailed
+	_, route, err = keyService.ResolveMonitorFallbackKey(context.Background(), key, "model")
+	require.Error(t, err)
+	require.Nil(t, route.EffectiveRateMultiplier)
+	require.Empty(t, route.RateSource)
+}
+
+func TestMonitorGroupBillingBypassesCachedTargetDefault(t *testing.T) {
+	repo := &userGroupRateResolverRepoStub{}
+	resolver := newUserGroupRateResolver(repo, nil, time.Minute, nil, "test")
+	require.Equal(t, 0.35, resolver.Resolve(context.Background(), 21, 1, 0.35))
+	svc := &GatewayService{userGroupRateResolver: resolver}
+	user := &User{ID: 21}
+	id := int64(1)
+	for _, rate := range []float64{0.2, 0.4} {
+		key := &APIKey{GroupID: &id, Group: &Group{ID: id, RateMultiplier: rate, MonitorFallbackRouted: true}, User: user}
+		got, _, _ := svc.recordUsageMultipliers(context.Background(), key, user, time.Now())
+		require.Equal(t, rate, got)
+		d := inflightEstimateDeps{userGroupRate: func(context.Context, int64, int64, float64) float64 {
+			t.Fatal("fallback must bypass cached target default")
+			return 0
+		}}
+		text, _ := d.rates(context.Background(), key)
+		require.Equal(t, rate, text)
+	}
+	require.Equal(t, 1, repo.calls)
+}
+
+func TestMonitorGroupDuplicatePreservesOptionalRate(t *testing.T) {
+	rate := 0.2
+	source := &Group{GroupType: GroupTypeFallback, FallbackRateMultiplier: &rate, FallbackGroupIDs: []int64{1, 2}}
+	copy := cloneGroupForDuplicate(source, "test")
+	require.Equal(t, rate, *copy.FallbackRateMultiplier)
+	*copy.FallbackRateMultiplier = 0.3
+	require.Equal(t, 0.2, *source.FallbackRateMultiplier)
+	source.FallbackRateMultiplier = nil
+	require.Nil(t, cloneGroupForDuplicate(source, "test2").FallbackRateMultiplier)
+}
+
+func TestMonitorGroupRateOverrideUpdateAndClear(t *testing.T) {
+	entry := &Group{ID: 10, Platform: PlatformOpenAI, Status: StatusActive, GroupType: GroupTypeFallback, FallbackGroupIDs: []int64{1}, RateMultiplier: 1, Hydrated: true}
+	repo := &mockGroupRepoForGateway{groups: map[int64]*Group{10: entry}}
+	svc := &adminServiceImpl{groupRepo: repo}
+	rate := 0.2
+	updated, err := svc.UpdateGroup(context.Background(), 10, &UpdateGroupInput{FallbackRateMultiplier: &rate})
+	require.NoError(t, err)
+	require.Equal(t, rate, *updated.FallbackRateMultiplier)
+	updated, err = svc.UpdateGroup(context.Background(), 10, &UpdateGroupInput{})
+	require.NoError(t, err)
+	require.Equal(t, rate, *updated.FallbackRateMultiplier)
+	clear := -1.0
+	updated, err = svc.UpdateGroup(context.Background(), 10, &UpdateGroupInput{FallbackRateMultiplier: &clear})
+	require.NoError(t, err)
+	require.Nil(t, updated.FallbackRateMultiplier)
+	zero := 0.0
+	_, err = svc.UpdateGroup(context.Background(), 10, &UpdateGroupInput{FallbackRateMultiplier: &zero})
+	require.Error(t, err)
+}
+
 func TestMonitorGroupUnchangedBrokenChainDoesNotPreventDisablingEntry(t *testing.T) {
 	entry := &Group{ID: 10, Platform: PlatformOpenAI, Status: StatusActive, GroupType: GroupTypeFallback, FallbackGroupIDs: []int64{999}, RateMultiplier: 1, SubscriptionType: SubscriptionTypeStandard, Hydrated: true}
 	repo := &mockGroupRepoForGateway{groups: map[int64]*Group{10: entry}}

@@ -33,7 +33,7 @@
       </template>
 
       <template #table>
-        <AvailableChannelsTable
+        <AvailableChannelsTable :purchase-pricing="purchasePricing"
           :columns="columnLabels"
           :rows="filteredChannels"
           :loading="loading"
@@ -58,10 +58,13 @@ import AvailableChannelsTable from '@/components/channels/AvailableChannelsTable
 import userChannelsAPI, { type UserAvailableChannel } from '@/api/channels'
 import userGroupsAPI from '@/api/groups'
 import { useAppStore } from '@/stores/app'
+import { useAuthStore } from '@/stores/auth'
 import { extractApiErrorMessage } from '@/utils/apiError'
 
 const { t } = useI18n()
 const appStore = useAppStore()
+const authStore = useAuthStore()
+const purchasePricing = computed(() => authStore.user?.billing_identity === 'purchase')
 
 const channels = ref<UserAvailableChannel[]>([])
 const userGroupRates = ref<Record<number, number>>({})

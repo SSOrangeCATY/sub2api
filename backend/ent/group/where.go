@@ -130,6 +130,11 @@ func GroupType(v string) predicate.Group {
 	return predicate.Group(sql.FieldEQ(FieldGroupType, v))
 }
 
+// FallbackRateMultiplier applies equality check predicate on the "fallback_rate_multiplier" field. It's identical to FallbackRateMultiplierEQ.
+func FallbackRateMultiplier(v float64) predicate.Group {
+	return predicate.Group(sql.FieldEQ(FieldFallbackRateMultiplier, v))
+}
+
 // SubscriptionType applies equality check predicate on the "subscription_type" field. It's identical to SubscriptionTypeEQ.
 func SubscriptionType(v string) predicate.Group {
 	return predicate.Group(sql.FieldEQ(FieldSubscriptionType, v))
@@ -1123,6 +1128,56 @@ func GroupTypeEqualFold(v string) predicate.Group {
 // GroupTypeContainsFold applies the ContainsFold predicate on the "group_type" field.
 func GroupTypeContainsFold(v string) predicate.Group {
 	return predicate.Group(sql.FieldContainsFold(FieldGroupType, v))
+}
+
+// FallbackRateMultiplierEQ applies the EQ predicate on the "fallback_rate_multiplier" field.
+func FallbackRateMultiplierEQ(v float64) predicate.Group {
+	return predicate.Group(sql.FieldEQ(FieldFallbackRateMultiplier, v))
+}
+
+// FallbackRateMultiplierNEQ applies the NEQ predicate on the "fallback_rate_multiplier" field.
+func FallbackRateMultiplierNEQ(v float64) predicate.Group {
+	return predicate.Group(sql.FieldNEQ(FieldFallbackRateMultiplier, v))
+}
+
+// FallbackRateMultiplierIn applies the In predicate on the "fallback_rate_multiplier" field.
+func FallbackRateMultiplierIn(vs ...float64) predicate.Group {
+	return predicate.Group(sql.FieldIn(FieldFallbackRateMultiplier, vs...))
+}
+
+// FallbackRateMultiplierNotIn applies the NotIn predicate on the "fallback_rate_multiplier" field.
+func FallbackRateMultiplierNotIn(vs ...float64) predicate.Group {
+	return predicate.Group(sql.FieldNotIn(FieldFallbackRateMultiplier, vs...))
+}
+
+// FallbackRateMultiplierGT applies the GT predicate on the "fallback_rate_multiplier" field.
+func FallbackRateMultiplierGT(v float64) predicate.Group {
+	return predicate.Group(sql.FieldGT(FieldFallbackRateMultiplier, v))
+}
+
+// FallbackRateMultiplierGTE applies the GTE predicate on the "fallback_rate_multiplier" field.
+func FallbackRateMultiplierGTE(v float64) predicate.Group {
+	return predicate.Group(sql.FieldGTE(FieldFallbackRateMultiplier, v))
+}
+
+// FallbackRateMultiplierLT applies the LT predicate on the "fallback_rate_multiplier" field.
+func FallbackRateMultiplierLT(v float64) predicate.Group {
+	return predicate.Group(sql.FieldLT(FieldFallbackRateMultiplier, v))
+}
+
+// FallbackRateMultiplierLTE applies the LTE predicate on the "fallback_rate_multiplier" field.
+func FallbackRateMultiplierLTE(v float64) predicate.Group {
+	return predicate.Group(sql.FieldLTE(FieldFallbackRateMultiplier, v))
+}
+
+// FallbackRateMultiplierIsNil applies the IsNil predicate on the "fallback_rate_multiplier" field.
+func FallbackRateMultiplierIsNil() predicate.Group {
+	return predicate.Group(sql.FieldIsNull(FieldFallbackRateMultiplier))
+}
+
+// FallbackRateMultiplierNotNil applies the NotNil predicate on the "fallback_rate_multiplier" field.
+func FallbackRateMultiplierNotNil() predicate.Group {
+	return predicate.Group(sql.FieldNotNull(FieldFallbackRateMultiplier))
 }
 
 // SubscriptionTypeEQ applies the EQ predicate on the "subscription_type" field.

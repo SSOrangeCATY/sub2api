@@ -662,6 +662,8 @@ export default {
 
   // Model Plaza (public group/model pricing showcase)
   modelPlaza: {
+    purchaseDynamic: '按实际账号进货价',
+    purchaseHint: '你属于进货价身份组。费用按实际处理请求的账号成本结算；兜底切换后跟随实际账号，不叠加分组销售倍率。',
     title: '模型广场',
     description: '按分组浏览可用模型与价格',
     loading: '加载中...',

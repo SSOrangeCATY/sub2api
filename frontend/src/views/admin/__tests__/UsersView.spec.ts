@@ -8,6 +8,7 @@ const {
   listUsers,
   toggleStatus,
   deleteUser,
+  migrateBillingIdentity,
   showError,
   showSuccess,
   getAllGroups,
@@ -18,6 +19,7 @@ const {
   listUsers: vi.fn(),
   toggleStatus: vi.fn(),
   deleteUser: vi.fn(),
+  migrateBillingIdentity: vi.fn(),
   showError: vi.fn(),
   showSuccess: vi.fn(),
   getAllGroups: vi.fn(),
@@ -31,7 +33,8 @@ vi.mock('@/api/admin', () => ({
     users: {
       list: listUsers,
       toggleStatus,
-      delete: deleteUser
+      delete: deleteUser,
+      migrateBillingIdentity
     },
     groups: {
       getAll: getAllGroups
@@ -185,6 +188,7 @@ describe('admin UsersView', () => {
     listUsers.mockReset()
     toggleStatus.mockReset()
     deleteUser.mockReset()
+    migrateBillingIdentity.mockReset()
     showError.mockReset()
     showSuccess.mockReset()
     getAllGroups.mockReset()
@@ -203,6 +207,34 @@ describe('admin UsersView', () => {
     getBatchUsersUsage.mockResolvedValue({ stats: {} })
     listEnabledDefinitions.mockResolvedValue([])
     getBatchUserAttributes.mockResolvedValue({ values: {} })
+  })
+
+  it('requires confirmation before migrating personal rates and refreshes users after success', async () => {
+    migrateBillingIdentity.mockResolvedValue({ backup_id: 7, migrated_users: 2, cleared_rates: 5 })
+    const wrapper = mountBulkDeleteView()
+    await flushPromises()
+    await wrapper.get('[data-test="migrate-billing-identity"]').trigger('click')
+    expect(migrateBillingIdentity).not.toHaveBeenCalled()
+    expect(wrapper.get('[data-test="delete-dialog"]').text()).toContain('admin.users.billingIdentity.confirm')
+    await wrapper.get('[data-test="confirm-delete"]').trigger('click')
+    await flushPromises()
+    expect(migrateBillingIdentity).toHaveBeenCalledTimes(1)
+    expect(listUsers).toHaveBeenCalledTimes(2)
+    expect(wrapper.find('[data-test="delete-dialog"]').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('keeps migration confirmation open and shows errors when migration fails', async () => {
+    migrateBillingIdentity.mockRejectedValue(new Error('Migration failed'))
+    const wrapper = mountBulkDeleteView()
+    await flushPromises()
+    await wrapper.get('[data-test="migrate-billing-identity"]').trigger('click')
+    await wrapper.get('[data-test="confirm-delete"]').trigger('click')
+    await flushPromises()
+    expect(showError).toHaveBeenCalledWith('Migration failed')
+    expect(wrapper.find('[data-test="delete-dialog"]').exists()).toBe(true)
+    expect(wrapper.get('[data-test="migrate-billing-identity"]').attributes('disabled')).toBeUndefined()
+    wrapper.unmount()
   })
 
   afterEach(() => {

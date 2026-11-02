@@ -494,6 +494,13 @@ export default {
 
     // Users
     users: {
+      billingIdentity: {
+        label: 'Billing identity', standard: 'Standard pricing', purchase: 'Purchase price',
+        hint: 'Purchase pricing follows the selected account procurement cost, including fallback changes. Group access stays unchanged.',
+        migrate: 'Migrate to purchase pricing',
+        confirm: 'Enroll all personal-rate owners in purchase pricing and clear all personal rates. An atomic backup is retained. RPM and group access stay unchanged.',
+        migrated: 'Migrated {users} users and cleared {rates} personal rates.'
+      },
       title: 'User Management',
       description: 'Manage users and their permissions',
       createUser: 'Create User',
@@ -848,12 +855,17 @@ export default {
     // Groups
     groups: {
       monitorFallback: {
+        followTarget: 'Follow routed group',
+        entryRate: 'Fallback fixed multiplier',
+        rateHint: 'Leave blank to follow the routed business group. A value overrides its group multiplier, keeping the target price card and usage attribution. Purchase identity still uses account procurement cost.',
+        ratePlaceholder: 'Follow route when blank',
+        clearRate: 'Clear fixed multiplier',
         health: { operational: 'Operational', degraded: 'Degraded', unknown: 'Unknown (attempt allowed)', failed: 'Failed', error: 'Probe error' },
         "type": "Group type",
         "business": "Business group",
         "fallback": "Fallback group (monitored routing)",
         "hint": "Order independent business groups. Skip confirmed failures; allow healthy, degraded and unknown groups. New requests prefer the primary after recovery. The entry is never probed or scheduled.",
-        "billing": "Uses target prices, multiplier, RPM and usage attribution. Entry access delegates access to configured standard targets. Subscription, composite and client-specific targets are unsupported.",
+        "billing": "Uses target prices, RPM and usage attribution. The multiplier follows the target unless overridden here. Purchase identity uses actual account procurement cost. Subscription, composite and client-specific targets are unsupported.",
         "required": "Add at least one monitored business group",
         "add": "Add business group in priority order",
         "up": "Move up",

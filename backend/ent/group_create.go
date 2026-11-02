@@ -238,6 +238,20 @@ func (_c *GroupCreate) SetNillableGroupType(v *string) *GroupCreate {
 	return _c
 }
 
+// SetFallbackRateMultiplier sets the "fallback_rate_multiplier" field.
+func (_c *GroupCreate) SetFallbackRateMultiplier(v float64) *GroupCreate {
+	_c.mutation.SetFallbackRateMultiplier(v)
+	return _c
+}
+
+// SetNillableFallbackRateMultiplier sets the "fallback_rate_multiplier" field if the given value is not nil.
+func (_c *GroupCreate) SetNillableFallbackRateMultiplier(v *float64) *GroupCreate {
+	if v != nil {
+		_c.SetFallbackRateMultiplier(*v)
+	}
+	return _c
+}
+
 // SetFallbackGroupIds sets the "fallback_group_ids" field.
 func (_c *GroupCreate) SetFallbackGroupIds(v []int64) *GroupCreate {
 	_c.mutation.SetFallbackGroupIds(v)
@@ -1582,6 +1596,10 @@ func (_c *GroupCreate) createSpec() (*Group, *sqlgraph.CreateSpec) {
 		_spec.SetField(group.FieldGroupType, field.TypeString, value)
 		_node.GroupType = value
 	}
+	if value, ok := _c.mutation.FallbackRateMultiplier(); ok {
+		_spec.SetField(group.FieldFallbackRateMultiplier, field.TypeFloat64, value)
+		_node.FallbackRateMultiplier = &value
+	}
 	if value, ok := _c.mutation.FallbackGroupIds(); ok {
 		_spec.SetField(group.FieldFallbackGroupIds, field.TypeJSON, value)
 		_node.FallbackGroupIds = value
@@ -2143,6 +2161,30 @@ func (u *GroupUpsert) SetGroupType(v string) *GroupUpsert {
 // UpdateGroupType sets the "group_type" field to the value that was provided on create.
 func (u *GroupUpsert) UpdateGroupType() *GroupUpsert {
 	u.SetExcluded(group.FieldGroupType)
+	return u
+}
+
+// SetFallbackRateMultiplier sets the "fallback_rate_multiplier" field.
+func (u *GroupUpsert) SetFallbackRateMultiplier(v float64) *GroupUpsert {
+	u.Set(group.FieldFallbackRateMultiplier, v)
+	return u
+}
+
+// UpdateFallbackRateMultiplier sets the "fallback_rate_multiplier" field to the value that was provided on create.
+func (u *GroupUpsert) UpdateFallbackRateMultiplier() *GroupUpsert {
+	u.SetExcluded(group.FieldFallbackRateMultiplier)
+	return u
+}
+
+// AddFallbackRateMultiplier adds v to the "fallback_rate_multiplier" field.
+func (u *GroupUpsert) AddFallbackRateMultiplier(v float64) *GroupUpsert {
+	u.Add(group.FieldFallbackRateMultiplier, v)
+	return u
+}
+
+// ClearFallbackRateMultiplier clears the value of the "fallback_rate_multiplier" field.
+func (u *GroupUpsert) ClearFallbackRateMultiplier() *GroupUpsert {
+	u.SetNull(group.FieldFallbackRateMultiplier)
 	return u
 }
 
@@ -3327,6 +3369,34 @@ func (u *GroupUpsertOne) SetGroupType(v string) *GroupUpsertOne {
 func (u *GroupUpsertOne) UpdateGroupType() *GroupUpsertOne {
 	return u.Update(func(s *GroupUpsert) {
 		s.UpdateGroupType()
+	})
+}
+
+// SetFallbackRateMultiplier sets the "fallback_rate_multiplier" field.
+func (u *GroupUpsertOne) SetFallbackRateMultiplier(v float64) *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetFallbackRateMultiplier(v)
+	})
+}
+
+// AddFallbackRateMultiplier adds v to the "fallback_rate_multiplier" field.
+func (u *GroupUpsertOne) AddFallbackRateMultiplier(v float64) *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.AddFallbackRateMultiplier(v)
+	})
+}
+
+// UpdateFallbackRateMultiplier sets the "fallback_rate_multiplier" field to the value that was provided on create.
+func (u *GroupUpsertOne) UpdateFallbackRateMultiplier() *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateFallbackRateMultiplier()
+	})
+}
+
+// ClearFallbackRateMultiplier clears the value of the "fallback_rate_multiplier" field.
+func (u *GroupUpsertOne) ClearFallbackRateMultiplier() *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.ClearFallbackRateMultiplier()
 	})
 }
 
@@ -4829,6 +4899,34 @@ func (u *GroupUpsertBulk) SetGroupType(v string) *GroupUpsertBulk {
 func (u *GroupUpsertBulk) UpdateGroupType() *GroupUpsertBulk {
 	return u.Update(func(s *GroupUpsert) {
 		s.UpdateGroupType()
+	})
+}
+
+// SetFallbackRateMultiplier sets the "fallback_rate_multiplier" field.
+func (u *GroupUpsertBulk) SetFallbackRateMultiplier(v float64) *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetFallbackRateMultiplier(v)
+	})
+}
+
+// AddFallbackRateMultiplier adds v to the "fallback_rate_multiplier" field.
+func (u *GroupUpsertBulk) AddFallbackRateMultiplier(v float64) *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.AddFallbackRateMultiplier(v)
+	})
+}
+
+// UpdateFallbackRateMultiplier sets the "fallback_rate_multiplier" field to the value that was provided on create.
+func (u *GroupUpsertBulk) UpdateFallbackRateMultiplier() *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateFallbackRateMultiplier()
+	})
+}
+
+// ClearFallbackRateMultiplier clears the value of the "fallback_rate_multiplier" field.
+func (u *GroupUpsertBulk) ClearFallbackRateMultiplier() *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.ClearFallbackRateMultiplier()
 	})
 }
 

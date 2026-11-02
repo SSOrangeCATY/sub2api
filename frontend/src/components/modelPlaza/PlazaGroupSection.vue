@@ -16,6 +16,7 @@
           :peak-start="group.peak_start"
           :peak-end="group.peak_end"
           :peak-rate-multiplier="group.peak_rate_multiplier"
+          :show-rate="!purchasePricing"
           always-show-rate
         />
         <span
@@ -56,6 +57,7 @@
       <PlazaModelPricingTable
         v-if="group.models.length > 0"
         :models="group.models"
+        :purchase-pricing="purchasePricing"
         :platform="group.platform"
         :rate-multiplier="group.rate_multiplier"
         :user-rate-multiplier="group.user_rate_multiplier ?? null"
@@ -87,6 +89,7 @@ import { useAppStore } from '@/stores/app'
 
 const props = defineProps<{
   group: ModelPlazaGroup
+  purchasePricing?: boolean
 }>()
 
 const { t } = useI18n()
@@ -94,7 +97,7 @@ const appStore = useAppStore()
 
 /** 高峰窗口描述(含倍率与服务器时区标注);分组未启用高峰为空串。 */
 const peakWindow = computed(() => {
-  if (!hasPeakRate(props.group)) return ''
+  if (props.purchasePricing || !hasPeakRate(props.group)) return ''
   return formatPeakRateWindow(
     props.group,
     serverTimezoneLabel(appStore.cachedPublicSettings?.server_utc_offset)

@@ -44,6 +44,7 @@ function mountTable(
   rateMultiplier: number,
   userRateMultiplier?: number | null,
   extraProps?: {
+    purchasePricing?: boolean
     imageRateIndependent?: boolean
     imageRateMultiplier?: number | null
     videoRateIndependent?: boolean
@@ -58,6 +59,14 @@ function mountTable(
 }
 
 describe('PlazaModelPricingTable', () => {
+  it('shows dynamic procurement pricing instead of sales prices for purchase members', () => {
+    const wrapper = mountTable([tokenModel()], 0.075, null, { purchasePricing: true })
+    const cells = wrapper.findAll('tbody tr')[0].findAll('td')
+    expect(cells[1].attributes('colspan')).toBe('3')
+    expect(cells[1].text()).toBe('modelPlaza.purchaseDynamic')
+    expect(cells[cells.length - 1].text()).toBe('modelPlaza.purchaseDynamic')
+    expect(wrapper.text()).not.toContain('0.075x')
+  })
   it.each([
     { enabled: true, multiplier: 1, userRate: 0.05, expected: 1 },
     { enabled: true, multiplier: 0.5, userRate: null, expected: 0.5 },

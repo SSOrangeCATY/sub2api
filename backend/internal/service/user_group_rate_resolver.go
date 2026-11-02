@@ -3,12 +3,15 @@ package service
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	gocache "github.com/patrickmn/go-cache"
 	"golang.org/x/sync/singleflight"
 )
+
+var personalRateCacheGeneration atomic.Uint64
 
 type userGroupRateResolver struct {
 	repo         UserGroupRateRepository
@@ -47,6 +50,9 @@ func (r *userGroupRateResolver) Resolve(ctx context.Context, userID, groupID int
 	}
 
 	key := fmt.Sprintf("%d:%d", userID, groupID)
+	if generation := personalRateCacheGeneration.Load(); generation > 0 {
+		key = fmt.Sprintf("%d:%s", generation, key)
+	}
 	if r.cache != nil {
 		if cached, ok := r.cache.Get(key); ok {
 			if multiplier, castOK := cached.(float64); castOK {

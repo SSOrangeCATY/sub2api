@@ -48,6 +48,8 @@ const (
 	FieldPlatform = "platform"
 	// FieldGroupType holds the string denoting the group_type field in the database.
 	FieldGroupType = "group_type"
+	// FieldFallbackRateMultiplier holds the string denoting the fallback_rate_multiplier field in the database.
+	FieldFallbackRateMultiplier = "fallback_rate_multiplier"
 	// FieldFallbackGroupIds holds the string denoting the fallback_group_ids field in the database.
 	FieldFallbackGroupIds = "fallback_group_ids"
 	// FieldSubscriptionType holds the string denoting the subscription_type field in the database.
@@ -247,6 +249,7 @@ var Columns = []string{
 	FieldDuplicateOperationID,
 	FieldPlatform,
 	FieldGroupType,
+	FieldFallbackRateMultiplier,
 	FieldFallbackGroupIds,
 	FieldSubscriptionType,
 	FieldDailyLimitUsd,
@@ -539,6 +542,11 @@ func ByPlatform(opts ...sql.OrderTermOption) OrderOption {
 // ByGroupType orders the results by the group_type field.
 func ByGroupType(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldGroupType, opts...).ToFunc()
+}
+
+// ByFallbackRateMultiplier orders the results by the fallback_rate_multiplier field.
+func ByFallbackRateMultiplier(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldFallbackRateMultiplier, opts...).ToFunc()
 }
 
 // BySubscriptionType orders the results by the subscription_type field.

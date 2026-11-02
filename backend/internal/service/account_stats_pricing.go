@@ -98,7 +98,12 @@ func tryModelFilePricing(billingService *BillingService, model string, tokens Us
 		Resolver:        resolver,
 		Resolved:        resolved,
 	})
-	if err != nil || breakdown == nil || breakdown.TotalCost <= 0 {
+	if err != nil || breakdown == nil || breakdown.TotalCost < 0 {
+		return nil
+	}
+	// A priced, metered request may explicitly be free. No usage is not a
+	// token-cost override for a search/media-only request.
+	if breakdown.TotalCost == 0 && !hasStatsTokenUsage(tokens) {
 		return nil
 	}
 	return &breakdown.TotalCost
@@ -210,7 +215,7 @@ func calculateStatsCost(pricing *ChannelModelPricing, tokens UsageTokens, reques
 
 // calculatePerRequestStatsCost 按次/图片计费。
 func calculatePerRequestStatsCost(pricing *ChannelModelPricing, requestCount int) *float64 {
-	if pricing.PerRequestPrice == nil || *pricing.PerRequestPrice <= 0 {
+	if pricing.PerRequestPrice == nil || *pricing.PerRequestPrice < 0 {
 		return nil
 	}
 	cost := *pricing.PerRequestPrice * float64(requestCount)
@@ -254,15 +259,35 @@ func calculateTokenStatsCost(pricing *ChannelModelPricing, tokens UsageTokens) *
 		cacheCreationCost +
 		float64(tokens.CacheReadTokens)*deref(p.CacheReadPrice) +
 		float64(tokens.ImageOutputTokens)*deref(p.ImageOutputPrice)
-	if cost <= 0 {
+	if cost < 0 {
+		return nil
+	}
+	if cost == 0 && !hasStatsTokenPriceForUsage(p, tokens) {
 		return nil
 	}
 	return &cost
 }
 
+func hasStatsTokenUsage(tokens UsageTokens) bool {
+	return tokens.InputTokens > 0 || tokens.OutputTokens > 0 || tokens.CacheCreationTokens > 0 ||
+		tokens.CacheReadTokens > 0 || tokens.ImageOutputTokens > 0 || tokens.ImageInputTokens > 0 ||
+		tokens.ImageCacheReadTokens > 0 || tokens.CacheCreation5mTokens > 0 || tokens.CacheCreation1hTokens > 0
+}
+
+func hasStatsTokenPriceForUsage(pricing *ChannelModelPricing, tokens UsageTokens) bool {
+	return (tokens.InputTokens > 0 && pricing.InputPrice != nil) ||
+		(tokens.OutputTokens > 0 && pricing.OutputPrice != nil) ||
+		((tokens.CacheCreationTokens > 0 || tokens.CacheCreation5mTokens > 0) && pricing.CacheWritePrice != nil) ||
+		(tokens.CacheCreation1hTokens > 0 && (pricing.CacheWrite1hPrice != nil || pricing.CacheWritePrice != nil)) ||
+		(tokens.CacheReadTokens > 0 && pricing.CacheReadPrice != nil) ||
+		(tokens.ImageOutputTokens > 0 && pricing.ImageOutputPrice != nil)
+}
+
 // applyAccountStatsCost resolves the account stats cost for a usage log entry.
 // It resolves the upstream model (falling back to the requested model) and calls
-// the 4-level priority chain via resolveAccountStatsCost.
+// the 4-level priority chain via resolveAccountStatsCost. Additive costs are
+// excluded from the token override and restored once, including when the
+// channel uses customer pricing as its account-cost base.
 func applyAccountStatsCost(
 	ctx context.Context,
 	usageLog *UsageLog,
@@ -273,6 +298,7 @@ func applyAccountStatsCost(
 	totalCost float64,
 	pricingAt time.Time,
 	longContextPricingEnabled bool,
+	additiveCosts ...float64,
 ) {
 	model := upstreamModel
 	if model == "" {
@@ -290,9 +316,16 @@ func applyAccountStatsCost(
 	if usageLog != nil && usageLog.ReasoningEffort != nil {
 		reasoningEffort = *usageLog.ReasoningEffort
 	}
+	additiveCost := 0.0
+	for _, cost := range additiveCosts {
+		additiveCost += cost
+	}
 	usageLog.AccountStatsCost = resolveAccountStatsCost(
-		ctx, cs, bs, accountID, groupID, model, tokens, requestCount, totalCost, serviceTier, pricingAt, longContextPricingEnabled, reasoningEffort,
+		ctx, cs, bs, accountID, groupID, model, tokens, requestCount, totalCost-additiveCost, serviceTier, pricingAt, longContextPricingEnabled, reasoningEffort,
 	)
+	if usageLog.AccountStatsCost != nil {
+		*usageLog.AccountStatsCost += additiveCost
+	}
 }
 
 // accountStatsLongContextPricingEnabled 判断账号统计成本是否计入长上下文阶梯。

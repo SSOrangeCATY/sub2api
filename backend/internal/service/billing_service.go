@@ -205,6 +205,7 @@ type CostBreakdown struct {
 	ImageOutputCost           float64
 	CacheCreationCost         float64
 	CacheReadCost             float64
+	SearchCost                float64 // Additive search surcharge before rate multipliers; excluded from token-only account pricing.
 	TotalCost                 float64
 	ActualCost                float64 // 应用倍率后的实际费用
 	BillingMode               string  // 计费模式（"token"/"per_request"/"image"），由 CalculateCostUnified 填充
@@ -221,6 +222,7 @@ func applyCostBreakdownMultiplier(cost *CostBreakdown, multiplier float64) {
 	cost.ImageOutputCost *= multiplier
 	cost.CacheCreationCost *= multiplier
 	cost.CacheReadCost *= multiplier
+	cost.SearchCost *= multiplier
 	cost.TotalCost *= multiplier
 	cost.ActualCost *= multiplier
 }

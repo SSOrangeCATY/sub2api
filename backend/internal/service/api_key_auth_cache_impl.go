@@ -14,7 +14,7 @@ import (
 	"github.com/dgraph-io/ristretto"
 )
 
-const apiKeyAuthSnapshotVersion = 26 // v26: monitor-driven fallback entry groups
+const apiKeyAuthSnapshotVersion = 28 // v28: optional monitored fallback multiplier
 
 type apiKeyAuthCacheConfig struct {
 	l1Size        int
@@ -105,7 +105,7 @@ func (s *APIKeyService) initAuthCache(cfg *config.Config) {
 // StartAuthCacheInvalidationSubscriber starts the Pub/Sub subscriber for L1 cache invalidation.
 // This should be called after the service is fully initialized.
 func (s *APIKeyService) StartAuthCacheInvalidationSubscriber(ctx context.Context) {
-	if s.cache == nil || (s.authCacheL1 == nil && s.authNegativeCacheL1 == nil) {
+	if s.cache == nil {
 		return
 	}
 	s.authInvalidationStart.Do(func() {
@@ -153,6 +153,10 @@ func (s *APIKeyService) StartAuthCacheInvalidationSubscriber(ctx context.Context
 }
 
 func (s *APIKeyService) invalidateLocalAuthCache(cacheKey string) {
+	if cacheKey == personalRatesResetMessage {
+		personalRateCacheGeneration.Add(1)
+		return
+	}
 	if s == nil {
 		return
 	}
@@ -354,6 +358,7 @@ func (s *APIKeyService) snapshotFromAPIKey(ctx context.Context, apiKey *APIKey) 
 			ID:                         apiKey.User.ID,
 			Status:                     apiKey.User.Status,
 			Role:                       apiKey.User.Role,
+			BillingIdentity:            apiKey.User.BillingIdentity,
 			Balance:                    apiKey.User.Balance,
 			Concurrency:                apiKey.User.Concurrency,
 			AllowedGroups:              apiKey.User.AllowedGroups,
@@ -414,6 +419,7 @@ func (s *APIKeyService) snapshotFromAPIKey(ctx context.Context, apiKey *APIKey) 
 			FallbackGroupID:                 apiKey.Group.FallbackGroupID,
 			GroupType:                       apiKey.Group.GroupType,
 			FallbackGroupIDs:                append([]int64(nil), apiKey.Group.FallbackGroupIDs...),
+			FallbackRateMultiplier:          apiKey.Group.FallbackRateMultiplier,
 			FallbackGroupIDOnInvalidRequest: apiKey.Group.FallbackGroupIDOnInvalidRequest,
 			ModelRouting:                    apiKey.Group.ModelRouting,
 			ModelRoutingEnabled:             apiKey.Group.ModelRoutingEnabled,
@@ -466,6 +472,7 @@ func (s *APIKeyService) snapshotToAPIKey(key string, snapshot *APIKeyAuthSnapsho
 			ID:                         snapshot.User.ID,
 			Status:                     snapshot.User.Status,
 			Role:                       snapshot.User.Role,
+			BillingIdentity:            snapshot.User.BillingIdentity,
 			Balance:                    snapshot.User.Balance,
 			Concurrency:                snapshot.User.Concurrency,
 			AllowedGroups:              snapshot.User.AllowedGroups,
@@ -519,6 +526,7 @@ func (s *APIKeyService) snapshotToAPIKey(key string, snapshot *APIKeyAuthSnapsho
 			FallbackGroupID:                 snapshot.Group.FallbackGroupID,
 			GroupType:                       snapshot.Group.GroupType,
 			FallbackGroupIDs:                append([]int64(nil), snapshot.Group.FallbackGroupIDs...),
+			FallbackRateMultiplier:          snapshot.Group.FallbackRateMultiplier,
 			FallbackGroupIDOnInvalidRequest: snapshot.Group.FallbackGroupIDOnInvalidRequest,
 			ModelRouting:                    snapshot.Group.ModelRouting,
 			ModelRoutingEnabled:             snapshot.Group.ModelRoutingEnabled,

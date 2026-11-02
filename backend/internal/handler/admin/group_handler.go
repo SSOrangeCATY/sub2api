@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -45,6 +46,19 @@ func (h *GroupHandler) GetLiveCapability(c *gin.Context) {
 type optionalLimitField struct {
 	set   bool
 	value *float64
+}
+
+// Null clears the fallback override; omission leaves it unchanged.
+type optionalFallbackRateField struct{ optionalLimitField }
+
+func (f *optionalFallbackRateField) UnmarshalJSON(data []byte) error {
+	if err := f.optionalLimitField.UnmarshalJSON(data); err != nil {
+		return err
+	}
+	if f.value != nil && (math.IsNaN(*f.value) || math.IsInf(*f.value, 0) || *f.value < 0.0001 || *f.value > 999999.9999) {
+		return fmt.Errorf("fallback multiplier must be between 0.0001 and 999999.9999")
+	}
+	return nil
 }
 
 func (f *optionalLimitField) UnmarshalJSON(data []byte) error {
@@ -224,6 +238,7 @@ type CreateGroupRequest struct {
 	I18n                      service.GroupI18n             `json:"i18n"` // 名称与描述的界面语言译文
 	Platform                  string                        `json:"platform" binding:"omitempty,group_platform"`
 	GroupType                 string                        `json:"group_type" binding:"omitempty,oneof=business fallback"`
+	FallbackRateMultiplier    *float64                      `json:"fallback_rate_multiplier"`
 	FallbackGroupIDs          []int64                       `json:"fallback_group_ids"`
 	RateMultiplier            float64                       `json:"rate_multiplier"`
 	IsExclusive               bool                          `json:"is_exclusive"`
@@ -302,6 +317,7 @@ type UpdateGroupRequest struct {
 	I18n                      *service.GroupI18n             `json:"i18n"` // 缺省不修改，传入则整体替换
 	Platform                  string                         `json:"platform" binding:"omitempty,group_platform"`
 	GroupType                 *string                        `json:"group_type" binding:"omitempty,oneof=business fallback"`
+	FallbackRateMultiplier    optionalFallbackRateField      `json:"fallback_rate_multiplier"`
 	FallbackGroupIDs          *[]int64                       `json:"fallback_group_ids"`
 	RateMultiplier            *float64                       `json:"rate_multiplier"`
 	IsExclusive               *bool                          `json:"is_exclusive"`
@@ -713,6 +729,7 @@ func (h *GroupHandler) Create(c *gin.Context) {
 		Platform:                        req.Platform,
 		GroupType:                       req.GroupType,
 		FallbackGroupIDs:                req.FallbackGroupIDs,
+		FallbackRateMultiplier:          req.FallbackRateMultiplier,
 		RateMultiplier:                  req.RateMultiplier,
 		IsExclusive:                     req.IsExclusive,
 		SubscriptionType:                req.SubscriptionType,
@@ -862,6 +879,7 @@ func (h *GroupHandler) Update(c *gin.Context) {
 		Platform:                        req.Platform,
 		GroupType:                       req.GroupType,
 		FallbackGroupIDs:                req.FallbackGroupIDs,
+		FallbackRateMultiplier:          req.FallbackRateMultiplier.ToServiceInput(),
 		RateMultiplier:                  req.RateMultiplier,
 		IsExclusive:                     req.IsExclusive,
 		Status:                          req.Status,
