@@ -82,6 +82,7 @@ export interface ModelPlazaGroup {
 }
 
 export interface ModelPlazaResponse {
+  billing_identity?: 'standard' | 'purchase'
   /** 管理员配置的全局价格说明（Markdown）。 */
   description: string
   groups: ModelPlazaGroup[]

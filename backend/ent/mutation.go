@@ -49025,6 +49025,7 @@ type UserMutation struct {
 	email                         *string
 	password_hash                 *string
 	role                          *string
+	billing_identity              *string
 	balance                       *float64
 	addbalance                    *float64
 	frozen_balance                *float64
@@ -49420,6 +49421,42 @@ func (m *UserMutation) OldRole(ctx context.Context) (v string, err error) {
 // ResetRole resets all changes to the "role" field.
 func (m *UserMutation) ResetRole() {
 	m.role = nil
+}
+
+// SetBillingIdentity sets the "billing_identity" field.
+func (m *UserMutation) SetBillingIdentity(s string) {
+	m.billing_identity = &s
+}
+
+// BillingIdentity returns the value of the "billing_identity" field in the mutation.
+func (m *UserMutation) BillingIdentity() (r string, exists bool) {
+	v := m.billing_identity
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldBillingIdentity returns the old "billing_identity" field's value of the User entity.
+// If the User object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UserMutation) OldBillingIdentity(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldBillingIdentity is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldBillingIdentity requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldBillingIdentity: %w", err)
+	}
+	return oldValue.BillingIdentity, nil
+}
+
+// ResetBillingIdentity resets all changes to the "billing_identity" field.
+func (m *UserMutation) ResetBillingIdentity() {
+	m.billing_identity = nil
 }
 
 // SetBalance sets the "balance" field.
@@ -51028,7 +51065,7 @@ func (m *UserMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *UserMutation) Fields() []string {
-	fields := make([]string, 0, 25)
+	fields := make([]string, 0, 26)
 	if m.created_at != nil {
 		fields = append(fields, user.FieldCreatedAt)
 	}
@@ -51046,6 +51083,9 @@ func (m *UserMutation) Fields() []string {
 	}
 	if m.role != nil {
 		fields = append(fields, user.FieldRole)
+	}
+	if m.billing_identity != nil {
+		fields = append(fields, user.FieldBillingIdentity)
 	}
 	if m.balance != nil {
 		fields = append(fields, user.FieldBalance)
@@ -51124,6 +51164,8 @@ func (m *UserMutation) Field(name string) (ent.Value, bool) {
 		return m.PasswordHash()
 	case user.FieldRole:
 		return m.Role()
+	case user.FieldBillingIdentity:
+		return m.BillingIdentity()
 	case user.FieldBalance:
 		return m.Balance()
 	case user.FieldFrozenBalance:
@@ -51183,6 +51225,8 @@ func (m *UserMutation) OldField(ctx context.Context, name string) (ent.Value, er
 		return m.OldPasswordHash(ctx)
 	case user.FieldRole:
 		return m.OldRole(ctx)
+	case user.FieldBillingIdentity:
+		return m.OldBillingIdentity(ctx)
 	case user.FieldBalance:
 		return m.OldBalance(ctx)
 	case user.FieldFrozenBalance:
@@ -51271,6 +51315,13 @@ func (m *UserMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetRole(v)
+		return nil
+	case user.FieldBillingIdentity:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetBillingIdentity(v)
 		return nil
 	case user.FieldBalance:
 		v, ok := value.(float64)
@@ -51585,6 +51636,9 @@ func (m *UserMutation) ResetField(name string) error {
 		return nil
 	case user.FieldRole:
 		m.ResetRole()
+		return nil
+	case user.FieldBillingIdentity:
+		m.ResetBillingIdentity()
 		return nil
 	case user.FieldBalance:
 		m.ResetBalance()

@@ -494,6 +494,13 @@ export default {
 
     // Users
     users: {
+      billingIdentity: {
+        label: 'Billing identity', standard: 'Standard pricing', purchase: 'Purchase price',
+        hint: 'Purchase pricing follows the selected account procurement cost, including fallback changes. Group access stays unchanged.',
+        migrate: 'Migrate to purchase pricing',
+        confirm: 'Enroll all personal-rate owners in purchase pricing and clear all personal rates. An atomic backup is retained. RPM and group access stay unchanged.',
+        migrated: 'Migrated {users} users and cleared {rates} personal rates.'
+      },
       title: 'User Management',
       description: 'Manage users and their permissions',
       createUser: 'Create User',

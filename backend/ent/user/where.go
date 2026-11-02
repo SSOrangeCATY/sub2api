@@ -85,6 +85,11 @@ func Role(v string) predicate.User {
 	return predicate.User(sql.FieldEQ(FieldRole, v))
 }
 
+// BillingIdentity applies equality check predicate on the "billing_identity" field. It's identical to BillingIdentityEQ.
+func BillingIdentity(v string) predicate.User {
+	return predicate.User(sql.FieldEQ(FieldBillingIdentity, v))
+}
+
 // Balance applies equality check predicate on the "balance" field. It's identical to BalanceEQ.
 func Balance(v float64) predicate.User {
 	return predicate.User(sql.FieldEQ(FieldBalance, v))
@@ -503,6 +508,71 @@ func RoleEqualFold(v string) predicate.User {
 // RoleContainsFold applies the ContainsFold predicate on the "role" field.
 func RoleContainsFold(v string) predicate.User {
 	return predicate.User(sql.FieldContainsFold(FieldRole, v))
+}
+
+// BillingIdentityEQ applies the EQ predicate on the "billing_identity" field.
+func BillingIdentityEQ(v string) predicate.User {
+	return predicate.User(sql.FieldEQ(FieldBillingIdentity, v))
+}
+
+// BillingIdentityNEQ applies the NEQ predicate on the "billing_identity" field.
+func BillingIdentityNEQ(v string) predicate.User {
+	return predicate.User(sql.FieldNEQ(FieldBillingIdentity, v))
+}
+
+// BillingIdentityIn applies the In predicate on the "billing_identity" field.
+func BillingIdentityIn(vs ...string) predicate.User {
+	return predicate.User(sql.FieldIn(FieldBillingIdentity, vs...))
+}
+
+// BillingIdentityNotIn applies the NotIn predicate on the "billing_identity" field.
+func BillingIdentityNotIn(vs ...string) predicate.User {
+	return predicate.User(sql.FieldNotIn(FieldBillingIdentity, vs...))
+}
+
+// BillingIdentityGT applies the GT predicate on the "billing_identity" field.
+func BillingIdentityGT(v string) predicate.User {
+	return predicate.User(sql.FieldGT(FieldBillingIdentity, v))
+}
+
+// BillingIdentityGTE applies the GTE predicate on the "billing_identity" field.
+func BillingIdentityGTE(v string) predicate.User {
+	return predicate.User(sql.FieldGTE(FieldBillingIdentity, v))
+}
+
+// BillingIdentityLT applies the LT predicate on the "billing_identity" field.
+func BillingIdentityLT(v string) predicate.User {
+	return predicate.User(sql.FieldLT(FieldBillingIdentity, v))
+}
+
+// BillingIdentityLTE applies the LTE predicate on the "billing_identity" field.
+func BillingIdentityLTE(v string) predicate.User {
+	return predicate.User(sql.FieldLTE(FieldBillingIdentity, v))
+}
+
+// BillingIdentityContains applies the Contains predicate on the "billing_identity" field.
+func BillingIdentityContains(v string) predicate.User {
+	return predicate.User(sql.FieldContains(FieldBillingIdentity, v))
+}
+
+// BillingIdentityHasPrefix applies the HasPrefix predicate on the "billing_identity" field.
+func BillingIdentityHasPrefix(v string) predicate.User {
+	return predicate.User(sql.FieldHasPrefix(FieldBillingIdentity, v))
+}
+
+// BillingIdentityHasSuffix applies the HasSuffix predicate on the "billing_identity" field.
+func BillingIdentityHasSuffix(v string) predicate.User {
+	return predicate.User(sql.FieldHasSuffix(FieldBillingIdentity, v))
+}
+
+// BillingIdentityEqualFold applies the EqualFold predicate on the "billing_identity" field.
+func BillingIdentityEqualFold(v string) predicate.User {
+	return predicate.User(sql.FieldEqualFold(FieldBillingIdentity, v))
+}
+
+// BillingIdentityContainsFold applies the ContainsFold predicate on the "billing_identity" field.
+func BillingIdentityContainsFold(v string) predicate.User {
+	return predicate.User(sql.FieldContainsFold(FieldBillingIdentity, v))
 }
 
 // BalanceEQ applies the EQ predicate on the "balance" field.

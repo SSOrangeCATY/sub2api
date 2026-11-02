@@ -53,7 +53,7 @@
     </div>
 
     <!-- 三级:倍率(当前组合下不存在的置灰) -->
-    <div class="flex items-start gap-2">
+    <div v-if="!hideRates" class="flex items-start gap-2">
       <span class="w-10 shrink-0 pt-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-dark-500">
         {{ t('modelPlaza.filters.rateLabel') }}
       </span>
@@ -122,6 +122,7 @@ import type { GroupPlatform } from '@/types'
 const props = defineProps<{
   /** 数据中出现的平台(去重排序后)。 */
   platforms: string[]
+  hideRates?: boolean
   /** 全量分组(含平台与生效倍率),三个维度的置灰联动由此推导。 */
   groups: Array<{ id: number; name: string; platform: string; rate: number }>
   /** 全量生效倍率去重升序。 */

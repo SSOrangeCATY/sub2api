@@ -12,7 +12,8 @@
     <span class="pt-group-name" :class="truncate ? 'truncate' : 'min-w-0 whitespace-normal [overflow-wrap:anywhere]'">{{ name }}</span>
     <!-- Right side label -->
     <span v-if="showLabel" class="pt-group-rate" :class="[labelClass, { 'pt-group-rate--warning': isSubscription && daysRemaining !== null && daysRemaining <= 7 }]">
-      <template v-if="hasCustomRate">
+      <template v-if="purchasePricing">{{ t('modelPlaza.purchaseDynamic') }}</template>
+      <template v-else-if="hasCustomRate">
         <!-- 原倍率删除线 + 专属倍率高亮 -->
         <span class="line-through opacity-50 mr-0.5">{{ rateMultiplier }}x</span>
         <span class="font-bold">{{ userRateMultiplier }}x</span>
@@ -36,6 +37,7 @@ import { formatPeakRateWindow, serverTimezoneLabel } from '@/utils/peak-rate'
 import PlatformIcon from './PlatformIcon.vue'
 
 interface Props {
+  purchasePricing?: boolean
   name: string
   platform?: GroupPlatform
   subscriptionType?: SubscriptionType
@@ -84,7 +86,7 @@ const hasCustomRate = computed(() => {
 const appStore = useAppStore()
 
 const hasPeakRate = computed(() => {
-  return Boolean(props.showRate && props.peakRateEnabled && props.peakStart && props.peakEnd)
+  return Boolean(!props.purchasePricing && props.showRate && props.peakRateEnabled && props.peakStart && props.peakEnd)
 })
 
 const peakRateText = computed(() => {
@@ -106,6 +108,7 @@ const peakRateTitle = computed(() => {
 // 是否显示右侧标签
 const showLabel = computed(() => {
   if (!props.showRate) return false
+  if (props.purchasePricing) return true
   // 订阅类型：显示天数或"订阅"
   if (isSubscription.value) return true
   // 标准类型：显示倍率（包括专属倍率）

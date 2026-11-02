@@ -494,6 +494,13 @@ export default {
 
     // Users Management
     users: {
+      billingIdentity: {
+        label: '计费身份组', standard: '标准售价', purchase: '进货价',
+        hint: '进货价按实际承接账号的采购成本结算；兜底切换后随目标账号变化，不改变分组访问权限。',
+        migrate: '迁移至进货价身份组',
+        confirm: '将所有设有个人专属倍率的用户加入进货价身份组，并清除全站个人专属倍率。系统在同一事务中保留恢复备份，RPM 和分组访问权限不变。',
+        migrated: '已迁移 {users} 位用户，清除 {rates} 条专属倍率。'
+      },
       title: '用户管理',
       description: '管理用户账户和权限',
       createUser: '创建用户',

@@ -421,17 +421,7 @@
                   t("admin.groups.compositeRoutes.action")
                 }}</span>
               </button>
-              <button
-                v-if="!authStore.isSimpleMode"
-                data-testid="group-rate-multipliers"
-                @click="handleRateMultipliers(row)"
-                class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-purple-600 dark:hover:bg-dark-700 dark:hover:text-purple-400"
-              >
-                <Icon name="dollar" size="sm" />
-                <span class="text-xs">{{
-                  t("admin.groups.rateMultipliers")
-                }}</span>
-              </button>
+
               <button
                 v-if="!authStore.isSimpleMode"
                 data-testid="group-rpm-overrides"
@@ -4292,13 +4282,6 @@
       </template>
     </BaseDialog>
 
-    <!-- Group Rate Multipliers Modal -->
-    <GroupRateMultipliersModal
-      :show="showRateMultipliersModal"
-      :group="rateMultipliersGroup"
-      @close="showRateMultipliersModal = false"
-      @success="loadGroups"
-    />
 
     <!-- Group RPM Overrides Modal -->
     <GroupRPMOverridesModal
@@ -4349,7 +4332,6 @@ import Icon from "@/components/icons/Icon.vue";
 import GroupI18nField from "@/components/admin/group/GroupI18nField.vue";
 import MonitorFallbackFields from "@/components/admin/group/MonitorFallbackFields.vue";
 import MonitorFallbackRoutes from "@/components/admin/group/MonitorFallbackRoutes.vue";
-import GroupRateMultipliersModal from "@/components/admin/group/GroupRateMultipliersModal.vue";
 import GroupRPMOverridesModal from "@/components/admin/group/GroupRPMOverridesModal.vue";
 import GroupCapacityBadge from "@/components/common/GroupCapacityBadge.vue";
 import ReasoningEffortPolicyFields from "@/components/admin/group/ReasoningEffortPolicyFields.vue";
@@ -4890,8 +4872,6 @@ const sortSubmitting = ref(false);
 const editingGroup = ref<AdminGroup | null>(null);
 const deletingGroup = ref<AdminGroup | null>(null);
 const duplicatingGroupIds = reactive(new Set<number>());
-const showRateMultipliersModal = ref(false);
-const rateMultipliersGroup = ref<AdminGroup | null>(null);
 const showRPMOverridesModal = ref(false);
 const rpmOverridesGroup = ref<AdminGroup | null>(null);
 const sortableGroups = ref<AdminGroup[]>([]);
@@ -6515,10 +6495,6 @@ const removeEditMessagesDispatchMapping = (row: MessagesDispatchMappingRow) => {
   }
 };
 
-const handleRateMultipliers = (group: AdminGroup) => {
-  rateMultipliersGroup.value = group;
-  showRateMultipliersModal.value = true;
-};
 
 const handleRPMOverrides = (group: AdminGroup) => {
   rpmOverridesGroup.value = group;

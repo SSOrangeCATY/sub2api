@@ -26,8 +26,9 @@
     <div class="flex shrink-0 items-center gap-2 pt-0.5">
       <div class="flex shrink-0 flex-col items-end gap-1">
         <!-- Rate pill (platform color) -->
-        <span v-if="rateMultiplier !== undefined" :class="['pt-group-option-rate inline-flex items-center whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold', ratePillClass]">
-          <template v-if="hasCustomRate">
+        <span v-if="purchasePricing || rateMultiplier !== undefined" :class="['pt-group-option-rate inline-flex items-center whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold', ratePillClass]">
+          <template v-if="purchasePricing">{{ t('modelPlaza.purchaseDynamic') }}</template>
+          <template v-else-if="hasCustomRate">
             <span class="mr-1 line-through opacity-50">{{ rateMultiplier }}x</span>
             <span class="font-bold">{{ userRateMultiplier }}x</span>
           </template>
@@ -69,6 +70,7 @@ import { formatPeakRateWindow, serverTimezoneLabel } from '@/utils/peak-rate'
 const { t } = useI18n()
 
 interface Props {
+  purchasePricing?: boolean
   name: string
   platform: GroupPlatform
   subscriptionType?: SubscriptionType
@@ -104,7 +106,7 @@ const hasCustomRate = computed(() => {
 const appStore = useAppStore()
 
 const hasPeakRate = computed(() => {
-  return Boolean(props.peakRateEnabled && props.peakStart && props.peakEnd)
+  return Boolean(!props.purchasePricing && props.peakRateEnabled && props.peakStart && props.peakEnd)
 })
 
 const peakRateText = computed(() => {

@@ -64,6 +64,7 @@ export interface UserProfileSourceContext {
 }
 
 export interface User {
+  billing_identity?: 'standard' | 'purchase'
   id: number
   username: string
   email: string
@@ -2145,6 +2146,7 @@ export interface ApiKeyUsageTrendPoint {
 // ==================== Admin User Management ====================
 
 export interface UpdateUserRequest {
+  billing_identity?: 'standard' | 'purchase'
   email?: string
   password?: string
   username?: string

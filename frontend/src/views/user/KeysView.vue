@@ -162,7 +162,7 @@
                 class="-mx-2 -my-1 flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1 transition-all duration-200 hover:bg-gray-100 dark:hover:bg-dark-700"
                 :title="t('keys.clickToChangeGroup')"
               >
-                <GroupBadge
+                <GroupBadge :purchase-pricing="purchasePricing"
                   v-if="row.group"
                   :name="row.group.name"
                   :platform="row.group.platform"
@@ -548,7 +548,7 @@
             data-tour="key-form-group"
           >
             <template #selected="{ option }">
-              <GroupBadge
+              <GroupBadge :purchase-pricing="purchasePricing"
                 v-if="option"
                 :name="(option as unknown as GroupOption).label"
                 :platform="(option as unknown as GroupOption).platform"
@@ -563,7 +563,7 @@
               <span v-else class="text-gray-400">{{ t('keys.selectGroup') }}</span>
             </template>
             <template #option="{ option, selected }">
-              <GroupOptionItem
+              <GroupOptionItem :purchase-pricing="purchasePricing"
                 :name="(option as unknown as GroupOption).label"
                 :platform="(option as unknown as GroupOption).platform"
                 :subscription-type="(option as unknown as GroupOption).subscriptionType"
@@ -1171,7 +1171,7 @@
             ]"
             :title="option.description || undefined"
           >
-            <GroupOptionItem
+            <GroupOptionItem :purchase-pricing="purchasePricing"
               :name="option.label"
               :platform="option.platform"
               :subscription-type="option.subscriptionType"
@@ -1202,6 +1202,7 @@
 	import { ref, reactive, computed, watch, onMounted, onUnmounted, type ComponentPublicInstance } from 'vue'
 	import { useI18n } from 'vue-i18n'
 	import { useAppStore } from '@/stores/app'
+import { useAuthStore } from '@/stores/auth'
 	import { useOnboardingStore } from '@/stores/onboarding'
 	import { useClipboard } from '@/composables/useClipboard'
 import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
@@ -1259,6 +1260,8 @@ interface GroupOption {
 }
 
 const appStore = useAppStore()
+const authStore = useAuthStore()
+const purchasePricing = computed(() => authStore.user?.billing_identity === 'purchase')
 const onboardingStore = useOnboardingStore()
 const { copyToClipboard: clipboardCopy } = useClipboard()
 

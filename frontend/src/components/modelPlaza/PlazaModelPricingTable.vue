@@ -112,7 +112,10 @@
           </td>
 
           <!-- token 计费:输入 / 输出 / 缓存(写/读),有阶梯时每档一行;档位标签只放输入列,其余列按行对齐 -->
-          <template v-if="billingMode(m) === BILLING_MODE_TOKEN">
+          <template v-if="purchasePricing">
+            <td colspan="3" class="pz-cell px-3 py-2.5 text-sm text-gray-900 dark:text-gray-100">{{ t('modelPlaza.purchaseDynamic') }}</td>
+          </template>
+          <template v-else-if="billingMode(m) === BILLING_MODE_TOKEN">
             <td class="pz-cell px-3 py-2.5 align-middle font-mono font-semibold text-gray-900 dark:text-gray-50">
               <template v-if="tokenIntervals(m).length">
                 <div
@@ -283,7 +286,8 @@
             class="border-l border-gray-100 py-2.5 pl-3 pr-5 text-right align-middle font-mono text-xs dark:border-dark-700/60"
           >
             <span
-              v-if="period"
+              v-if="purchasePricing" class="font-semibold text-gray-900 dark:text-gray-100">{{ t('modelPlaza.purchaseDynamic') }}</span>
+            <span v-else-if="period"
               class="font-bold text-primary-600 dark:text-primary-400"
               :title="t('modelPlaza.table.timePricingRateHint', { rate: effectiveRate, multiplier: period.multiplier })"
               >{{ periodRate(period) }}x</span
@@ -335,6 +339,7 @@ const props = defineProps<{
   /** 分组平台;实付分区底色随平台着色,未知平台回退品牌青。 */
   platform?: string
   /** 分组默认倍率。 */
+  purchasePricing?: boolean
   rateMultiplier: number
   /** 用户专属倍率;与默认不同,实付价按此计算并划线展示原倍率。 */
   userRateMultiplier?: number | null

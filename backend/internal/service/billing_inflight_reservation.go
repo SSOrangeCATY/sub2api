@@ -387,11 +387,13 @@ type InflightEstimateRequest struct {
 
 // inflightEstimateDeps 两种网关 service 共用的估算依赖。
 type inflightEstimateDeps struct {
-	cfg            *config.Config
-	billing        *BillingService
-	resolver       *ModelPricingResolver
-	resolveMapping func(ctx context.Context, groupID int64, model string) ChannelMappingResult
-	userGroupRate  func(ctx context.Context, userID, groupID int64, groupDefault float64) float64
+	purchaseAccounts     func(context.Context, *APIKey, string) ([]Account, error)
+	accountStatsEstimate func(context.Context, int64, int64, string, UsageTokens, int, float64, time.Time, bool) *float64
+	cfg                  *config.Config
+	billing              *BillingService
+	resolver             *ModelPricingResolver
+	resolveMapping       func(ctx context.Context, groupID int64, model string) ChannelMappingResult
+	userGroupRate        func(ctx context.Context, userID, groupID int64, groupDefault float64) float64
 	// accountMappedModels 返回调度器可选账号对 model 的账号级映射结果（去重，不含 model 本身）。
 	// 准入时账号尚未选定，计费侧 billableModelWithFallback 会回退到实际转发模型（UpstreamModel，
 	// 即账号映射后的模型），因此这里取所有候选映射模型的最高估算。
@@ -643,6 +645,9 @@ func (d inflightEstimateDeps) estimate(ctx context.Context, apiKey *APIKey, req 
 		// 非计量请求（媒体状态查询、custom-voices 等）：无需预留，也不算「无法定价」。
 		return 0, true
 	}
+	if apiKey.User.UsesPurchasePricing() {
+		return d.estimatePurchase(ctx, apiKey, req)
+	}
 	textRate, imageRate := d.rates(ctx, apiKey)
 	if textRate <= 0 && imageRate <= 0 {
 		// 免费分组：不计费，也无需预留。
@@ -713,12 +718,23 @@ func inflightReservationCfg(cfg *config.Config) config.InflightReservationConfig
 
 func (s *GatewayService) inflightEstimateDeps() inflightEstimateDeps {
 	d := inflightEstimateDeps{cfg: s.cfg, billing: s.billingService, resolver: s.resolver}
+	d.accountStatsEstimate = func(ctx context.Context, accountID, groupID int64, model string, tokens UsageTokens, count int, total float64, at time.Time, long bool) *float64 {
+		return resolveAccountStatsCost(ctx, s.channelService, s.billingService, accountID, groupID, model, tokens, count, total, "", at, long)
+	}
 	if s.channelService != nil {
 		d.resolveMapping = s.channelService.ResolveChannelMapping
 	}
 	d.userGroupRate = s.getUserGroupRateMultiplier
 	if s.schedulerSnapshot != nil {
 		snap := s.schedulerSnapshot
+		d.purchaseAccounts = func(ctx context.Context, key *APIKey, model string) ([]Account, error) {
+			platform, forced, err := s.resolvePlatform(ctx, key.GroupID, key.Group, model)
+			if err != nil {
+				return nil, err
+			}
+			accounts, _, err := snap.ListSchedulableAccounts(ctx, key.GroupID, platform, forced)
+			return accounts, err
+		}
 		d.accountMappedModels = inflightAccountMappedModelsFromSnapshot(
 			func(ctx context.Context, groupID *int64, platform string, forced bool) ([]Account, error) {
 				accounts, _, err := snap.ListSchedulableAccounts(ctx, groupID, platform, forced)
@@ -742,25 +758,48 @@ func (s *GatewayService) EstimateInflightReservation(ctx context.Context, apiKey
 	return s.inflightEstimateDeps().estimate(ctx, apiKey, req)
 }
 
+func openAIInflightPlatform(ctx context.Context, key *APIKey) (string, bool) {
+	if platform, ok := ResolvedTargetPlatformFromContext(ctx); ok {
+		return NormalizeOpenAICompatiblePlatform(platform), true
+	}
+	if key != nil && key.Group != nil {
+		if key.Group.Platform == PlatformComposite {
+			return "", false
+		}
+		if key.Group.Platform != "" {
+			return NormalizeOpenAICompatiblePlatform(key.Group.Platform), true
+		}
+	}
+	return PlatformOpenAI, true
+}
+
 func (s *OpenAIGatewayService) inflightEstimateDeps() inflightEstimateDeps {
 	d := inflightEstimateDeps{cfg: s.cfg, billing: s.billingService, resolver: s.resolver}
+	d.accountStatsEstimate = func(ctx context.Context, accountID, groupID int64, model string, tokens UsageTokens, count int, total float64, at time.Time, long bool) *float64 {
+		return resolveAccountStatsCost(ctx, s.channelService, s.billingService, accountID, groupID, model, tokens, count, total, "", at, long)
+	}
 	if s.channelService != nil {
 		d.resolveMapping = s.channelService.ResolveChannelMapping
 	}
 	d.userGroupRate = s.ResolveUserGroupRateMultiplier
 	if s.schedulerSnapshot != nil {
 		snap := s.schedulerSnapshot
+		d.purchaseAccounts = func(ctx context.Context, key *APIKey, model string) ([]Account, error) {
+			platform, ok := openAIInflightPlatform(ctx, key)
+			if !ok {
+				return nil, nil
+			}
+			accounts, _, err := snap.ListSchedulableAccounts(ctx, key.GroupID, platform, false)
+			return accounts, err
+		}
 		d.accountMappedModels = inflightAccountMappedModelsFromSnapshot(
 			func(ctx context.Context, groupID *int64, platform string, forced bool) ([]Account, error) {
 				accounts, _, err := snap.ListSchedulableAccounts(ctx, groupID, platform, forced)
 				return accounts, err
 			},
 			func(ctx context.Context, apiKey *APIKey, model string) (string, bool, bool) {
-				platform := PlatformOpenAI
-				if apiKey.Group != nil && apiKey.Group.Platform != "" && apiKey.Group.Platform != PlatformComposite {
-					platform = apiKey.Group.Platform
-				}
-				return NormalizeOpenAICompatiblePlatform(platform), false, true
+				platform, ok := openAIInflightPlatform(ctx, apiKey)
+				return platform, false, ok
 			},
 		)
 	}

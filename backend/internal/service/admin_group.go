@@ -1401,22 +1401,20 @@ func (s *adminServiceImpl) ClearGroupRateMultipliers(ctx context.Context, groupI
 	if s.userGroupRateRepo == nil {
 		return nil
 	}
-	return s.userGroupRateRepo.DeleteByGroupID(ctx, groupID)
+	err := s.userGroupRateRepo.SyncGroupRateMultipliers(ctx, groupID, nil)
+	if err == nil {
+		if resetter, ok := s.authCacheInvalidator.(interface{ InvalidatePersonalRateCaches(context.Context) }); ok {
+			resetter.InvalidatePersonalRateCaches(ctx)
+		}
+	}
+	return err
 }
 
 func (s *adminServiceImpl) BatchSetGroupRateMultipliers(ctx context.Context, groupID int64, entries []GroupRateMultiplierInput) error {
 	if err := s.ValidateSimpleModeGroupOperation(AdminGroupOperationMultiplier); err != nil {
 		return err
 	}
-	if s.userGroupRateRepo == nil {
-		return nil
-	}
-	for _, e := range entries {
-		if e.RateMultiplier <= 0 {
-			return fmt.Errorf("rate_multiplier must be > 0 (user_id=%d)", e.UserID)
-		}
-	}
-	return s.userGroupRateRepo.SyncGroupRateMultipliers(ctx, groupID, entries)
+	return infraerrors.BadRequest("PERSONAL_RATES_RETIRED", "use billing identity instead of personal rate overrides")
 }
 
 func (s *adminServiceImpl) ClearGroupRPMOverrides(ctx context.Context, groupID int64) error {
