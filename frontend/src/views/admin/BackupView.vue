@@ -194,7 +194,7 @@
             <button type="button" class="btn btn-primary btn-sm" :disabled="creatingBackup" @click="createBackup">
               {{ creatingBackup ? t('admin.backup.operations.backing') : t('admin.backup.operations.createBackup') }}
             </button>
-            <button type="button" class="btn btn-secondary btn-sm" :disabled="loadingBackups" @click="loadBackups">
+            <button type="button" class="btn btn-secondary btn-sm" :disabled="fetchingBackups" @click="loadBackups()">
               {{ loadingBackups ? t('common.loading') : t('common.refresh') }}
             </button>
           </div>
@@ -527,8 +527,14 @@ const retentionPreview = computed(() => {
 // Backups
 const backups = ref<BackupRecord[]>([])
 const loadingBackups = ref(false)
+const fetchingBackups = ref(false)
+let listRequest: Promise<boolean> | null = null
+let lastBackupsLoadedAt = 0
 const creatingBackup = ref(false)
 const restoringId = ref('')
+let pendingCreate = false
+let pendingRestore = false
+let operationVersion = 0
 const manualExpireDays = ref(14)
 const downloadParts = ref<BackupDownloadPart[]>([])
 const downloadPartsModalOpen = ref(false)
@@ -547,7 +553,7 @@ function updateRecordInList(updated: BackupRecord) {
 }
 
 function startPolling(backupId: string) {
-  if (disposed) return
+  if (disposed || document.hidden) return
   stopPolling()
   let count = 0
   pollingTimer.value = setInterval(async () => {
@@ -559,6 +565,7 @@ function startPolling(backupId: string) {
     }
     try {
       const record = await adminAPI.backup.getBackup(backupId)
+      if (disposed || document.hidden) return
       updateRecordInList(record)
       if (record.status === 'completed' || record.status === 'failed') {
         stopPolling()
@@ -568,6 +575,7 @@ function startPolling(backupId: string) {
         } else {
           appStore.showError(record.error_message || t('admin.backup.operations.backupFailed'))
         }
+        operationVersion++
         await loadBackups()
       }
     } catch {
@@ -584,7 +592,7 @@ function stopPolling() {
 }
 
 function startRestorePolling(backupId: string) {
-  if (disposed) return
+  if (disposed || document.hidden) return
   stopRestorePolling()
   let count = 0
   restoringPollingTimer.value = setInterval(async () => {
@@ -596,6 +604,7 @@ function startRestorePolling(backupId: string) {
     }
     try {
       const record = await adminAPI.backup.getBackup(backupId)
+      if (disposed || document.hidden) return
       updateRecordInList(record)
       if (record.restore_status === 'completed' || record.restore_status === 'failed') {
         stopRestorePolling()
@@ -605,6 +614,7 @@ function startRestorePolling(backupId: string) {
         } else {
           appStore.showError(record.restore_error || t('admin.backup.operations.restoreFailed'))
         }
+        operationVersion++
         await loadBackups()
       }
     } catch {
@@ -625,16 +635,24 @@ function handleVisibilityChange() {
     stopPolling()
     stopRestorePolling()
   } else {
-    // 标签页恢复时刷新列表，检查是否仍有活跃操作
-    loadBackups().then(() => {
+    // Reconcile active work immediately; ordinary short tab switches need no request.
+    if (!creatingBackup.value && !restoringId.value && Date.now() - lastBackupsLoadedAt < 60_000) return
+    void loadBackups(true).then((loaded) => {
+      if (disposed || document.hidden) return
       const running = backups.value.find(r => r.status === 'running')
+      const restoring = backups.value.find(r => r.restore_status === 'running')
+      if (!loaded) {
+        // A temporary list failure must not strand work paused while hidden.
+        if (creatingBackup.value && running) startPolling(running.id)
+        if (restoringId.value && restoring?.id === restoringId.value) startRestorePolling(restoring.id)
+        return
+      }
+      if (!pendingCreate) creatingBackup.value = !!running
       if (running) {
-        creatingBackup.value = true
         startPolling(running.id)
       }
-      const restoring = backups.value.find(r => r.restore_status === 'running')
+      if (!pendingRestore) restoringId.value = restoring?.id || ''
       if (restoring) {
-        restoringId.value = restoring.id
         startRestorePolling(restoring.id)
       }
     })
@@ -788,19 +806,38 @@ async function saveSchedule() {
   }
 }
 
-async function loadBackups() {
-  loadingBackups.value = true
-  try {
-    const result = await adminAPI.backup.listBackups()
-    backups.value = result.items || []
-  } catch (error) {
-    appStore.showError((error as { message?: string })?.message || t('errors.networkError'))
-  } finally {
-    loadingBackups.value = false
-  }
+async function loadBackups(silent = false): Promise<boolean> {
+  if (disposed) return false
+  if (listRequest) return listRequest
+  fetchingBackups.value = true
+  if (!silent) loadingBackups.value = true
+  listRequest = (async () => {
+    try {
+      // Keep all waiting callers attached until a list reflects the latest operation.
+      while (!disposed) {
+        const version = operationVersion
+        const result = await adminAPI.backup.listBackups()
+        if (disposed) return false
+        if (version !== operationVersion) continue
+        backups.value = result.items || []
+        lastBackupsLoadedAt = Date.now()
+        return true
+      }
+      return false
+    } catch (error) {
+      if (!disposed && !silent) appStore.showError((error as { message?: string })?.message || t('errors.networkError'))
+      return false
+    } finally {
+      loadingBackups.value = false; fetchingBackups.value = false; listRequest = null
+    }
+  })()
+  return listRequest
 }
 
 async function createBackup() {
+  if (creatingBackup.value) return
+  pendingCreate = true
+  operationVersion++
   creatingBackup.value = true
   try {
     const record = await backupStepUp.run(() => adminAPI.backup.createBackup({ expire_days: manualExpireDays.value }))
@@ -822,6 +859,9 @@ async function createBackup() {
       appStore.showError(error?.message || t('errors.networkError'))
     }
     creatingBackup.value = false
+  } finally {
+    pendingCreate = false
+    operationVersion++
   }
 }
 
@@ -855,9 +895,12 @@ function closeDownloadParts() {
 }
 
 async function restoreBackup(id: string) {
+  if (restoringId.value) return
   if (!window.confirm(t('admin.backup.actions.restoreConfirm'))) return
   const password = window.prompt(t('admin.backup.actions.restorePasswordPrompt'))
   if (!password) return
+  pendingRestore = true
+  operationVersion++
   restoringId.value = id
   try {
     const record = await backupStepUp.run(() => adminAPI.backup.restoreBackup(id, password))
@@ -873,6 +916,9 @@ async function restoreBackup(id: string) {
     } else {
       appStore.showError(error?.message || t('errors.networkError'))
     }
+  } finally {
+    pendingRestore = false
+    operationVersion++
   }
 }
 
@@ -881,6 +927,7 @@ async function removeBackup(id: string) {
   if (!window.confirm(t(archived ? 'admin.backup.archive.deleteConfirm' : 'admin.backup.actions.deleteConfirm'))) return
   try {
     await adminAPI.backup.deleteBackup(id, archived)
+    operationVersion++
     appStore.showSuccess(t('admin.backup.actions.deleted'))
     await loadBackups()
   } catch (error) {

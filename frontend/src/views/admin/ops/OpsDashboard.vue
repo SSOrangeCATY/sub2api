@@ -406,6 +406,7 @@ const { pause: pauseCountdown, resume: resumeCountdown } = useIntervalFn(
   () => {
     if (!autoRefreshEnabled.value) return
     if (!opsEnabled.value) return
+    if (document.hidden) return
     if (loading.value) return
 
     if (autoRefreshCountdown.value <= 0) {

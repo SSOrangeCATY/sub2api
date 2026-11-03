@@ -1,5 +1,5 @@
 import { flushPromises, mount } from '@vue/test-utils'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ref } from 'vue'
 import WelfareView from '../WelfareView.vue'
 const api = vi.hoisted(() => ({ binding: vi.fn(), center: vi.fn(), action: vi.fn() }))
@@ -20,6 +20,99 @@ describe('Website welfare center', () => {
     api.center.mockResolvedValue({ snapshot: structuredClone(snapshot) })
     api.action.mockResolvedValue({ message: 'success' })
     auth.refreshUser.mockResolvedValue({})
+  })
+  afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks() })
+  it('does not reload on quick focus or visibility returns', async () => {
+    vi.useFakeTimers(); vi.setSystemTime(new Date('2026-11-03T10:00:00Z'))
+    const wrapper = render(); await flushPromises()
+    for (let i = 0; i < 3; i++) {
+      window.dispatchEvent(new Event('focus'))
+      document.dispatchEvent(new Event('visibilitychange'))
+    }
+    await flushPromises()
+    expect(api.binding).toHaveBeenCalledOnce(); expect(api.center).toHaveBeenCalledOnce()
+    wrapper.unmount()
+  })
+  it('syncs stale points once in the background without replacing the form or receipt', async () => {
+    vi.useFakeTimers(); vi.setSystemTime(new Date('2026-11-03T10:00:00Z'))
+    const wrapper = render(); await flushPromises()
+    const input = wrapper.get('#welfare-code').element
+    await wrapper.get('#welfare-code').setValue('DRAFT')
+    let finish!: (value: object) => void
+    api.center.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+    vi.setSystemTime(new Date('2026-11-03T10:02:00Z'))
+    window.dispatchEvent(new Event('focus')); await flushPromises()
+    document.dispatchEvent(new Event('visibilitychange')); window.dispatchEvent(new Event('focus'))
+    await flushPromises()
+    expect(api.center).toHaveBeenCalledTimes(2)
+    expect(wrapper.get('#welfare-code').element).toBe(input)
+    expect((input as HTMLInputElement).value).toBe('DRAFT')
+    expect(wrapper.text()).not.toContain('qqWelfare.loading')
+    expect(wrapper.get('.welfare-account strong').text()).toContain('2')
+    finish({ snapshot: { ...snapshot, points: 3, checked_in: true } }); await flushPromises()
+    expect(wrapper.get('.welfare-account strong').text()).toContain('3')
+    expect(wrapper.get('#welfare-code').element).toBe(input)
+    wrapper.unmount()
+  })
+  it('preserves the verification card when returning to an unverified account', async () => {
+    api.binding.mockResolvedValue({ verified: false, ready: true })
+    const wrapper = render(); await flushPromises()
+    const card = wrapper.get('[data-verify]').element
+    window.dispatchEvent(new Event('focus')); await flushPromises()
+    expect(wrapper.get('[data-verify]').element).toBe(card)
+    expect(api.binding).toHaveBeenCalledOnce()
+    wrapper.unmount()
+  })
+  it('keeps content on manual refresh and on a failed background sync', async () => {
+    vi.useFakeTimers(); vi.setSystemTime(new Date('2026-11-03T10:00:00Z'))
+    const wrapper = render(); await flushPromises()
+    let fail!: (error: Error) => void
+    api.center.mockImplementationOnce(() => new Promise((_, reject) => { fail = reject }))
+    const input = wrapper.get('#welfare-code').element
+    await wrapper.findAll('button').find(b => b.text() === 'qqWelfare.refresh')!.trigger('click')
+    await flushPromises()
+    expect(wrapper.get('#welfare-code').element).toBe(input)
+    fail(new Error('network unavailable')); await flushPromises()
+    expect(wrapper.get('#welfare-code').element).toBe(input)
+    expect(wrapper.text()).toContain('network unavailable')
+    vi.setSystemTime(new Date('2026-11-03T10:02:00Z'))
+    api.center.mockRejectedValueOnce(new Error('background failed'))
+    window.dispatchEvent(new Event('focus')); await flushPromises()
+    expect(wrapper.get('#welfare-code').element).toBe(input)
+    expect(wrapper.text()).not.toContain('background failed')
+    wrapper.unmount()
+  })
+  it('retries a failed Beijing day rollover without hiding the existing content', async () => {
+    vi.useFakeTimers(); vi.setSystemTime(new Date('2026-11-03T15:59:50Z'))
+    const wrapper = render(); await flushPromises()
+    const input = wrapper.get('#welfare-code').element
+    api.center.mockRejectedValueOnce(new Error('offline'))
+    await vi.advanceTimersByTimeAsync(30000); await flushPromises()
+    expect(api.center).toHaveBeenCalledTimes(2)
+    expect(wrapper.get('#welfare-code').element).toBe(input)
+    api.center.mockResolvedValue({ snapshot: { ...snapshot, checked_in: false } })
+    await vi.advanceTimersByTimeAsync(30000); await flushPromises()
+    expect(api.center).toHaveBeenCalledTimes(3)
+    await vi.advanceTimersByTimeAsync(30000)
+    expect(api.center).toHaveBeenCalledTimes(3)
+    wrapper.unmount()
+  })
+  it('defers background sync while hidden or while exchange confirmation is open', async () => {
+    vi.useFakeTimers(); vi.setSystemTime(new Date('2026-11-03T10:00:00Z'))
+    const wrapper = render(); await flushPromises()
+    vi.setSystemTime(new Date('2026-11-03T10:02:00Z'))
+    vi.spyOn(document, 'hidden', 'get').mockReturnValue(true)
+    window.dispatchEvent(new Event('focus')); await flushPromises()
+    expect(api.center).toHaveBeenCalledOnce()
+    vi.spyOn(document, 'hidden', 'get').mockReturnValue(false)
+    await wrapper.findAll('button').find(b => b.text() === 'qqWelfare.exchange')!.trigger('click')
+    window.dispatchEvent(new Event('focus')); await flushPromises()
+    expect(wrapper.find('[data-confirm]').exists()).toBe(true)
+    expect(api.center).toHaveBeenCalledOnce()
+    wrapper.unmount()
+    window.dispatchEvent(new Event('focus')); document.dispatchEvent(new Event('visibilitychange'))
+    await vi.advanceTimersByTimeAsync(60000)
+    expect(api.center).toHaveBeenCalledOnce()
   })
   it('gates all rewards until first group verification, then unlocks automatically', async () => {
     api.binding.mockResolvedValueOnce({ verified: false, ready: true })
