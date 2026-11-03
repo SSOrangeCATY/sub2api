@@ -12,6 +12,8 @@ const {
   listBackups,
   getDownloadURL,
   getBackup,
+  createBackup,
+  restoreBackup,
 } = vi.hoisted(() => ({
   getS3Config: vi.fn(),
   getImageStorageConfig: vi.fn(),
@@ -21,6 +23,8 @@ const {
   listBackups: vi.fn(),
   getDownloadURL: vi.fn(),
   getBackup: vi.fn(),
+  createBackup: vi.fn(),
+  restoreBackup: vi.fn(),
 }))
 
 vi.mock('@/api', () => ({
@@ -34,12 +38,12 @@ vi.mock('@/api', () => ({
       testImageStorageConnection: vi.fn(),
       getSchedule,
       updateSchedule,
-      createBackup: vi.fn(),
+      createBackup,
       listBackups,
       getBackup,
       deleteBackup,
       getDownloadURL,
-      restoreBackup: vi.fn(),
+      restoreBackup,
     },
   },
 }))
@@ -103,6 +107,8 @@ describe('admin BackupView', () => {
     listBackups.mockResolvedValue({ items: [] })
     getDownloadURL.mockReset()
     getBackup.mockReset()
+    createBackup.mockReset()
+    restoreBackup.mockReset()
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
   })
 
@@ -162,6 +168,59 @@ describe('admin BackupView', () => {
     expect(wrapper.findAll('button').find(b => b.text() === 'admin.backup.operations.createBackup')!.attributes('disabled')).toBeUndefined()
     expect(vi.getTimerCount()).toBe(0)
     expect(getBackup).not.toHaveBeenCalled()
+  })
+
+  it.each(['backup', 'restore'])('keeps pending %s commands busy across a return refresh', async (operation) => {
+    vi.useFakeTimers()
+    vi.spyOn(document, 'hidden', 'get').mockReturnValue(false)
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    vi.spyOn(window, 'prompt').mockReturnValue('synthetic-password')
+    listBackups.mockResolvedValue({ items: [baseRecord('existing')] })
+    let finish!: (value: object) => void
+    const command = operation === 'backup' ? createBackup : restoreBackup
+    command.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+    const wrapper = mountBackupView(); await flushPromises()
+    const action = () => wrapper.findAll('button').find(b => b.text() === (operation === 'backup'
+      ? 'admin.backup.operations.createBackup' : 'admin.backup.actions.restore'))!
+    const button = action()
+    await button.trigger('click'); await flushPromises()
+    vi.spyOn(document, 'hidden', 'get').mockReturnValue(true)
+    document.dispatchEvent(new Event('visibilitychange'))
+    vi.spyOn(document, 'hidden', 'get').mockReturnValue(false)
+    document.dispatchEvent(new Event('visibilitychange')); await flushPromises()
+    expect(listBackups).toHaveBeenCalledTimes(2)
+    expect(button.attributes('disabled')).toBeDefined()
+    let finishList!: (value: object) => void
+    listBackups.mockImplementationOnce(() => new Promise(resolve => { finishList = resolve }))
+    document.dispatchEvent(new Event('visibilitychange')); await flushPromises()
+    finish({ ...baseRecord('existing'), status: operation === 'backup' ? 'running' : 'completed',
+      restore_status: operation === 'restore' ? 'running' : undefined })
+    await flushPromises()
+    finishList({ items: [baseRecord('existing')] }); await flushPromises()
+    expect(button.attributes('disabled')).toBeDefined()
+    expect(command).toHaveBeenCalledOnce()
+    expect(vi.getTimerCount()).toBe(1)
+    if (operation === 'backup') expect(wrapper.get('tbody').text()).toContain('admin.backup.status.running')
+  })
+
+  it('fetches a fresh list after deletion overlapping a delayed return refresh', async () => {
+    vi.useFakeTimers(); vi.setSystemTime(new Date('2026-11-03T10:00:00Z'))
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    listBackups.mockResolvedValue({ items: [baseRecord('deleted')] })
+    const wrapper = mountBackupView(); await flushPromises()
+    let finish!: (value: object) => void
+    listBackups.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+    listBackups.mockResolvedValue({ items: [] })
+    vi.setSystemTime(new Date('2026-11-03T10:02:00Z'))
+    vi.spyOn(document, 'hidden', 'get').mockReturnValue(false)
+    document.dispatchEvent(new Event('visibilitychange')); await flushPromises()
+    await wrapper.findAll('button').find(b => b.text() === 'common.delete')!.trigger('click')
+    await flushPromises()
+    expect(deleteBackup).toHaveBeenCalledWith('deleted', false)
+    finish({ items: [baseRecord('deleted')] }); await flushPromises()
+    expect(listBackups).toHaveBeenCalledTimes(3)
+    expect(wrapper.get('tbody').text()).not.toContain('deleted.sql.gz')
+    expect(wrapper.findAll('button').some(b => b.text() === 'common.delete')).toBe(false)
   })
 
   it.each(['backup', 'restore'])('does not resume %s polling after navigation during initial loading', async (operation) => {

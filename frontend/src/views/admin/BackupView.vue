@@ -532,6 +532,9 @@ let listRequest: Promise<void> | null = null
 let lastBackupsLoadedAt = 0
 const creatingBackup = ref(false)
 const restoringId = ref('')
+let pendingCreate = false
+let pendingRestore = false
+let operationVersion = 0
 const manualExpireDays = ref(14)
 const downloadParts = ref<BackupDownloadPart[]>([])
 const downloadPartsModalOpen = ref(false)
@@ -572,7 +575,7 @@ function startPolling(backupId: string) {
         } else {
           appStore.showError(record.error_message || t('admin.backup.operations.backupFailed'))
         }
-        await loadBackups()
+        await loadBackups(false, true)
       }
     } catch {
       // 轮询失败时不中断
@@ -610,7 +613,7 @@ function startRestorePolling(backupId: string) {
         } else {
           appStore.showError(record.restore_error || t('admin.backup.operations.restoreFailed'))
         }
-        await loadBackups()
+        await loadBackups(false, true)
       }
     } catch {
       // 轮询失败时不中断
@@ -632,15 +635,16 @@ function handleVisibilityChange() {
   } else {
     // Reconcile active work immediately; ordinary short tab switches need no request.
     if (!creatingBackup.value && !restoringId.value && Date.now() - lastBackupsLoadedAt < 60_000) return
+    const version = operationVersion
     void loadBackups(true).then(() => {
-      if (disposed || document.hidden) return
+      if (disposed || document.hidden || version !== operationVersion) return
       const running = backups.value.find(r => r.status === 'running')
-      creatingBackup.value = !!running
+      if (!pendingCreate) creatingBackup.value = !!running
       if (running) {
         startPolling(running.id)
       }
       const restoring = backups.value.find(r => r.restore_status === 'running')
-      restoringId.value = restoring?.id || ''
+      if (!pendingRestore) restoringId.value = restoring?.id || ''
       if (restoring) {
         startRestorePolling(restoring.id)
       }
@@ -795,15 +799,21 @@ async function saveSchedule() {
   }
 }
 
-async function loadBackups(silent = false): Promise<void> {
+async function loadBackups(silent = false, fresh = false): Promise<void> {
   if (disposed) return
-  if (listRequest) return listRequest
+  if (listRequest) {
+    if (!fresh) return listRequest
+    // A mutation needs a list requested after it completed, not an older return refresh.
+    await listRequest
+    return loadBackups(silent, true)
+  }
+  const version = operationVersion
   fetchingBackups.value = true
   if (!silent) loadingBackups.value = true
   listRequest = (async () => {
     try {
       const result = await adminAPI.backup.listBackups()
-      if (disposed) return
+      if (disposed || version !== operationVersion) return
       backups.value = result.items || []
       lastBackupsLoadedAt = Date.now()
     } catch (error) {
@@ -816,6 +826,9 @@ async function loadBackups(silent = false): Promise<void> {
 }
 
 async function createBackup() {
+  if (creatingBackup.value) return
+  pendingCreate = true
+  operationVersion++
   creatingBackup.value = true
   try {
     const record = await backupStepUp.run(() => adminAPI.backup.createBackup({ expire_days: manualExpireDays.value }))
@@ -837,6 +850,9 @@ async function createBackup() {
       appStore.showError(error?.message || t('errors.networkError'))
     }
     creatingBackup.value = false
+  } finally {
+    pendingCreate = false
+    operationVersion++
   }
 }
 
@@ -870,9 +886,12 @@ function closeDownloadParts() {
 }
 
 async function restoreBackup(id: string) {
+  if (restoringId.value) return
   if (!window.confirm(t('admin.backup.actions.restoreConfirm'))) return
   const password = window.prompt(t('admin.backup.actions.restorePasswordPrompt'))
   if (!password) return
+  pendingRestore = true
+  operationVersion++
   restoringId.value = id
   try {
     const record = await backupStepUp.run(() => adminAPI.backup.restoreBackup(id, password))
@@ -888,6 +907,9 @@ async function restoreBackup(id: string) {
     } else {
       appStore.showError(error?.message || t('errors.networkError'))
     }
+  } finally {
+    pendingRestore = false
+    operationVersion++
   }
 }
 
@@ -896,8 +918,9 @@ async function removeBackup(id: string) {
   if (!window.confirm(t(archived ? 'admin.backup.archive.deleteConfirm' : 'admin.backup.actions.deleteConfirm'))) return
   try {
     await adminAPI.backup.deleteBackup(id, archived)
+    operationVersion++
     appStore.showSuccess(t('admin.backup.actions.deleted'))
-    await loadBackups()
+    await loadBackups(false, true)
   } catch (error) {
     appStore.showError((error as { message?: string })?.message || t('errors.networkError'))
   }
