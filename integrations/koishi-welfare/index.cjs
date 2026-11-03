@@ -50,9 +50,9 @@ exports.apply = ctx => {
   const renderer = new WelfareRenderer();
   const logger = ctx.logger('welfare-center');
   const commands = [
-    ['福利签到', 'checkin', '每日签到获得 1 积分'],
-    ['福利积分', 'points', '查看个人积分与签到状态'],
-    ['福利认证 <code:string>', 'verify', '使用网站生成的认证码绑定账号'],
+    ['签到', 'checkin', '每日签到获得 1 积分'],
+    ['积分', 'points', '查看个人积分与签到状态'],
+    ['认证 <code:string>', 'verify', '使用网站生成的认证码绑定账号'],
     ['福利连接 <code:string>', 'bind-group', '管理员连接认证群'],
   ];
   for (const [name, action, description] of commands) {
@@ -66,7 +66,7 @@ exports.apply = ctx => {
         return result.message || '福利服务暂不可用，请稍后重试。';
       } catch {
         logger.warn('Welfare request or image generation unavailable');
-        return '福利服务暂不可用，请稍后查询「福利积分」。';
+        return '福利服务暂不可用，请稍后查询「积分」。';
       }
     });
   }
