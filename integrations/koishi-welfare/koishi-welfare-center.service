@@ -1,0 +1,19 @@
+[Unit]
+Description=Private QQ welfare transport for Koishi
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/koishi/welfare-center/bridge.py
+Restart=on-failure
+RestartSec=5
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/koishi/data/welfare-center
+
+[Install]
+WantedBy=multi-user.target

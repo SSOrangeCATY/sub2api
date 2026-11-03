@@ -1,0 +1,59 @@
+/* Standard / neutral / tight / plain / compact / calm. Welfare data supplies the visual hierarchy. */
+.welfare-page { max-width: 1280px; margin: 0 auto; color: var(--ef-ink); }
+[data-page='/admin/qq-welfare'] .pt-workspace { background: var(--ef-paper); }
+.welfare-page h1 { font-size: clamp(28px, 3vw, 42px); font-weight: 800; margin: 4px 0 9px; }
+.welfare-page h2, .welfare-panel h2 { font-size: 22px; font-weight: 700; margin: 3px 0; }
+.welfare-page h3 { font-weight: 700; font-size: 18px; }
+.welfare-eyebrow { font: 600 12px var(--ef-font-ui); font-stretch: 125%; letter-spacing: .14em; color: var(--ef-ink-2); }
+.welfare-page p, .welfare-panel p { font-size: 14px; line-height: 1.8; margin: 10px 0; color: var(--ef-ink-2); }
+.welfare-panel { padding: 22px; margin: 20px 0; background: var(--ef-panel); border-block: 1px solid var(--ef-rule); }
+.welfare-section-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; margin-bottom: 12px; }
+.welfare-tag { border: 1px solid var(--ef-ink); padding: 4px 9px; font-size: 13px; white-space: nowrap; }
+.welfare-tag.is-current { background: var(--ef-signal); color: var(--ef-on-signal); border-color: transparent; }
+.welfare-metrics { display: grid; grid-template-columns: 1.1fr 1fr 1fr; border-block: 2px solid var(--ef-ink); margin: 24px 0; }
+.welfare-metrics>div { padding: 20px; border-inline-start: 1px solid var(--ef-rule); }
+.welfare-metrics>div:first-child { border-inline-start: 0; }
+.welfare-metrics label { display: block; color: var(--ef-ink-2); font-size: 13px; }
+.welfare-metrics strong { display: block; margin-top: 9px; font: 650 38px var(--ef-font-ui); font-variant-numeric: tabular-nums; }
+.welfare-metrics strong.is-time { font-size: 20px; }
+.welfare-fields { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 18px; margin: 18px 0; }
+.welfare-fields label { display: flex; flex-direction: column; gap: 8px; font-size: 13px; min-width: 0; }
+.welfare-fields input:not([type='checkbox']) { width: 100%; min-width: 0; min-height: 44px; border: 1px solid var(--ef-rule); padding: 10px; background: var(--ef-paper); color: var(--ef-ink); border-radius: 0; }
+.welfare-fields .welfare-check { flex-direction: row; align-items: center; min-height: 44px; }
+.welfare-check input { accent-color: var(--ef-ink); width: 18px; height: 18px; }
+.welfare-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.welfare-page .ef-btn, .welfare-panel .ef-btn { min-height: 44px; margin-right: 8px; }
+.welfare-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 26px 0 16px; border-bottom: 1px solid var(--ef-rule); padding-bottom: 12px; }
+.welfare-tabs button[aria-selected='true'] { background: var(--ef-signal); color: var(--ef-on-signal); }
+.welfare-notice { padding: 12px 16px; border-left: 5px solid var(--ef-ink); background: var(--ef-signal); color: var(--ef-on-signal) !important; }
+.welfare-code-box { padding: 18px; border: 1px solid var(--ef-rule); margin: 14px 0; overflow-wrap: anywhere; }
+.welfare-code-box code { display: block; font-family: monospace; font-size: 17px; padding: 10px 0; user-select: all; }
+.welfare-table-scroll { overflow-x: auto; }
+.welfare-table { width: 100%; min-width: 700px; border-collapse: collapse; font-size: 14px; text-align: left; }
+.welfare-table th { padding: 12px 10px; border-bottom: 2px solid var(--ef-ink); color: var(--ef-ink-2); font-size: 12px; white-space: nowrap; }
+.welfare-table td { padding: 15px 10px; border-bottom: 1px solid var(--ef-rule); overflow-wrap: anywhere; max-width: 260px; font-variant-numeric: tabular-nums; }
+.welfare-table td:nth-child(2) { min-width: 150px; }
+.welfare-table code { font-size: 13px; }
+.welfare-empty { padding: 36px 0; text-align: center; }
+@media(max-width: 768px) { .welfare-fields { grid-template-columns: 1fr 1fr; } .welfare-metrics { grid-template-columns: 1fr 1fr; } .welfare-metrics>div:last-child { grid-column: 1/-1; border-inline-start: 0; border-top: 1px solid var(--ef-rule); } }
+@media(max-width: 480px) { .welfare-fields { grid-template-columns: 1fr; } .welfare-panel { padding: 16px; } .welfare-metrics>div { padding: 15px; } }
+@media(prefers-reduced-motion:reduce) { .welfare-page *, .welfare-panel * { animation: none !important; transition: none !important; } }
+
+/* Variant: yellow / neutral / tight / plain / compact / calm.
+   Main visual: actual points and daily check-in. Page: console. */
+.welfare-account { display:flex; align-items:center; justify-content:space-between; gap:24px; border-block:2px solid var(--ef-ink); padding:24px 0; margin:24px 0; }
+.welfare-account strong { display:block; font:700 76px/1.1 var(--ef-font-ui); font-variant-numeric:tabular-nums; }
+.welfare-account strong small { font-size:18px; font-weight:500; margin-left:12px; }
+.welfare-reward-row { display:grid; grid-template-columns:36px minmax(0,1fr) auto auto; align-items:center; gap:18px; padding:14px 0; border-top:1px solid var(--ef-rule); }
+.welfare-reward-row p, .welfare-order-row p { margin:4px 0 0; }
+.welfare-row-id { font:600 18px var(--ef-font-ui); color:var(--ef-ink-2); }
+.welfare-reward-row strong { font:650 20px var(--ef-font-ui); }
+.welfare-claim-form { display:flex; gap:12px; margin:20px 0 8px; }
+.welfare-claim-form input { flex:1; min-width:0; min-height:44px; border:1px solid var(--ef-rule); padding:10px 12px; border-radius:0; background:var(--ef-paper); color:var(--ef-ink); }
+.welfare-claim-form input::placeholder { color:var(--ef-ink-2); opacity:1; }
+.welfare-order-row { display:flex; justify-content:space-between; gap:20px; padding:16px 0; border-bottom:1px solid var(--ef-rule); }
+.welfare-order-row>div { min-width:0; }
+.welfare-order-row>div:last-child { text-align:right; flex-shrink:0; }
+.welfare-order-row code { overflow-wrap:anywhere; font-size:12px; }
+.welfare-center h3 { overflow-wrap:anywhere; }
+@media(max-width:600px) { .welfare-account { flex-direction:column; align-items:flex-start; gap:16px; } .welfare-reward-row { grid-template-columns:28px minmax(0,1fr) auto; gap:10px; } .welfare-reward-row>strong { grid-column:2; } .welfare-reward-row>.ef-btn { grid-column:3; grid-row:1/3; } }

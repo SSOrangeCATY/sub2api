@@ -241,6 +241,12 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/welfare',
+    name: 'Welfare',
+    component: () => import('@/views/user/WelfareView.vue'),
+    meta: { requiresAuth: true, requiresAdmin: false, title: 'Welfare Center', titleKey: 'qqWelfare.centerTitle' }
+  },
+  {
     path: '/redeem',
     name: 'Redeem',
     component: () => import('@/views/user/RedeemView.vue'),
@@ -583,6 +589,12 @@ const routes: RouteRecordRaw[] = [
       titleKey: 'admin.proxies.title',
       descriptionKey: 'admin.proxies.description'
     }
+  },
+  {
+    path: '/admin/qq-welfare',
+    name: 'AdminQQWelfare',
+    component: () => import('@/views/admin/QQWelfareView.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true, title: 'QQ Bot', titleKey: 'qqWelfare.adminTitle' }
   },
   {
     path: '/admin/redeem',
@@ -972,9 +984,11 @@ router.beforeEach(async (to, _from, next) => {
   // 简易模式下限制访问某些页面
   if (authStore.isSimpleMode) {
     const restrictedPaths = [
+      '/admin/qq-welfare',
       '/admin/subscriptions',
       '/admin/redeem',
       '/subscriptions',
+      '/welfare',
       '/redeem'
     ]
 

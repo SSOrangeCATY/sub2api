@@ -17,6 +17,9 @@ func RegisterUserRoutes(
 	settingService *service.SettingService,
 	panelRateLimiter *middleware.PanelRateLimiter,
 ) {
+	if h.QQWelfare != nil {
+		v1.POST("/qq-welfare/bot", h.QQWelfare.Bot)
+	}
 	authenticated := v1.Group("")
 	authenticated.Use(gin.HandlerFunc(jwtAuth))
 	authenticated.Use(middleware.BackendModeUserGuard(settingService))
@@ -28,6 +31,12 @@ func RegisterUserRoutes(
 		// 用户接口
 		user := authenticated.Group("/user")
 		{
+			if h.QQWelfare != nil {
+				user.GET("/qq-welfare", h.QQWelfare.Binding)
+				user.POST("/qq-welfare/code", h.QQWelfare.BindingCode)
+				user.GET("/qq-welfare/center", h.QQWelfare.Center)
+				user.POST("/qq-welfare/actions", h.QQWelfare.UserAction)
+			}
 			user.GET("/profile", h.User.GetProfile)
 			if h.MCPOAuth != nil {
 				user.GET("/mcp/config", h.MCPOAuth.ConnectionConfig)

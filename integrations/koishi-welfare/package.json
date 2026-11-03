@@ -1,0 +1,7 @@
+{
+  "name": "koishi-plugin-welfare-center",
+  "version": "1.0.0",
+  "main": "index.cjs",
+  "private": true,
+  "peerDependencies": { "koishi": "^4.18.0" }
+}
