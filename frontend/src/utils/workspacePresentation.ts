@@ -2,6 +2,7 @@
 export type WorkspaceSurface = 'records' | 'settings' | 'task' | 'console' | 'monitor' | 'embedded'
 
 export function workspacePresentation(path: string) {
+  if (path === '/admin/qq-welfare') return { surface: 'console' as const, heading: false }
   if (path === '/channel-status' || path === '/monitor' || path === '/admin/channels/monitor') {
     return { surface: 'monitor' as const, heading: false }
   }

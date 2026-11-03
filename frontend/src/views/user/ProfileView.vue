@@ -33,6 +33,7 @@
         </div>
       </div>
 
+      <ProfileQQWelfareCard class="pt-profile-qq" />
       <ProfilePasswordForm class="pt-profile-password" />
 
       <ProfileBalanceNotifyCard
@@ -59,6 +60,7 @@ import AppLayout from '@/components/layout/AppLayout.vue'
 import ProfileBalanceNotifyCard from '@/components/user/profile/ProfileBalanceNotifyCard.vue'
 import ProfileInfoCard from '@/components/user/profile/ProfileInfoCard.vue'
 import ProfilePasswordForm from '@/components/user/profile/ProfilePasswordForm.vue'
+import ProfileQQWelfareCard from '@/components/user/profile/ProfileQQWelfareCard.vue'
 import ProfileTotpCard from '@/components/user/profile/ProfileTotpCard.vue'
 import ProfilePasskeyCard from '@/components/user/profile/ProfilePasskeyCard.vue'
 import { isWeChatWebOAuthEnabled } from '@/api/auth'
