@@ -17,7 +17,7 @@ import (
 )
 
 var (
-	ErrWelfareUnverified     = infraerrors.Forbidden("WELFARE_UNVERIFIED", "请先在网站个人资料中生成认证码，再在指定 QQ 群 @机器人 发送：福利认证 认证码")
+	ErrWelfareUnverified     = infraerrors.Forbidden("WELFARE_UNVERIFIED", "请先在网站个人资料中生成认证码，再在指定 QQ 群 @机器人 发送：认证 认证码")
 	ErrWelfareGroup          = infraerrors.Forbidden("WELFARE_GROUP_REQUIRED", "福利中心仅限已配置的 QQ 群，请在指定群内 @机器人 使用。")
 	ErrWelfareUnavailable    = infraerrors.Conflict("WELFARE_UNAVAILABLE", "福利中心未启用或认证群尚未配置。")
 	ErrWelfareAlreadyClaimed = infraerrors.Conflict("WELFARE_ALREADY_CLAIMED", "该网站账号已领取过此兑换码。")
@@ -250,12 +250,12 @@ func (s *QQWelfareService) event(ctx context.Context, e QQWelfareEvent) (*QQWelf
 		if err := s.repo.BindGroup(ctx, WelfareHash(e.Code), e.GroupID); err != nil {
 			return nil, err
 		}
-		return &QQWelfareResult{Message: "认证群连接成功。群成员现在可以发送：福利认证 认证码"}, nil
+		return &QQWelfareResult{Message: "认证群连接成功。群成员现在可以发送：认证 认证码"}, nil
 	case "verify":
 		if err := s.repo.Verify(ctx, e, WelfareHash(e.Code)); err != nil {
 			return nil, err
 		}
-		return &QQWelfareResult{Message: "Q 群认证成功，长期有效。可在网站福利中心签到和兑换，群内发送「福利签到」或「福利积分」。"}, nil
+		return &QQWelfareResult{Message: "Q 群认证成功，长期有效。可在网站福利中心签到和兑换，群内发送「签到」或「积分」。"}, nil
 	case "overview", "points":
 		snap, err := s.repo.Snapshot(ctx, e)
 		if err != nil {
