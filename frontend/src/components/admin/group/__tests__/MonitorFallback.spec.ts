@@ -10,6 +10,20 @@ const group = (id: number, extra = {}) => ({ id, name: 'G' + id, status: 'active
 beforeEach(() => { getAll.mockResolvedValue([group(1), group(2), group(3, { platform: 'gemini' }), group(4, { group_type: 'fallback' }), group(5, { status: 'inactive' })]); get.mockResolvedValue({ data: [] }) })
 afterEach(() => { vi.clearAllMocks(); vi.useRealTimers() })
 describe('Monitored fallback fields', () => {
+ it('loads candidates only when fallback is selected and caches an empty result', async () => {
+  getAll.mockResolvedValue([])
+  const wrapper = mount(Fields, { props: { groupType: 'business', groupIds: [], platform: 'openai' } })
+  await flushPromises()
+  expect(getAll).not.toHaveBeenCalled()
+  await wrapper.setProps({ groupType: 'fallback' })
+  await flushPromises()
+  expect(getAll).toHaveBeenCalledOnce()
+  await wrapper.setProps({ groupType: 'business' })
+  await wrapper.setProps({ groupType: 'fallback' })
+  await flushPromises()
+  expect(getAll).toHaveBeenCalledOnce()
+  wrapper.unmount()
+ })
  it('preserves hydrated chains when opening a different platform editor', async () => {
   const wrapper = mount(Fields, { props: { groupType: 'fallback', groupIds: [1], platform: 'openai' } })
   await flushPromises()

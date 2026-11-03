@@ -424,7 +424,7 @@ describe('CreateAccountModal OpenAI long-context billing', () => {
     expect(createAccountMock.mock.calls[0]?.[0]?.upstream_billing_probe_enabled).toBe(true)
   })
 
-  it('waits for the initial upstream billing probe before refreshing the account list', async () => {
+  it('finishes account creation while the initial billing probe is still pending', async () => {
     let resolveProbe: (() => void) | undefined
     probeUpstreamBillingMock.mockImplementationOnce(
       () => new Promise<void>((resolve) => {
@@ -435,12 +435,44 @@ describe('CreateAccountModal OpenAI long-context billing', () => {
     const wrapper = await submitApiKeyAccount('openai')
 
     expect(probeUpstreamBillingMock).toHaveBeenCalledWith(42)
-    expect(wrapper.emitted('created')).toBeUndefined()
+    expect(wrapper.emitted('created')).toHaveLength(1)
+    expect(wrapper.emitted('close')).toHaveLength(1)
 
     resolveProbe?.()
     await flushPromises()
 
     expect(wrapper.emitted('created')).toHaveLength(1)
+  })
+
+  it('closes before model sync finishes and publishes a separate enrichment event', async () => {
+    let finishSync!: (value: { models: string[] }) => void
+    syncUpstreamModelsMock.mockReturnValueOnce(new Promise(resolve => { finishSync = resolve }))
+    const wrapper = mountModal()
+    await selectButtonByText(wrapper, 'OpenAI')
+    await selectButtonByText(wrapper, 'API Key')
+    await wrapper.get('form#create-account-form input[type="text"]').setValue('Slow sync account')
+    await wrapper.get('form#create-account-form input[type="password"]').setValue('test-api-key')
+    await wrapper.get('[data-testid="model-whitelist-selector"]').trigger('click')
+    await wrapper.get('form#create-account-form').trigger('submit.prevent')
+    await flushPromises()
+    expect(wrapper.emitted('created')).toHaveLength(1)
+    expect(wrapper.emitted('close')).toHaveLength(1)
+    expect(wrapper.emitted('enriched')).toBeUndefined()
+    finishSync({ models: ['public-glm'] })
+    await flushPromises()
+    expect(wrapper.emitted('enriched')).toEqual([[42]])
+    expect(wrapper.emitted('created')).toHaveLength(1)
+    wrapper.unmount()
+  })
+
+  it('warns about a background billing probe failure without failing creation', async () => {
+    probeUpstreamBillingMock.mockRejectedValueOnce(new Error('upstream unavailable'))
+    const wrapper = await submitApiKeyAccount('openai')
+
+    expect(wrapper.emitted('created')).toHaveLength(1)
+    expect(wrapper.emitted('close')).toHaveLength(1)
+    expect(showWarningMock).toHaveBeenCalledWith('admin.accounts.upstreamBilling.probeFailed')
+    wrapper.unmount()
   })
 
   it('sends an explicit disabled state when the create toggle is turned off', async () => {

@@ -85,6 +85,7 @@ capacity targets.
 limit_conn_zone $binary_remote_addr zone=sub2api_conn:20m;
 limit_req_zone  $binary_remote_addr zone=sub2api_auth:20m rate=5r/s;
 limit_req_zone  $binary_remote_addr zone=sub2api_api:40m rate=30r/s;
+limit_req_zone  $binary_remote_addr zone=sub2api_assets:20m rate=120r/s;
 map $http_upgrade $connection_upgrade {
     default upgrade;
     ''      close;
@@ -107,6 +108,18 @@ server {
     location ~ ^/(v1/)?(embeddings|alpha/search)$ {
         client_max_body_size 32m;
         limit_req zone=sub2api_api burst=60 nodelay;
+        proxy_pass http://127.0.0.1:8080;
+    }
+
+    # Hashed Vite chunks load in parallel during navigation. Keep them out of
+    # the low-rate API bucket so a page load cannot turn into a burst of 429s.
+    location ^~ /assets/ {
+        limit_req zone=sub2api_assets burst=240 nodelay;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
         proxy_pass http://127.0.0.1:8080;
     }
 

@@ -46,7 +46,7 @@
 
         <!-- Tab: Security — Admin API Key -->
         <div v-show="activeTab === 'security'" class="space-y-6">
-          <AdminAccessKeysSettings />
+          <AdminAccessKeysSettings v-if="loadedSettingsTabs.has('security')" />
           <!-- 已有全权密钥只提供轮换和删除入口。 -->
           <details v-if="adminApiKeyExists" class="card">
             <summary class="cursor-pointer px-6 py-4 font-medium">{{ t("adminAccessKeys.legacy") }}</summary>
@@ -162,7 +162,7 @@
         <!-- /Tab: Security — Admin API Key -->
 
         <!-- Tab: Gateway -->
-        <div v-show="activeTab === 'gateway'" class="space-y-6">
+        <div v-if="activeTab === 'gateway'" class="space-y-6">
           <!-- Overload Cooldown (529) Settings -->
           <div class="card">
             <div
@@ -1382,7 +1382,7 @@
         <!-- /Tab: Gateway -->
 
         <!-- Tab: Security — Registration, Turnstile, LinuxDo -->
-        <div v-show="activeTab === 'security'" class="space-y-6">
+        <div v-if="activeTab === 'security'" class="space-y-6">
           <!-- Registration Settings -->
           <div class="card">
             <div
@@ -3783,7 +3783,7 @@
         <!-- /Tab: Security — Registration, Turnstile, LinuxDo, OIDC -->
 
         <!-- Tab: Users -->
-        <div v-show="activeTab === 'users'" class="space-y-6">
+        <div v-if="activeTab === 'users'" class="space-y-6">
           <!-- Default Settings -->
           <div class="card">
             <div
@@ -4399,7 +4399,7 @@
         <!-- /Tab: Users -->
 
         <!-- Tab: Gateway — Claude Code, Scheduling -->
-        <div v-show="activeTab === 'gateway'" class="space-y-6">
+        <div v-if="activeTab === 'gateway'" class="space-y-6">
           <!-- Claude Code Settings -->
           <div class="card">
             <div
@@ -5889,7 +5889,11 @@
                 {{ t("admin.settings.webSearchEmulation.description") }}
               </p>
             </div>
-            <div class="space-y-5 p-6">
+            <p v-if="!webSearchConfigLoaded" class="px-6 pt-4 text-sm" role="status">
+              {{ webSearchConfigLoading ? t('common.loading') : t('admin.settings.failedToLoad') }}
+              <button v-if="!webSearchConfigLoading" type="button" class="btn btn-secondary btn-sm" @click="loadWebSearchConfig">{{ t('common.tryAgain') }}</button>
+            </p>
+            <fieldset class="space-y-5 p-6" :disabled="!webSearchConfigLoaded" :aria-busy="webSearchConfigLoading" data-testid="web-search-config">
               <!-- Global Toggle -->
               <div class="flex items-center justify-between">
                 <div>
@@ -6227,7 +6231,7 @@
                   </div>
                 </div>
               </div>
-            </div>
+            </fieldset>
           </div>
 
           <!-- Web Search Test Dialog -->
@@ -6345,7 +6349,7 @@
         <!-- /Tab: Gateway — Claude Code, Scheduling -->
 
         <!-- Tab: General -->
-        <div v-show="activeTab === 'general'" class="space-y-6">
+        <div v-if="activeTab === 'general'" class="space-y-6">
           <!-- Site Settings -->
           <div class="card">
             <div
@@ -6918,7 +6922,7 @@
 	        <!-- /Tab: General -->
 
 	        <!-- Tab: Login Agreement -->
-	        <div v-show="activeTab === 'agreement'" class="space-y-6">
+	        <div v-if="activeTab === 'agreement'" class="space-y-6">
 	          <div class="card">
 	            <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
 	              <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -7120,7 +7124,7 @@
         <!-- /Tab: Login Agreement -->
 
 	        <!-- Tab: Features (功能开关) -->
-        <div v-show="activeTab === 'features'" class="space-y-6">
+        <div v-if="activeTab === 'features'" class="space-y-6">
 
         <div class="card">
           <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
@@ -7876,7 +7880,7 @@
 
         <!-- Tab: Email -->
         <!-- Tab: Payment -->
-        <div v-show="activeTab === 'payment'" class="space-y-6">
+        <div v-if="activeTab === 'payment'" class="space-y-6">
           <!-- Payment System Settings -->
           <div class="card">
             <div
@@ -8716,7 +8720,7 @@
             </div>
           </div>
 
-          <EmailTemplateEditor />
+          <EmailTemplateEditor v-if="loadedSettingsTabs.has('email')" />
 
           <!-- Balance Low Notification -->
           <div class="card">
@@ -8858,7 +8862,7 @@
 
         <!-- Tab: Backup -->
         <div v-show="activeTab === 'backup'">
-          <BackupSettings />
+          <BackupSettings v-if="loadedSettingsTabs.has('backup')" />
         </div>
 
         <!-- Save Button -->
@@ -9062,6 +9066,7 @@ type SettingsTab =
   | "email"
   | "backup";
 const activeTab = ref<SettingsTab>("general");
+const loadedSettingsTabs = reactive(new Set<SettingsTab>(["general"]));
 const settingsTabs = [
   { key: "general" as SettingsTab, icon: "home" as const },
   { key: "agreement" as SettingsTab, icon: "document" as const },
@@ -9129,6 +9134,24 @@ const { copyToClipboard } = useClipboard();
 const loading = ref(true);
 const loadFailed = ref(false);
 const saving = ref(false);
+let settingsCacheRefresh: Promise<unknown> = Promise.resolve();
+
+function refreshSettingsCachesAfterSave() {
+  // Serialize post-save refreshes, including any request started before the
+  // save. A later save must get a new snapshot after older requests settle.
+  settingsCacheRefresh = settingsCacheRefresh.then(async () => {
+    await Promise.allSettled([
+      appStore.fetchPublicSettings(),
+      adminSettingsStore.fetch(),
+    ]);
+    await Promise.allSettled([
+      appStore.fetchPublicSettings(true),
+      adminSettingsStore.fetch(true),
+    ]);
+  }).catch((error) => {
+    console.error("Failed to refresh settings cache after save:", error);
+  });
+}
 const testingSmtp = ref(false);
 const sendingTestEmail = ref(false);
 const smtpPasswordManuallyEdited = ref(false);
@@ -10257,6 +10280,9 @@ const webSearchProxies = ref<Proxy[]>([]);
 
 // Web Search Emulation config (loaded/saved separately)
 const DEFAULT_WEB_SEARCH_QUOTA_LIMIT = 1000;
+const webSearchConfigLoaded = ref(false);
+const webSearchConfigLoading = ref(true);
+let savedWebSearchConfig = "";
 
 const webSearchConfig = reactive<WebSearchEmulationConfig>({
   enabled: false,
@@ -10382,26 +10408,43 @@ async function testWebSearchProvider() {
 }
 
 async function loadWebSearchConfig() {
+  webSearchConfigLoading.value = true;
   try {
-    const [resp, proxiesResp] = await Promise.all([
-      adminAPI.settings.getWebSearchEmulationConfig(),
-      adminAPI.proxies.list().catch(() => ({ items: [] as Proxy[] })),
-    ]);
+    const resp = await adminAPI.settings.getWebSearchEmulationConfig();
     if (resp) {
       webSearchConfig.enabled = resp.enabled || false;
       webSearchConfig.providers = resp.providers || [];
+      webSearchConfigLoaded.value = true;
+      savedWebSearchConfig = JSON.stringify(webSearchConfig);
     }
-    webSearchProxies.value = proxiesResp.items || [];
   } catch (err: unknown) {
     // 404 is expected when config hasn't been created yet; show error for other failures
     const status = (err as { status?: number })?.status;
+    if (status === 404) {
+      webSearchConfigLoaded.value = true;
+      savedWebSearchConfig = JSON.stringify(webSearchConfig);
+    }
     if (status !== 404 && status !== undefined) {
       appStore.showError(extractApiErrorMessage(err, t("common.error")));
     }
+  } finally {
+    webSearchConfigLoading.value = false;
+  }
+}
+
+async function loadWebSearchProxies() {
+  try {
+    const response = await adminAPI.proxies.list();
+    webSearchProxies.value = response.items || [];
+  } catch {
+    // Proxy availability must not block loading or saving unrelated settings.
   }
 }
 
 async function saveWebSearchConfig(): Promise<boolean> {
+  // Never overwrite unloaded configuration with the form's empty defaults.
+  if (!webSearchConfigLoaded.value) return true;
+  if (JSON.stringify(webSearchConfig) === savedWebSearchConfig) return true;
   try {
     for (const p of webSearchConfig.providers) {
       const raw = p.quota_limit;
@@ -10418,10 +10461,12 @@ async function saveWebSearchConfig(): Promise<boolean> {
         quota_limit: Number(p.quota_limit) > 0 ? Number(p.quota_limit) : null,
       }),
     );
+    const submittedConfig = JSON.stringify(webSearchConfig);
     await adminAPI.settings.updateWebSearchEmulationConfig({
       enabled: webSearchConfig.enabled,
       providers,
     });
+    savedWebSearchConfig = submittedConfig;
     return true;
   } catch (err: unknown) {
     appStore.showError(extractApiErrorMessage(err, t("common.error")));
@@ -11179,8 +11224,6 @@ async function loadSettings() {
       openaiFastPolicyLoaded.value = true;
     }
 
-    // Load web search emulation config separately
-    await loadWebSearchConfig();
   } catch (error: unknown) {
     loadFailed.value = true;
     appStore.showError(
@@ -11883,9 +11926,8 @@ async function saveSettings() {
     }
     // Save web search emulation config separately (errors handled internally)
     const wsOk = await saveWebSearchConfig();
-    // Refresh cached settings so sidebar/header update immediately
-    await appStore.fetchPublicSettings(true);
-    await adminSettingsStore.fetch(true);
+    // Cache reads are independent; don't serialize two round trips after save.
+    refreshSettingsCachesAfterSave();
     if (wsOk) {
       appStore.showSuccess(t("admin.settings.settingsSaved"));
     }
@@ -12880,21 +12922,32 @@ async function handleDeleteProvider() {
   }
 }
 
-onMounted(() => {
-  loadSettings();
-  loadSubscriptionGroups();
-  loadAdminApiKey();
-  loadUpstreamBillingProbeSettings();
-  loadOllamaCloudUsageSettings();
-  loadOpenCodeGoUsageSettings();
-  loadOverloadCooldownSettings();
-  loadRateLimit429CooldownSettings();
-  loadPanelRateLimitSettings();
-  loadStreamTimeoutSettings();
-  loadRectifierSettings();
-  loadBetaPolicySettings();
-  loadProviders();
+// Fetch optional sections only when opened. The general form needs one request,
+// rather than a burst for every hidden settings tab. Keep drafts when revisited.
+watch(activeTab, (tab) => {
+  if (loadedSettingsTabs.has(tab)) return;
+  loadedSettingsTabs.add(tab);
+  if (tab === "security") {
+    void loadAdminApiKey();
+    void loadPanelRateLimitSettings();
+  }
+  if (tab === "users") void loadSubscriptionGroups();
+  if (tab === "payment") void loadProviders();
+  if (tab === "gateway") {
+    void loadWebSearchConfig();
+    void loadWebSearchProxies();
+    void loadUpstreamBillingProbeSettings();
+    void loadOllamaCloudUsageSettings();
+    void loadOpenCodeGoUsageSettings();
+    void loadOverloadCooldownSettings();
+    void loadRateLimit429CooldownSettings();
+    void loadStreamTimeoutSettings();
+    void loadRectifierSettings();
+    void loadBetaPolicySettings();
+  }
 });
+
+onMounted(() => { void loadSettings(); });
 
 // =========================
 // Affiliate (邀请返利) 专属用户管理

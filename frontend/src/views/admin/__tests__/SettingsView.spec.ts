@@ -563,6 +563,8 @@ function mountView() {
         ProxySelector: true,
         ImageUpload: ImageUploadStub,
         BackupSettings: true,
+        AdminAccessKeysSettings: true,
+        EmailTemplateEditor: { template: '<input data-testid="email-template-draft" />' },
       },
     },
   });
@@ -724,6 +726,109 @@ describe("admin SettingsView payment visible method controls", () => {
     adminSettingsFetch.mockResolvedValue(undefined);
   });
 
+  it("renders and saves general settings while optional web search and proxy reads are pending", async () => {
+    let finishConfig!: (value: { enabled: boolean; providers: [] }) => void;
+    let finishProxies!: (value: { items: [] }) => void;
+    getWebSearchEmulationConfig.mockReturnValueOnce(new Promise(resolve => { finishConfig = resolve; }));
+    listProxies.mockReturnValueOnce(new Promise(resolve => { finishProxies = resolve; }));
+    const wrapper = mountView();
+    await flushPromises();
+
+    expect(wrapper.find("form").exists()).toBe(true);
+    expect(wrapper.find('[data-testid="panel-rate-limit-user-rpm"]').exists()).toBe(false);
+    expect(getWebSearchEmulationConfig).not.toHaveBeenCalled();
+    expect(listProxies).not.toHaveBeenCalled();
+    await openGatewayTab(wrapper);
+    expect(wrapper.get('[data-testid="web-search-config"]').attributes('disabled')).toBeDefined();
+    await wrapper.get('#settings-tab-general').trigger('click');
+    await wrapper.get('[data-testid="compact-home-toggle"]').setValue(true);
+    await wrapper.get("form").trigger("submit.prevent");
+    await flushPromises();
+    expect(updateSettings).toHaveBeenCalledWith(expect.objectContaining({ compact_home_enabled: true }));
+    expect(updateWebSearchEmulationConfig).not.toHaveBeenCalled();
+    expect(showSuccess).toHaveBeenCalledWith("admin.settings.settingsSaved");
+
+    finishConfig({ enabled: false, providers: [] });
+    finishProxies({ items: [] });
+    await flushPromises();
+    wrapper.unmount();
+  });
+
+  it("finishes a persisted save while cache refreshes are pending and preserves drafts across tabs", async () => {
+    let finishPublic!: () => void;
+    let finishAdmin!: () => void;
+    fetchPublicSettings.mockResolvedValueOnce(undefined).mockReturnValueOnce(new Promise<void>(resolve => { finishPublic = resolve; }));
+    adminSettingsFetch.mockResolvedValueOnce(undefined).mockReturnValueOnce(new Promise<void>(resolve => { finishAdmin = resolve; }));
+    const wrapper = mountView();
+    await flushPromises();
+    await wrapper.get('[data-testid="compact-home-toggle"]').setValue(true);
+    await openGatewayTab(wrapper);
+    const general = wrapper.findAll('[role="tab"]').find(tab => tab.attributes('id') === 'settings-tab-general')!;
+    await general.trigger('click');
+    expect(wrapper.get<HTMLInputElement>('[data-testid="compact-home-toggle"]').element.checked).toBe(true);
+    await wrapper.get("form").trigger("submit.prevent");
+    await flushPromises();
+    expect(fetchPublicSettings).toHaveBeenCalledWith(true);
+    expect(adminSettingsFetch).toHaveBeenCalledWith(true);
+    expect(showSuccess).toHaveBeenCalledWith("admin.settings.settingsSaved");
+    expect(wrapper.get('button[type="submit"]').attributes('disabled')).toBeUndefined();
+    finishPublic();
+    finishAdmin();
+    await flushPromises();
+    wrapper.unmount();
+  });
+
+  it("mounts the email template editor on demand and preserves its draft across tabs", async () => {
+    const wrapper = mountView();
+    await flushPromises();
+    expect(wrapper.find('[data-testid="email-template-draft"]').exists()).toBe(false);
+    await wrapper.get('#settings-tab-email').trigger('click');
+    await wrapper.get('[data-testid="email-template-draft"]').setValue('unsaved email draft');
+    await wrapper.get('#settings-tab-general').trigger('click');
+    await wrapper.get('#settings-tab-email').trigger('click');
+    expect(wrapper.get<HTMLInputElement>('[data-testid="email-template-draft"]').element.value).toBe('unsaved email draft');
+    wrapper.unmount();
+  });
+
+  it("queues a fresh cache read after consecutive saves while the first refresh is pending", async () => {
+    let finishPublic!: () => void;
+    let finishAdmin!: () => void;
+    fetchPublicSettings.mockResolvedValueOnce(undefined).mockReturnValueOnce(new Promise<void>(resolve => { finishPublic = resolve; }));
+    adminSettingsFetch.mockResolvedValueOnce(undefined).mockReturnValueOnce(new Promise<void>(resolve => { finishAdmin = resolve; }));
+    const wrapper = mountView();
+    await flushPromises();
+    await wrapper.get('form').trigger('submit.prevent');
+    await flushPromises();
+    await wrapper.get('[data-testid="compact-home-toggle"]').setValue(true);
+    await wrapper.get('form').trigger('submit.prevent');
+    await flushPromises();
+    expect(updateSettings).toHaveBeenCalledTimes(2);
+    expect(fetchPublicSettings.mock.calls.filter(([force]) => force === true)).toHaveLength(1);
+    expect(adminSettingsFetch.mock.calls.filter(([force]) => force === true)).toHaveLength(1);
+    finishPublic();
+    finishAdmin();
+    await flushPromises();
+    expect(fetchPublicSettings.mock.calls.filter(([force]) => force === true)).toHaveLength(2);
+    expect(adminSettingsFetch.mock.calls.filter(([force]) => force === true)).toHaveLength(2);
+    wrapper.unmount();
+  });
+
+  it("allows retry after an optional configuration read fails without saving empty defaults", async () => {
+    getWebSearchEmulationConfig.mockRejectedValueOnce({ status: 503 });
+    const wrapper = mountView();
+    await flushPromises();
+    await openGatewayTab(wrapper);
+    expect(wrapper.get('[data-testid="web-search-config"]').attributes('disabled')).toBeDefined();
+    await wrapper.get('form').trigger('submit.prevent');
+    await flushPromises();
+    expect(updateWebSearchEmulationConfig).not.toHaveBeenCalled();
+    await wrapper.findAll('button').find(button => button.text() === 'common.tryAgain')!.trigger('click');
+    await flushPromises();
+    expect(wrapper.get('[data-testid="web-search-config"]').attributes('disabled')).toBeUndefined();
+    expect(getWebSearchEmulationConfig).toHaveBeenCalledTimes(2);
+    wrapper.unmount();
+  });
+
   it("loads and saves the open button visibility for each custom menu", async () => {
     const menuItems = [
       { id: "docs", label: "Docs", url: "https://example.com/docs", icon_svg: "", visibility: "user", sort_order: 0 },
@@ -780,6 +885,7 @@ describe("admin SettingsView payment visible method controls", () => {
     const wrapper = mountView();
     await flushPromises();
 
+    await openSecurityTab(wrapper);
     expect(getPanelRateLimitSettings).toHaveBeenCalled();
     expect(wrapper.text()).toContain("admin.settings.panelRateLimit.title");
     expect(wrapper.text()).toContain("admin.settings.panelRateLimit.proxySafeNote");
@@ -1382,6 +1488,7 @@ describe("admin SettingsView payment visible method controls", () => {
     const wrapper = mountView();
 
     await flushPromises();
+    await openGatewayTab(wrapper);
 
     expect(wrapper.text()).toContain("OpenAI 实验调度策略");
     expect(wrapper.text()).toContain(
@@ -1544,6 +1651,7 @@ describe("admin SettingsView payment visible method controls", () => {
     });
     const wrapper = mountView();
     await flushPromises();
+    await openGatewayTab(wrapper);
     const input = wrapper.get('[data-testid="openai-oauth-scheduling-rate-multiplier"]');
     expect(input.attributes("required")).toBeUndefined();
     await input.setValue("");
@@ -1574,6 +1682,7 @@ describe("admin SettingsView payment visible method controls", () => {
     });
     const wrapper = mountView();
     await flushPromises();
+    await openGatewayTab(wrapper);
     const input = wrapper.get<HTMLInputElement>('[data-testid="openai-oauth-scheduling-rate-multiplier"]');
     expect(input.element.value).toBe("");
     await wrapper.find("form").trigger("submit.prevent");
@@ -1587,6 +1696,7 @@ describe("admin SettingsView payment visible method controls", () => {
     const wrapper = mountView();
 
     await flushPromises();
+    await openGatewayTab(wrapper);
     expect(
       wrapper.find('[data-testid="openai-oauth-scheduling-rate-multiplier"]').exists(),
     ).toBe(false);
@@ -1691,8 +1801,10 @@ describe("admin SettingsView payment visible method controls", () => {
         },
       },
       setup(props) {
-        receivedProviders = props.providers as Array<Record<string, unknown>>;
-        return () => h("div", { class: "provider-list-capture" });
+        return () => {
+          receivedProviders = props.providers as Array<Record<string, unknown>>;
+          return h("div", { class: "provider-list-capture" });
+        };
       },
     });
 
