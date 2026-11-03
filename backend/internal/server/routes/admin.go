@@ -32,6 +32,14 @@ func RegisterAdminRoutes(
 	admin.Use(middleware.AdminComplianceGuard(settingService))
 	// 受限密钥的账户操作走独立资源校验，普通管理员保持原处理器。
 	admin.Use(h.Admin.Account.ScopedAdminKeyAccounts)
+	if h.QQWelfare != nil {
+		welfare := admin.Group("/qq-welfare")
+		welfare.GET("", h.QQWelfare.Admin)
+		welfare.PUT("/config", h.QQWelfare.Config)
+		welfare.POST("/group-code", h.QQWelfare.GroupCode)
+		welfare.POST("/products", h.QQWelfare.Product)
+		welfare.POST("/coupons", h.QQWelfare.Coupon)
+	}
 	{
 		// 部署与运营合规确认
 		registerAdminComplianceRoutes(admin, h)
