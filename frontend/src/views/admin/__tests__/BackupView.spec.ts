@@ -223,6 +223,23 @@ describe('admin BackupView', () => {
     expect(wrapper.findAll('button').some(b => b.text() === 'common.delete')).toBe(false)
   })
 
+  it('retries a required post-delete list invalidated by a failed create command', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    listBackups.mockResolvedValueOnce({ items: [baseRecord('deleted')] })
+    const wrapper = mountBackupView(); await flushPromises()
+    let finish!: (value: object) => void
+    listBackups.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+    listBackups.mockResolvedValue({ items: [] })
+    await wrapper.findAll('button').find(b => b.text() === 'common.delete')!.trigger('click')
+    await flushPromises()
+    createBackup.mockRejectedValueOnce(new Error('synthetic command failure'))
+    await wrapper.findAll('button').find(b => b.text() === 'admin.backup.operations.createBackup')!.trigger('click')
+    await flushPromises()
+    finish({ items: [] }); await flushPromises()
+    expect(listBackups).toHaveBeenCalledTimes(3)
+    expect(wrapper.get('tbody').text()).not.toContain('deleted.sql.gz')
+  })
+
   it.each(['backup', 'restore'])('does not resume %s polling after navigation during initial loading', async (operation) => {
     vi.useFakeTimers()
     let finish!: (value: object) => void

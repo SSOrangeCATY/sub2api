@@ -808,12 +808,14 @@ async function loadBackups(silent = false, fresh = false): Promise<void> {
     return loadBackups(silent, true)
   }
   const version = operationVersion
+  let obsolete = false
   fetchingBackups.value = true
   if (!silent) loadingBackups.value = true
   listRequest = (async () => {
     try {
       const result = await adminAPI.backup.listBackups()
-      if (disposed || version !== operationVersion) return
+      if (disposed) return
+      if (version !== operationVersion) { obsolete = true; return }
       backups.value = result.items || []
       lastBackupsLoadedAt = Date.now()
     } catch (error) {
@@ -822,7 +824,8 @@ async function loadBackups(silent = false, fresh = false): Promise<void> {
       loadingBackups.value = false; fetchingBackups.value = false; listRequest = null
     }
   })()
-  return listRequest
+  await listRequest
+  if (fresh && obsolete) return loadBackups(silent, true)
 }
 
 async function createBackup() {
