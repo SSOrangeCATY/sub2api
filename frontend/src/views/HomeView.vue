@@ -274,6 +274,7 @@
 </template>
 
 <script setup lang="ts">
+import { useBodySurface } from '@/composables/useBodySurface'
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore, useAppStore } from '@/stores'
@@ -307,6 +308,7 @@ const subtitleIsDescription = computed(() => siteSubtitle.value.trim() !== wordm
 const docUrl = computed(() => sanitizeUrl(appStore.cachedPublicSettings?.doc_url || appStore.docUrl || ''))
 const homeContent = computed(() => appStore.cachedPublicSettings?.home_content || '')
 const hasHomeContent = computed(() => homeContent.value.trim().length > 0)
+useBodySurface(['pt-product-surface'], () => !hasHomeContent.value && !compactHomeEnabled.value)
 const compactHomeEnabled = computed(() => appStore.cachedPublicSettings?.compact_home_enabled === true)
 const modelPlazaEnabled = computed(() => isFeatureFlagEnabled(FeatureFlags.modelPlaza))
 

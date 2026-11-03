@@ -127,14 +127,14 @@
 
 /* Legacy inline loaders keep their layout box but use stepped bars. The
    selectors exclude refresh icons and custom Home HTML. */
-body:has(:is(.ef-app-layout, .ef-default-home, .key-usage-page, .ef-model-plaza, .ef-auth-layout)) :is(svg.animate-spin:has(> circle), div.animate-spin[class*='border-']) {
+body.pt-product-surface :is(svg.animate-spin:has(> circle), div.animate-spin[class*='border-']) {
   border: 0 !important;
   border-radius: 0 !important;
   background: var(--ef-ink, #161616) !important;
   color: var(--ef-ink, #161616) !important;
   clip-path: polygon(0 25%,20% 25%,20% 75%,0 75%,0 25%,27% 25%,47% 25%,47% 75%,27% 75%,27% 25%,54% 25%,74% 25%,74% 75%,54% 75%,54% 25%,81% 25%,100% 25%,100% 75%,81% 75%,81% 25%);
 }
-body:has(:is(.ef-app-layout, .ef-default-home, .key-usage-page, .ef-model-plaza, .ef-auth-layout)) svg.animate-spin:has(> circle) > * { visibility: hidden; }
+body.pt-product-surface svg.animate-spin:has(> circle) > * { visibility: hidden; }
 .pt-quota-ok { background: var(--pt-ink); }
 .pt-quota-warn { background: var(--ef-signal); }
 .pt-quota-critical { background: var(--ef-signal); background-image: repeating-linear-gradient(135deg,transparent,transparent 3px,var(--ef-on-signal) 3px,var(--ef-on-signal) 4px); }
@@ -171,20 +171,20 @@ body:has(:is(.ef-app-layout, .ef-default-home, .key-usage-page, .ef-model-plaza,
   background: var(--pt-chip) !important;
   color: var(--pt-muted) !important;
 }
-body:has(:is(.ef-app-layout, .ef-model-plaza)) .pt-group-badge {
+body.pt-group-surface .pt-group-badge {
   max-width: min(100%, 28rem); min-width: 0; flex-wrap: nowrap; gap: 5px 7px;
   background: var(--ef-signal) !important; color: var(--ef-on-signal) !important;
   padding: 4px 8px; border: 0 !important; box-shadow: none !important;
   font-weight: 700; line-height: 1.5;
 }
-body:has(:is(.ef-app-layout, .ef-model-plaza)) .pt-group-name { min-width: 0; max-width: 100%; }
-body:has(:is(.ef-app-layout, .ef-model-plaza)) :is(.pt-group-rate, .pt-group-peak, .pt-group-option-rate) {
+body.pt-group-surface .pt-group-name { min-width: 0; max-width: 100%; }
+body.pt-group-surface :is(.pt-group-rate, .pt-group-peak, .pt-group-option-rate) {
   background: #161616 !important; color: #ffffff !important;
   border: 0 !important; box-shadow: none !important; flex-shrink: 0;
 }
-body:has(:is(.ef-app-layout, .ef-model-plaza)) .pt-group-rate--warning::before { content: '! '; font-weight: 800; }
-body:has(:is(.ef-app-layout, .ef-model-plaza)) .pt-group-option { flex-wrap: wrap; }
-.ef-app-layout[data-page='/admin/groups'] :is(td[data-field='name'], div[data-field='name'] > div) > span {
+body.pt-group-surface .pt-group-rate--warning::before { content: '! '; font-weight: 800; }
+body.pt-group-surface .pt-group-option { flex-wrap: wrap; }
+.pt-workspace[data-page='/admin/groups'] :is(td[data-field='name'], div[data-field='name'] > div) > span {
   display: inline-block; max-width: 28rem; white-space: normal; overflow-wrap: anywhere;
   padding: 4px 8px; background: var(--ef-signal); color: var(--ef-on-signal) !important; font-weight: 700;
 }
@@ -244,9 +244,9 @@ body:has(:is(.ef-app-layout, .ef-model-plaza)) .pt-group-option { flex-wrap: wra
   .pt-chart-grid { grid-template-columns: minmax(0,1fr); }
 }
 @media (max-width: 639px) {
-  .ef-app-layout[data-page='/keys'] div[data-field='group'] > div { flex: 1; }
-  .ef-app-layout[data-page='/keys'] div[data-field='group'] button { min-width: 0; max-width: 100%; }
-  .ef-app-layout[data-page='/keys'] div[data-field='group'] button > :is(span:not(.pt-group-badge), svg) { flex-shrink: 0; white-space: nowrap; }
+  .pt-workspace[data-page='/keys'] div[data-field='group'] > div { flex: 1; }
+  .pt-workspace[data-page='/keys'] div[data-field='group'] button { min-width: 0; max-width: 100%; }
+  .pt-workspace[data-page='/keys'] div[data-field='group'] button > :is(span:not(.pt-group-badge), svg) { flex-shrink: 0; white-space: nowrap; }
   .ef-default-home::before, .dashboard-accent::before, .pt-user-dashboard::before {
     background: color-mix(in srgb, var(--pt-ink) 6%, transparent);
     -webkit-mask: url('./contours/contour-a.svg') right -12rem top -5rem / 32rem auto no-repeat;

@@ -417,6 +417,7 @@
 </template>
 
 <script setup lang="ts">
+import { useBodySurface } from '@/composables/useBodySurface'
 import '@/styles/endfield/public-surfaces.css'
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -430,6 +431,8 @@ import { sanitizeUrl } from '@/utils/url'
 import { DEFAULT_BRAND_MARK } from '@/utils/branding'
 import { isEfDark, setEfTheme } from '@/utils/theme'
 import { efChartPalette, efSeriesColor } from '@/utils/chartTheme'
+
+useBodySurface(['pt-product-surface'])
 
 const { t, locale } = useI18n()
 const appStore = useAppStore()

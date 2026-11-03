@@ -34,12 +34,15 @@
 </template>
 
 <script setup lang="ts">
+import { useBodySurface } from '@/composables/useBodySurface'
 import { computed, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import '@/styles/endfield/public-surfaces.css'
 import { useAppStore } from '@/stores'
 import { DEFAULT_BRAND_MARK } from '@/utils/branding'
+
+useBodySurface(['pt-product-surface'])
 
 const appStore = useAppStore()
 const { t } = useI18n()

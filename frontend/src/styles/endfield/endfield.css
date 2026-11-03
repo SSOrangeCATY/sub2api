@@ -1318,11 +1318,11 @@ a.ef-record:is(:hover, :focus-visible) > * {
   }
 }
 
-/* Going from page to page (same-origin navigations): the new page is drawn
-   across the old one by a slanted shutter. */
+/* Keep full-document navigation immediately visible; interaction feedback
+   remains local to controls instead of covering the page with a shutter. */
 @media (prefers-reduced-motion: no-preference) {
   @view-transition {
-    navigation: auto;
+    navigation: none;
   }
   ::view-transition-old(root) {
     animation: none;
