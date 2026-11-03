@@ -253,6 +253,32 @@ describe('admin BackupView', () => {
     expect(wrapper.get('tbody').text()).toContain('existing.sql.gz')
   })
 
+  it('resumes paused backup polling after a failed restore invalidates the return list', async () => {
+    vi.useFakeTimers()
+    vi.spyOn(document, 'hidden', 'get').mockReturnValue(false)
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    vi.spyOn(window, 'prompt').mockReturnValue('synthetic-password')
+    const records = [{ ...baseRecord('running'), status: 'running' }, baseRecord('existing')]
+    listBackups.mockResolvedValue({ items: records })
+    const wrapper = mountBackupView(); await flushPromises()
+    vi.spyOn(document, 'hidden', 'get').mockReturnValue(true)
+    document.dispatchEvent(new Event('visibilitychange'))
+    expect(vi.getTimerCount()).toBe(0)
+    let finish!: (value: object) => void
+    listBackups.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+    vi.spyOn(document, 'hidden', 'get').mockReturnValue(false)
+    document.dispatchEvent(new Event('visibilitychange')); await flushPromises()
+    restoreBackup.mockRejectedValueOnce(new Error('synthetic command failure'))
+    await wrapper.findAll('button').find(b => b.text() === 'admin.backup.actions.restore')!.trigger('click')
+    await flushPromises()
+    finish({ items: records }); await flushPromises()
+    expect(listBackups).toHaveBeenCalledTimes(3)
+    expect(vi.getTimerCount()).toBe(1)
+    getBackup.mockResolvedValue({ ...baseRecord('running'), status: 'running' })
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(getBackup).toHaveBeenCalledWith('running')
+  })
+
   it.each(['backup', 'restore'])('does not resume %s polling after navigation during initial loading', async (operation) => {
     vi.useFakeTimers()
     let finish!: (value: object) => void

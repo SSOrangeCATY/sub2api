@@ -528,7 +528,7 @@ const retentionPreview = computed(() => {
 const backups = ref<BackupRecord[]>([])
 const loadingBackups = ref(false)
 const fetchingBackups = ref(false)
-let listRequest: Promise<void> | null = null
+let listRequest: Promise<boolean> | null = null
 let lastBackupsLoadedAt = 0
 const creatingBackup = ref(false)
 const restoringId = ref('')
@@ -575,7 +575,8 @@ function startPolling(backupId: string) {
         } else {
           appStore.showError(record.error_message || t('admin.backup.operations.backupFailed'))
         }
-        await loadBackups(false, true)
+        operationVersion++
+        await loadBackups()
       }
     } catch {
       // 轮询失败时不中断
@@ -613,7 +614,8 @@ function startRestorePolling(backupId: string) {
         } else {
           appStore.showError(record.restore_error || t('admin.backup.operations.restoreFailed'))
         }
-        await loadBackups(false, true)
+        operationVersion++
+        await loadBackups()
       }
     } catch {
       // 轮询失败时不中断
@@ -635,9 +637,8 @@ function handleVisibilityChange() {
   } else {
     // Reconcile active work immediately; ordinary short tab switches need no request.
     if (!creatingBackup.value && !restoringId.value && Date.now() - lastBackupsLoadedAt < 60_000) return
-    const version = operationVersion
-    void loadBackups(true).then(() => {
-      if (disposed || document.hidden || version !== operationVersion) return
+    void loadBackups(true).then((loaded) => {
+      if (!loaded || disposed || document.hidden) return
       const running = backups.value.find(r => r.status === 'running')
       if (!pendingCreate) creatingBackup.value = !!running
       if (running) {
@@ -799,33 +800,32 @@ async function saveSchedule() {
   }
 }
 
-async function loadBackups(silent = false, fresh = false): Promise<void> {
-  if (disposed) return
-  if (listRequest) {
-    if (!fresh) return listRequest
-    // A mutation needs a list requested after it completed, not an older return refresh.
-    await listRequest
-    return loadBackups(silent, true)
-  }
-  const version = operationVersion
-  let obsolete = false
+async function loadBackups(silent = false): Promise<boolean> {
+  if (disposed) return false
+  if (listRequest) return listRequest
   fetchingBackups.value = true
   if (!silent) loadingBackups.value = true
   listRequest = (async () => {
     try {
-      const result = await adminAPI.backup.listBackups()
-      if (disposed) return
-      if (version !== operationVersion) { obsolete = true; return }
-      backups.value = result.items || []
-      lastBackupsLoadedAt = Date.now()
+      // Keep all waiting callers attached until a list reflects the latest operation.
+      while (!disposed) {
+        const version = operationVersion
+        const result = await adminAPI.backup.listBackups()
+        if (disposed) return false
+        if (version !== operationVersion) continue
+        backups.value = result.items || []
+        lastBackupsLoadedAt = Date.now()
+        return true
+      }
+      return false
     } catch (error) {
       if (!disposed && !silent) appStore.showError((error as { message?: string })?.message || t('errors.networkError'))
+      return false
     } finally {
       loadingBackups.value = false; fetchingBackups.value = false; listRequest = null
     }
   })()
-  await listRequest
-  if (obsolete && (!silent || fresh)) return loadBackups(silent, true)
+  return listRequest
 }
 
 async function createBackup() {
@@ -923,7 +923,7 @@ async function removeBackup(id: string) {
     await adminAPI.backup.deleteBackup(id, archived)
     operationVersion++
     appStore.showSuccess(t('admin.backup.actions.deleted'))
-    await loadBackups(false, true)
+    await loadBackups()
   } catch (error) {
     appStore.showError((error as { message?: string })?.message || t('errors.networkError'))
   }
