@@ -638,13 +638,19 @@ function handleVisibilityChange() {
     // Reconcile active work immediately; ordinary short tab switches need no request.
     if (!creatingBackup.value && !restoringId.value && Date.now() - lastBackupsLoadedAt < 60_000) return
     void loadBackups(true).then((loaded) => {
-      if (!loaded || disposed || document.hidden) return
+      if (disposed || document.hidden) return
       const running = backups.value.find(r => r.status === 'running')
+      const restoring = backups.value.find(r => r.restore_status === 'running')
+      if (!loaded) {
+        // A temporary list failure must not strand work paused while hidden.
+        if (creatingBackup.value && running) startPolling(running.id)
+        if (restoringId.value && restoring?.id === restoringId.value) startRestorePolling(restoring.id)
+        return
+      }
       if (!pendingCreate) creatingBackup.value = !!running
       if (running) {
         startPolling(running.id)
       }
-      const restoring = backups.value.find(r => r.restore_status === 'running')
       if (!pendingRestore) restoringId.value = restoring?.id || ''
       if (restoring) {
         startRestorePolling(restoring.id)

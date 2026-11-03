@@ -279,6 +279,30 @@ describe('admin BackupView', () => {
     expect(getBackup).toHaveBeenCalledWith('running')
   })
 
+  it.each(['backup', 'restore'])('resumes known %s polling after a temporary return-list failure', async (operation) => {
+    vi.useFakeTimers()
+    vi.spyOn(document, 'hidden', 'get').mockReturnValue(false)
+    listBackups.mockResolvedValue({ items: [{ ...baseRecord('running'),
+      status: operation === 'backup' ? 'running' : 'completed',
+      restore_status: operation === 'restore' ? 'running' : undefined,
+    }] })
+    const wrapper = mountBackupView(); await flushPromises()
+    vi.spyOn(document, 'hidden', 'get').mockReturnValue(true)
+    document.dispatchEvent(new Event('visibilitychange'))
+    expect(vi.getTimerCount()).toBe(0)
+    listBackups.mockRejectedValueOnce(new Error('synthetic temporary list failure'))
+    vi.spyOn(document, 'hidden', 'get').mockReturnValue(false)
+    document.dispatchEvent(new Event('visibilitychange')); await flushPromises()
+    expect(vi.getTimerCount()).toBe(1)
+    expect(listBackups).toHaveBeenCalledTimes(2)
+    listBackups.mockResolvedValue({ items: [baseRecord('running')] })
+    getBackup.mockResolvedValue({ ...baseRecord('running'), restore_status: 'completed' })
+    await vi.advanceTimersByTimeAsync(2000); await flushPromises()
+    expect(getBackup).toHaveBeenCalledWith('running')
+    expect(vi.getTimerCount()).toBe(0)
+    expect(wrapper.findAll('button').find(b => b.text() === 'admin.backup.operations.createBackup')!.attributes('disabled')).toBeUndefined()
+  })
+
   it.each(['backup', 'restore'])('does not resume %s polling after navigation during initial loading', async (operation) => {
     vi.useFakeTimers()
     let finish!: (value: object) => void
