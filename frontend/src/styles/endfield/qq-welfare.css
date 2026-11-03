@@ -1,6 +1,6 @@
 /* Standard / neutral / tight / plain / compact / calm. Welfare data supplies the visual hierarchy. */
 .welfare-page { max-width: 1280px; margin: 0 auto; color: var(--ef-ink); }
-[data-page='/admin/qq-welfare'] .pt-workspace { background: var(--ef-paper); }
+.pt-workspace[data-page='/admin/qq-welfare'] { background: var(--ef-paper); }
 .welfare-page h1 { font-size: clamp(28px, 3vw, 42px); font-weight: 800; margin: 4px 0 9px; }
 .welfare-page h2, .welfare-panel h2 { font-size: 22px; font-weight: 700; margin: 3px 0; }
 .welfare-page h3 { font-weight: 700; font-size: 18px; }

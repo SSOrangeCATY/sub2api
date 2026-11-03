@@ -982,6 +982,10 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+/* Variable-font weight interpolation forces text layout on every frame when
+   the active route changes. Animate paint and collapse spacing only. */
+.sidebar-link { transition-property: color, background-color, padding; }
+
 /* @apply expands the dark and hover rules, so the current route needs an
    explicit override. Weight and the inset outline also identify it without hue. */
 .sidebar-link-active,

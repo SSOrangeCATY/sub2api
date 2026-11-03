@@ -120,8 +120,14 @@ export default defineConfig(({ mode }) => {
               return 'vendor-vue'
             }
 
-            // UI 工具库（较大，单独分离）
-            if (id.includes('/@vueuse/') || id.includes('/xlsx/')) {
+            // Keep spreadsheet code out of routes that only use VueUse.
+            if (id.includes('/xlsx/')) return 'vendor-xlsx'
+            if (id.includes('/qrcode/')) return 'vendor-qrcode'
+            if (id.includes('/driver.js/')) return 'vendor-tour'
+            if (id.includes('/vue-draggable-plus/') || id.includes('/sortablejs/')) return 'vendor-drag'
+            if (id.includes('/@tanstack/')) return 'vendor-virtual'
+
+            if (id.includes('/@vueuse/')) {
               return 'vendor-ui'
             }
 
