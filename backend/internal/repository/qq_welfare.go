@@ -60,6 +60,11 @@ func (r *qqWelfareRepository) Binding(ctx context.Context, uid int64) (*service.
 	out.Verified = out.Verified && out.Ready
 	return out, err
 }
+func (r *qqWelfareRepository) UserIdentity(ctx context.Context, uid int64) (*service.QQWelfareEvent, error) {
+	e := &service.QQWelfareEvent{}
+	err := r.db.QueryRowContext(ctx, `SELECT a.qq_id,a.group_id FROM qq_welfare_accounts a JOIN users u ON u.id=a.user_id JOIN qq_welfare_config c ON c.id=1 WHERE a.user_id=$1 AND u.status='active' AND u.deleted_at IS NULL AND c.enabled AND c.group_open_id<>'' AND a.group_id=c.group_open_id`, uid).Scan(&e.ActorID, &e.GroupID)
+	return e, welfareMissing(err, service.ErrWelfareUnverified)
+}
 func (r *qqWelfareRepository) CreateBinding(ctx context.Context, uid int64, hash string, expiry time.Time) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -192,7 +197,7 @@ func (r *qqWelfareRepository) Snapshot(ctx context.Context, e service.QQWelfareE
 	if err != nil {
 		return nil, err
 	}
-	snap.Orders, err = welfareOrders(ctx, tx, uid, 5)
+	snap.Orders, err = welfareOrders(ctx, tx, uid, 100)
 	if err != nil {
 		return nil, err
 	}
@@ -221,9 +226,13 @@ func (r *qqWelfareRepository) Fulfill(ctx context.Context, e service.QQWelfareEv
 	var rewardID, couponID *int64
 	if e.Action == "exchange" {
 		rewardID = &e.ProductID
-		err = tx.QueryRowContext(ctx, `SELECT title,points_cost,balance_value FROM qq_welfare_rewards WHERE id=$1 AND enabled AND stock>0 AND (expires_at IS NULL OR expires_at>now()) FOR UPDATE`, e.ProductID).Scan(&order.Title, &order.PointsCost, &order.BalanceValue)
+		var version int64
+		err = tx.QueryRowContext(ctx, `SELECT title,points_cost,balance_value,version FROM qq_welfare_rewards WHERE id=$1 AND enabled AND stock>0 AND (expires_at IS NULL OR expires_at>now()) FOR UPDATE`, e.ProductID).Scan(&order.Title, &order.PointsCost, &order.BalanceValue, &version)
 		if err != nil {
 			return nil, welfareMissing(err, service.ErrWelfareSoldOut)
+		}
+		if e.IsWebsite && e.ProductVersion != version {
+			return nil, infraerrors.Conflict("WELFARE_STALE_PRODUCT", "商品已发生变化，请刷新后重新确认兑换。")
 		}
 		if points < int64(order.PointsCost) {
 			return nil, service.ErrWelfarePoints
@@ -366,9 +375,12 @@ func (r *qqWelfareRepository) TouchAndLimit(ctx context.Context, e service.QQWel
 	if _, err := r.Config(ctx); err != nil {
 		return err
 	}
-	_, err := r.db.ExecContext(ctx, `UPDATE qq_welfare_config SET last_bot_seen_at=now() WHERE id=1 AND (last_bot_seen_at IS NULL OR last_bot_seen_at<now()-interval '15 seconds')`)
-	if err != nil {
-		return err
+	var err error
+	if !e.IsWebsite {
+		_, err = r.db.ExecContext(ctx, `UPDATE qq_welfare_config SET last_bot_seen_at=now() WHERE id=1 AND (last_bot_seen_at IS NULL OR last_bot_seen_at<now()-interval '15 seconds')`)
+		if err != nil {
+			return err
+		}
 	}
 	var count int
 	key := service.WelfareHash(e.GroupID + "\x00" + e.ActorID)

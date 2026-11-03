@@ -34,6 +34,8 @@ func RegisterUserRoutes(
 			if h.QQWelfare != nil {
 				user.GET("/qq-welfare", h.QQWelfare.Binding)
 				user.POST("/qq-welfare/code", h.QQWelfare.BindingCode)
+				user.GET("/qq-welfare/center", h.QQWelfare.Center)
+				user.POST("/qq-welfare/actions", h.QQWelfare.UserAction)
 			}
 			user.GET("/profile", h.User.GetProfile)
 			if h.MCPOAuth != nil {

@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"math"
 	"testing"
 	"time"
@@ -12,9 +13,59 @@ import (
 
 type welfareRepoStub struct {
 	QQWelfareRepository
-	cfg   QQWelfareConfig
-	saved bool
-	hash  string
+	cfg         QQWelfareConfig
+	saved       bool
+	hash        string
+	event       QQWelfareEvent
+	identityErr error
+}
+
+func (r *welfareRepoStub) UserIdentity(_ context.Context, uid int64) (*QQWelfareEvent, error) {
+	if r.identityErr != nil {
+		return nil, r.identityErr
+	}
+	return &QQWelfareEvent{ActorID: fmt.Sprintf("qq-%d", uid), GroupID: "trusted-group"}, nil
+}
+func (r *welfareRepoStub) TouchAndLimit(_ context.Context, e QQWelfareEvent) error {
+	r.event = e
+	return nil
+}
+func (r *welfareRepoStub) Snapshot(context.Context, QQWelfareEvent) (*QQWelfareSnapshot, error) {
+	return &QQWelfareSnapshot{Points: 3, Products: []QQWelfareProduct{{Title: "private reward"}}, Orders: []QQWelfareOrder{{ID: "private receipt"}}}, nil
+}
+func TestQQWelfareWebsiteAndBotPermissions(t *testing.T) {
+	ctx := context.Background()
+	r := &welfareRepoStub{}
+	s := NewQQWelfareService(r, nil, nil)
+	for _, action := range []string{"exchange", "claim", "overview", "records"} {
+		var e QQWelfareEvent
+		require.NoError(t, json.Unmarshal([]byte(`{"action":"`+action+`","is_website":true}`), &e))
+		e.IsWebsite = true
+		_, err := s.Event(ctx, e)
+		require.Error(t, err)
+	}
+	_, err := s.UserAction(ctx, 7, "verify", "", "", 0, 0)
+	require.Error(t, err)
+	_, err = s.UserAction(ctx, 7, "exchange", "bad", "", 1, 0)
+	require.Error(t, err)
+	r.identityErr = ErrWelfareUnverified
+	_, err = s.UserAction(ctx, 7, "checkin", "", "", 0, 0)
+	require.ErrorIs(t, err, ErrWelfareUnverified)
+	r.identityErr = nil
+	result, err := s.UserAction(ctx, 7, "overview", "", "", 0, 0)
+	require.NoError(t, err)
+	require.EqualValues(t, 3, result.Snapshot.Points)
+	require.Equal(t, "qq-7", r.event.ActorID)
+	require.True(t, r.event.IsWebsite)
+	require.Equal(t, "website:", r.event.MessageID)
+	result, err = s.Event(ctx, QQWelfareEvent{Action: "points", ActorID: "qq-7", GroupID: "trusted-group", MessageID: "message"})
+	require.NoError(t, err)
+	require.Nil(t, result.Snapshot)
+	require.EqualValues(t, 3, result.Points.Points)
+	b, err := json.Marshal(result)
+	require.NoError(t, err)
+	require.NotContains(t, string(b), "private")
+	require.False(t, r.event.IsWebsite)
 }
 
 func (r *welfareRepoStub) Config(context.Context) (*QQWelfareConfig, error) { return &r.cfg, nil }

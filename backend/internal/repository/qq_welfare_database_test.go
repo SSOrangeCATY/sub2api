@@ -59,6 +59,54 @@ func newWelfareFixture(t *testing.T) *welfareFixture {
 	})
 	return f
 }
+func TestQQWelfareWebsiteSharesIdentityPointsAndReplay(t *testing.T) {
+	f := newWelfareFixture(t)
+	ctx := context.Background()
+	svc := service.NewQQWelfareService(f.repo, nil, nil)
+	_, err := f.repo.UserIdentity(ctx, f.uid+1000000)
+	require.ErrorIs(t, err, service.ErrWelfareUnverified)
+	web, err := svc.UserAction(ctx, f.uid, "checkin", "", "", 0, 0)
+	require.NoError(t, err)
+	require.Contains(t, web.Message, "获得 1 积分")
+	e := f.event
+	e.Action = "checkin"
+	bot, err := svc.Event(ctx, e)
+	require.NoError(t, err)
+	require.Contains(t, bot.Message, "今天已签到")
+	e.Action = "points"
+	bot, err = svc.Event(ctx, e)
+	require.NoError(t, err)
+	require.EqualValues(t, 1, bot.Points.Points)
+	p := &service.QQWelfareProduct{Title: f.prefix, PointsCost: 1, BalanceValue: 0.25, Stock: 2, Enabled: true}
+	require.NoError(t, f.repo.SaveProduct(ctx, p))
+	_, err = svc.UserAction(ctx, f.uid, "exchange", "website-stale-1234567", "", p.ID, p.Version+1)
+	require.Error(t, err)
+	first, err := svc.UserAction(ctx, f.uid, "exchange", "website-request-123456", "", p.ID, p.Version)
+	require.NoError(t, err)
+	retry, err := svc.UserAction(ctx, f.uid, "exchange", "website-request-123456", "", p.ID, p.Version)
+	require.NoError(t, err)
+	require.Equal(t, first.Message, retry.Message)
+	c := &service.QQWelfareCoupon{Title: f.prefix, Code: fmt.Sprintf("WEB_%d", f.uid), BalanceValue: 0.5, Enabled: true}
+	require.NoError(t, f.repo.SaveCoupon(ctx, c))
+	_, err = svc.UserAction(ctx, f.uid, "claim", "website-request-234567", c.Code, 0, 0)
+	require.NoError(t, err)
+	_, err = svc.UserAction(ctx, f.uid, "claim", "website-request-345678", c.Code, 0, 0)
+	require.ErrorIs(t, err, service.ErrWelfareAlreadyClaimed)
+	var balance float64
+	require.NoError(t, f.db.QueryRowContext(ctx, `SELECT balance FROM users WHERE id=$1`, f.uid).Scan(&balance))
+	require.Equal(t, 0.75, balance)
+	_, err = f.db.ExecContext(ctx, `UPDATE qq_welfare_config SET last_bot_seen_at=NULL WHERE id=1`)
+	require.NoError(t, err)
+	_, err = svc.UserAction(ctx, f.uid, "overview", "", "", 0, 0)
+	require.NoError(t, err)
+	cfg, err := f.repo.Config(ctx)
+	require.NoError(t, err)
+	require.Nil(t, cfg.LastBotSeenAt)
+	_, err = f.db.ExecContext(ctx, `UPDATE users SET status='disabled' WHERE id=$1`, f.uid)
+	require.NoError(t, err)
+	_, err = svc.UserAction(ctx, f.uid, "checkin", "", "", 0, 0)
+	require.ErrorIs(t, err, service.ErrWelfareUnverified)
+}
 func TestQQWelfareConcurrentCheckInAndGate(t *testing.T) {
 	f := newWelfareFixture(t)
 	ctx := context.Background()

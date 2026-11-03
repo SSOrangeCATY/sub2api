@@ -83,18 +83,28 @@ type QQWelfareAdmin struct {
 	VerifiedAccounts int64              `json:"verified_accounts"`
 }
 type QQWelfareEvent struct {
-	Action    string `json:"action"`
-	GroupID   string `json:"group_id"`
-	ActorID   string `json:"actor_id"`
-	MessageID string `json:"message_id"`
-	Code      string `json:"code"`
-	ProductID int64  `json:"product_id"`
+	IsWebsite      bool   `json:"-"`
+	ProductVersion int64  `json:"-"`
+	Action         string `json:"action"`
+	GroupID        string `json:"group_id"`
+	ActorID        string `json:"actor_id"`
+	MessageID      string `json:"message_id"`
+	Code           string `json:"code"`
+	ProductID      int64  `json:"product_id"`
 }
 type QQWelfareResult struct {
 	Message  string             `json:"message"`
 	Snapshot *QQWelfareSnapshot `json:"snapshot,omitempty"`
+	Points   *QQWelfarePoints   `json:"points,omitempty"`
+}
+type QQWelfarePoints struct {
+	Points      int64     `json:"points"`
+	CheckedIn   bool      `json:"checked_in"`
+	GroupNumber string    `json:"group_number"`
+	GeneratedAt time.Time `json:"generated_at"`
 }
 type QQWelfareRepository interface {
+	UserIdentity(context.Context, int64) (*QQWelfareEvent, error)
 	Config(context.Context) (*QQWelfareConfig, error)
 	UpdateConfig(context.Context, bool, string) error
 	GroupCode(context.Context, string, time.Time) error
@@ -203,7 +213,31 @@ func (s *QQWelfareService) SaveCoupon(ctx context.Context, p *QQWelfareCoupon) e
 	}
 	return s.repo.SaveCoupon(ctx, p)
 }
+
+// UserAction derives the QQ identity from the authenticated website user, never the request body.
+func (s *QQWelfareService) UserAction(ctx context.Context, uid int64, action, requestID, code string, productID, productVersion int64) (*QQWelfareResult, error) {
+	if action != "overview" && action != "checkin" && action != "exchange" && action != "claim" {
+		return nil, infraerrors.BadRequest("WELFARE_INVALID_ACTION", "未知福利操作。")
+	}
+	if (action == "exchange" || action == "claim") && !regexp.MustCompile(`^[A-Za-z0-9_-]{16,64}$`).MatchString(requestID) {
+		return nil, infraerrors.BadRequest("WELFARE_INVALID_REQUEST", "缺少有效的请求编号。")
+	}
+	e, err := s.repo.UserIdentity(ctx, uid)
+	if err != nil {
+		return nil, err
+	}
+	e.IsWebsite, e.Action, e.MessageID, e.Code, e.ProductID, e.ProductVersion = true, action, "website:"+requestID, code, productID, productVersion
+	return s.event(ctx, *e)
+}
 func (s *QQWelfareService) Event(ctx context.Context, e QQWelfareEvent) (*QQWelfareResult, error) {
+	// Even in-process callers cannot opt the bot endpoint into website permissions.
+	e.IsWebsite = false
+	if e.Action != "points" && e.Action != "checkin" && e.Action != "verify" && e.Action != "bind-group" {
+		return nil, infraerrors.BadRequest("WELFARE_INVALID_ACTION", "机器人仅支持签到、积分查询和群认证，兑换请前往网站福利中心。")
+	}
+	return s.event(ctx, e)
+}
+func (s *QQWelfareService) event(ctx context.Context, e QQWelfareEvent) (*QQWelfareResult, error) {
 	if len(e.GroupID) < 1 || len(e.GroupID) > 128 || len(e.ActorID) < 1 || len(e.ActorID) > 128 || len(e.MessageID) < 1 || len(e.MessageID) > 256 || len(e.Code) > 64 {
 		return nil, ErrWelfareGroup
 	}
@@ -221,11 +255,14 @@ func (s *QQWelfareService) Event(ctx context.Context, e QQWelfareEvent) (*QQWelf
 		if err := s.repo.Verify(ctx, e, WelfareHash(e.Code)); err != nil {
 			return nil, err
 		}
-		return &QQWelfareResult{Message: "Q 群认证成功，网站账号已绑定。发送「福利中心」查看积分与商品。"}, nil
-	case "overview", "records":
+		return &QQWelfareResult{Message: "Q 群认证成功，长期有效。可在网站福利中心签到和兑换，群内发送「福利签到」或「福利积分」。"}, nil
+	case "overview", "points":
 		snap, err := s.repo.Snapshot(ctx, e)
 		if err != nil {
 			return nil, err
+		}
+		if e.Action == "points" {
+			return &QQWelfareResult{Points: &QQWelfarePoints{Points: snap.Points, CheckedIn: snap.CheckedIn, GroupNumber: snap.GroupNumber, GeneratedAt: snap.GeneratedAt}}, nil
 		}
 		return &QQWelfareResult{Snapshot: snap}, nil
 	case "checkin":
@@ -240,7 +277,7 @@ func (s *QQWelfareService) Event(ctx context.Context, e QQWelfareEvent) (*QQWelf
 		return &QQWelfareResult{Message: fmt.Sprintf("%s。当前积分：%d（北京时间每日 00:00 更新）。", message, points)}, nil
 	case "exchange", "claim":
 		if e.Action == "exchange" && e.ProductID <= 0 {
-			return nil, infraerrors.BadRequest("WELFARE_INVALID_PRODUCT", "请输入商品编号，例如：福利兑换 1")
+			return nil, infraerrors.BadRequest("WELFARE_INVALID_PRODUCT", "请选择有效的积分商品。")
 		}
 		if e.Action == "claim" && !welfareCouponPattern.MatchString(e.Code) {
 			return nil, ErrWelfareSoldOut
