@@ -28,6 +28,7 @@ func TestQQWelfareHTTPBoundaries(t *testing.T) {
 		{"missing bot key", "", `{}`, http.StatusUnauthorized},
 		{"wrong bot key", "wrong", `{}`, http.StatusUnauthorized},
 		{"oversized event", "test-bot-key", `{"code":"` + strings.Repeat("a", 5000) + `"}`, http.StatusBadRequest},
+		{"bot cannot claim via forged website flag", "test-bot-key", `{"action":"claim","is_website":true,"code":"WELCOME"}`, http.StatusBadRequest},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			r := gin.New()
@@ -41,7 +42,7 @@ func TestQQWelfareHTTPBoundaries(t *testing.T) {
 			require.NotContains(t, w.Body.String(), "test-bot-key")
 		})
 	}
-	for _, handler := range []gin.HandlerFunc{h.Binding, h.BindingCode} {
+	for _, handler := range []gin.HandlerFunc{h.Binding, h.BindingCode, h.Center, h.UserAction} {
 		r := gin.New()
 		r.GET("/user", handler)
 		w := httptest.NewRecorder()

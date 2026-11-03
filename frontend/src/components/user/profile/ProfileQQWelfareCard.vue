@@ -25,6 +25,7 @@ import { useClipboard } from '@/composables/useClipboard'
 import { extractApiErrorMessage } from '@/utils/apiError'
 import '@/styles/endfield/qq-welfare.css'
 const { t } = useI18n()
+const emit = defineEmits<{ verified: [] }>()
 const { copyToClipboard } = useClipboard()
 const status = ref<WelfareBinding | null>(null)
 const loading = ref(true), busy = ref(false), error = ref(''), code = ref(''), expired = ref(false)
@@ -33,7 +34,7 @@ let deadline = 0, interval: ReturnType<typeof setInterval> | undefined
 async function load(silent = false) {
   if (!silent) loading.value = true
   error.value = ''
-  try { status.value = await qqWelfare.binding(); if (status.value.verified) code.value = '' }
+  try { status.value = await qqWelfare.binding(); if (status.value.verified) { code.value = ''; emit('verified') } }
   catch (err) { error.value = extractApiErrorMessage(err) || t('qqWelfare.failure') }
   finally { loading.value = false }
 }

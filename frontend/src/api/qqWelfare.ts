@@ -16,7 +16,11 @@ export interface WelfareAdmin {
   config: WelfareConfig; products: WelfareProduct[]; coupons: WelfareCoupon[]; orders: WelfareOrder[]; verified_accounts: number
 }
 export interface WelfareBinding { verified: boolean; ready: boolean; group_number: string }
+export interface WelfareSnapshot { points: number; checked_in: boolean; group_number: string; products: WelfareProduct[]; orders: WelfareOrder[]; generated_at: string }
+export interface WelfareResult { message: string; snapshot?: WelfareSnapshot }
 export const qqWelfare = {
+  async center() { return (await apiClient.get<WelfareResult>('/user/qq-welfare/center')).data },
+  async action(action: 'checkin' | 'exchange' | 'claim', request_id = '', code = '', product_id = 0, product_version = 0) { return (await apiClient.post<WelfareResult>('/user/qq-welfare/actions', {action, request_id, code, product_id, product_version})).data },
   async binding() { return (await apiClient.get<WelfareBinding>('/user/qq-welfare')).data },
   async bindingCode() { return (await apiClient.post<{code: string; expires_in: number}>('/user/qq-welfare/code')).data },
   async admin() { return (await apiClient.get<WelfareAdmin>('/admin/qq-welfare')).data },

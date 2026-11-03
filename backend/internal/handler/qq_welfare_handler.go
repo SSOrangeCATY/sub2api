@@ -42,6 +42,42 @@ func (h *QQWelfareHandler) BindingCode(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	response.Success(c, gin.H{"code": code, "expires_in": 600})
 }
+func (h *QQWelfareHandler) Center(c *gin.Context) {
+	h.userAction(c, true)
+}
+func (h *QQWelfareHandler) UserAction(c *gin.Context) {
+	h.userAction(c, false)
+}
+func (h *QQWelfareHandler) userAction(c *gin.Context, overview bool) {
+	subject, ok := middleware.GetAuthSubjectFromContext(c)
+	if !ok {
+		response.Unauthorized(c, "请先登录。")
+		return
+	}
+	var req struct {
+		Action         string `json:"action"`
+		RequestID      string `json:"request_id"`
+		Code           string `json:"code"`
+		ProductID      int64  `json:"product_id"`
+		ProductVersion int64  `json:"product_version"`
+	}
+	if overview {
+		req.Action = "overview"
+	} else {
+		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 4096)
+		if err := c.ShouldBindJSON(&req); err != nil {
+			response.BadRequest(c, "福利请求格式错误。")
+			return
+		}
+	}
+	data, err := h.svc.UserAction(c.Request.Context(), subject.UserID, req.Action, req.RequestID, req.Code, req.ProductID, req.ProductVersion)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	c.Header("Cache-Control", "no-store")
+	response.Success(c, data)
+}
 func (h *QQWelfareHandler) Bot(c *gin.Context) {
 	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 4096)
 	if err := h.svc.Authenticate(c.Request.Context(), c.GetHeader("X-Welfare-Bot-Key")); err != nil {
