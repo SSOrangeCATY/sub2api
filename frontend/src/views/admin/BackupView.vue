@@ -825,7 +825,7 @@ async function loadBackups(silent = false, fresh = false): Promise<void> {
     }
   })()
   await listRequest
-  if (fresh && obsolete) return loadBackups(silent, true)
+  if (obsolete && (!silent || fresh)) return loadBackups(silent, true)
 }
 
 async function createBackup() {

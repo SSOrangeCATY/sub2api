@@ -240,6 +240,19 @@ describe('admin BackupView', () => {
     expect(wrapper.get('tbody').text()).not.toContain('deleted.sql.gz')
   })
 
+  it('retries initial loading invalidated by a failed create command', async () => {
+    let finish!: (value: object) => void
+    listBackups.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+    listBackups.mockResolvedValue({ items: [baseRecord('existing')] })
+    const wrapper = mountBackupView(); await flushPromises()
+    createBackup.mockRejectedValueOnce(new Error('synthetic command failure'))
+    await wrapper.findAll('button').find(b => b.text() === 'admin.backup.operations.createBackup')!.trigger('click')
+    await flushPromises()
+    finish({ items: [baseRecord('existing')] }); await flushPromises()
+    expect(listBackups).toHaveBeenCalledTimes(2)
+    expect(wrapper.get('tbody').text()).toContain('existing.sql.gz')
+  })
+
   it.each(['backup', 'restore'])('does not resume %s polling after navigation during initial loading', async (operation) => {
     vi.useFakeTimers()
     let finish!: (value: object) => void
