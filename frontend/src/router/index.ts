@@ -13,6 +13,7 @@ import { useRoutePrefetch } from '@/composables/useRoutePrefetch'
 import { getSetupStatus } from '@/api/setup'
 import { resolveCompletedSetupRedirectPath } from './setupRedirect'
 import { resolveRouteDocumentTitle } from './title'
+import { withWorkspaceLayout } from './workspaceLayout'
 
 /**
  * Route definitions with lazy loading
@@ -196,6 +197,7 @@ const routes: RouteRecordRaw[] = [
     name: 'Dashboard',
     component: () => import('@/views/user/DashboardView.vue'),
     meta: {
+      workspaceLayout: true,
       requiresAuth: true,
       requiresAdmin: false,
       title: 'Dashboard',
@@ -208,6 +210,7 @@ const routes: RouteRecordRaw[] = [
     name: 'Keys',
     component: () => import('@/views/user/KeysView.vue'),
     meta: {
+      workspaceLayout: true,
       requiresAuth: true,
       requiresAdmin: false,
       title: 'API Keys',
@@ -221,6 +224,7 @@ const routes: RouteRecordRaw[] = [
     alias: '/docs/batch-image',
     component: () => import('@/views/user/BatchImageGuideView.vue'),
     meta: {
+      workspaceLayout: true,
       requiresAuth: true,
       requiresAdmin: false,
       title: 'Batch Image Guide',
@@ -233,6 +237,7 @@ const routes: RouteRecordRaw[] = [
     name: 'Usage',
     component: () => import('@/views/user/UsageView.vue'),
     meta: {
+      workspaceLayout: true,
       requiresAuth: true,
       requiresAdmin: false,
       title: 'Usage Records',
@@ -244,13 +249,14 @@ const routes: RouteRecordRaw[] = [
     path: '/welfare',
     name: 'Welfare',
     component: () => import('@/views/user/WelfareView.vue'),
-    meta: { requiresAuth: true, requiresAdmin: false, title: 'Welfare Center', titleKey: 'qqWelfare.centerTitle' }
+    meta: { workspaceLayout: true, requiresAuth: true, requiresAdmin: false, title: 'Welfare Center', titleKey: 'qqWelfare.centerTitle' }
   },
   {
     path: '/redeem',
     name: 'Redeem',
     component: () => import('@/views/user/RedeemView.vue'),
     meta: {
+      workspaceLayout: true,
       requiresAuth: true,
       requiresAdmin: false,
       title: 'Redeem Code',
@@ -263,6 +269,7 @@ const routes: RouteRecordRaw[] = [
     name: 'Affiliate',
     component: () => import('@/views/user/AffiliateView.vue'),
     meta: {
+      workspaceLayout: true,
       requiresAuth: true,
       requiresAdmin: false,
       title: 'Affiliate',
@@ -275,6 +282,7 @@ const routes: RouteRecordRaw[] = [
     name: 'UserAvailableChannels',
     component: () => import('@/views/user/AvailableChannelsView.vue'),
     meta: {
+      workspaceLayout: true,
       requiresAuth: true,
       requiresAdmin: false,
       title: 'Available Channels',
@@ -287,6 +295,7 @@ const routes: RouteRecordRaw[] = [
     name: 'MCP',
     component: () => import('@/views/user/MCPView.vue'),
     meta: {
+      workspaceLayout: true,
       requiresAuth: true,
       requiresAdmin: false,
       title: 'MCP Connection',
@@ -310,6 +319,7 @@ const routes: RouteRecordRaw[] = [
     name: 'Profile',
     component: () => import('@/views/user/ProfileView.vue'),
     meta: {
+      workspaceLayout: true,
       requiresAuth: true,
       requiresAdmin: false,
       title: 'Profile',
@@ -322,6 +332,7 @@ const routes: RouteRecordRaw[] = [
     name: 'Subscriptions',
     component: () => import('@/views/user/SubscriptionsView.vue'),
     meta: {
+      workspaceLayout: true,
       requiresAuth: true,
       requiresAdmin: false,
       title: 'My Subscriptions',
@@ -335,6 +346,7 @@ const routes: RouteRecordRaw[] = [
     name: 'PurchaseSubscription',
     component: () => import('@/views/user/PaymentView.vue'),
     meta: {
+      workspaceLayout: true,
       requiresAuth: true,
       requiresAdmin: false,
       title: 'Purchase Subscription',
@@ -348,6 +360,7 @@ const routes: RouteRecordRaw[] = [
     name: 'OrderList',
     component: () => import('@/views/user/UserOrdersView.vue'),
     meta: {
+      workspaceLayout: true,
       requiresAuth: true,
       requiresAdmin: false,
       title: 'My Orders',
@@ -360,6 +373,7 @@ const routes: RouteRecordRaw[] = [
     name: 'PaymentQRCode',
     component: () => import('@/views/user/PaymentQRCodeView.vue'),
     meta: {
+      workspaceLayout: true,
       requiresAuth: true,
       requiresAdmin: false,
       title: 'Payment',
@@ -396,6 +410,7 @@ const routes: RouteRecordRaw[] = [
     name: 'AirwallexPayment',
     component: () => import('@/views/user/AirwallexPaymentView.vue'),
     meta: {
+      workspaceLayout: true,
       requiresAuth: false,
       requiresAdmin: false,
       title: 'Airwallex Payment',
@@ -419,6 +434,7 @@ const routes: RouteRecordRaw[] = [
     name: 'CustomPage',
     component: () => import('@/views/user/CustomPageView.vue'),
     meta: {
+      workspaceLayout: true,
       requiresAuth: true,
       requiresAdmin: false,
       title: 'Custom Page',
@@ -436,6 +452,7 @@ const routes: RouteRecordRaw[] = [
     name: 'AdminDashboard',
     component: () => import('@/views/admin/DashboardView.vue'),
     meta: {
+      workspaceLayout: true,
       requiresAuth: true,
       requiresAdmin: true,
       title: 'Admin Dashboard',
@@ -460,6 +477,7 @@ const routes: RouteRecordRaw[] = [
     name: 'AdminAuditLogs',
     component: () => import('@/views/admin/AuditLogView.vue'),
     meta: {
+      workspaceLayout: true,
       requiresAuth: true,
       requiresAdmin: true,
       title: 'Audit Logs',
@@ -472,6 +490,7 @@ const routes: RouteRecordRaw[] = [
     name: 'AdminUsers',
     component: () => import('@/views/admin/UsersView.vue'),
     meta: {
+      workspaceLayout: true,
       requiresAuth: true,
       requiresAdmin: true,
       title: 'User Management',
@@ -484,6 +503,7 @@ const routes: RouteRecordRaw[] = [
     name: 'AdminGroups',
     component: () => import('@/views/admin/GroupsView.vue'),
     meta: {
+      workspaceLayout: true,
       requiresAuth: true,
       requiresAdmin: true,
       title: 'Group Management',
@@ -500,6 +520,7 @@ const routes: RouteRecordRaw[] = [
     name: 'AdminChannels',
     component: () => import('@/views/admin/ChannelsView.vue'),
     meta: {
+      workspaceLayout: true,
       requiresAuth: true,
       requiresAdmin: true,
       title: 'Channel Management',
@@ -512,6 +533,7 @@ const routes: RouteRecordRaw[] = [
     name: 'AdminChannelMonitor',
     component: () => import('@/views/admin/ChannelMonitorView.vue'),
     meta: {
+      workspaceLayout: true,
       requiresAuth: true,
       requiresAdmin: true,
       title: 'Channel Monitor',
@@ -524,6 +546,7 @@ const routes: RouteRecordRaw[] = [
     name: 'ChannelStatus',
     component: () => import('@/views/user/ChannelStatusView.vue'),
     meta: {
+      workspaceLayout: true,
       requiresAuth: true,
       requiresAdmin: false,
       title: 'Channel Status',
@@ -535,6 +558,7 @@ const routes: RouteRecordRaw[] = [
     name: 'AdminSubscriptions',
     component: () => import('@/views/admin/SubscriptionsView.vue'),
     meta: {
+      workspaceLayout: true,
       requiresAuth: true,
       requiresAdmin: true,
       title: 'Subscription Management',
@@ -547,6 +571,7 @@ const routes: RouteRecordRaw[] = [
     name: 'AdminAccounts',
     component: () => import('@/views/admin/AccountsView.vue'),
     meta: {
+      workspaceLayout: true,
       requiresAuth: true,
       requiresAdmin: true,
       title: 'Account Management',
@@ -559,6 +584,7 @@ const routes: RouteRecordRaw[] = [
     name: 'AdminPlugins',
     component: () => import('@/views/admin/PluginsView.vue'),
     meta: {
+      workspaceLayout: true,
       requiresAuth: true,
       requiresAdmin: true,
       title: 'Plugin Management',
@@ -571,6 +597,7 @@ const routes: RouteRecordRaw[] = [
     name: 'AdminAnnouncements',
     component: () => import('@/views/admin/AnnouncementsView.vue'),
     meta: {
+      workspaceLayout: true,
       requiresAuth: true,
       requiresAdmin: true,
       title: 'Announcements',
@@ -583,6 +610,7 @@ const routes: RouteRecordRaw[] = [
     name: 'AdminProxies',
     component: () => import('@/views/admin/ProxiesView.vue'),
     meta: {
+      workspaceLayout: true,
       requiresAuth: true,
       requiresAdmin: true,
       title: 'Proxy Management',
@@ -594,13 +622,14 @@ const routes: RouteRecordRaw[] = [
     path: '/admin/qq-welfare',
     name: 'AdminQQWelfare',
     component: () => import('@/views/admin/QQWelfareView.vue'),
-    meta: { requiresAuth: true, requiresAdmin: true, title: 'QQ Bot', titleKey: 'qqWelfare.adminTitle' }
+    meta: { workspaceLayout: true, requiresAuth: true, requiresAdmin: true, title: 'QQ Bot', titleKey: 'qqWelfare.adminTitle' }
   },
   {
     path: '/admin/redeem',
     name: 'AdminRedeem',
     component: () => import('@/views/admin/RedeemView.vue'),
     meta: {
+      workspaceLayout: true,
       requiresAuth: true,
       requiresAdmin: true,
       title: 'Redeem Code Management',
@@ -613,6 +642,7 @@ const routes: RouteRecordRaw[] = [
     name: 'AdminPromoCodes',
     component: () => import('@/views/admin/PromoCodesView.vue'),
     meta: {
+      workspaceLayout: true,
       requiresAuth: true,
       requiresAdmin: true,
       title: 'Promo Code Management',
@@ -625,6 +655,7 @@ const routes: RouteRecordRaw[] = [
     name: 'AdminSettings',
     component: () => import('@/views/admin/SettingsView.vue'),
     meta: {
+      workspaceLayout: true,
       requiresAuth: true,
       requiresAdmin: true,
       title: 'System Settings',
@@ -637,6 +668,7 @@ const routes: RouteRecordRaw[] = [
     name: 'AdminRiskControl',
     component: () => import('@/views/admin/RiskControlView.vue'),
     meta: {
+      workspaceLayout: true,
       requiresAuth: true,
       requiresAdmin: true,
       title: 'Risk Control',
@@ -650,6 +682,7 @@ const routes: RouteRecordRaw[] = [
     name: 'AdminPromptAudit',
     component: () => import('@/features/prompt-audit/PromptAuditView.vue'),
     meta: {
+      workspaceLayout: true,
       requiresAuth: true,
       requiresAdmin: true,
       title: 'Prompt Audit',
@@ -663,6 +696,7 @@ const routes: RouteRecordRaw[] = [
     name: 'AdminUsage',
     component: () => import('@/views/admin/UsageView.vue'),
     meta: {
+      workspaceLayout: true,
       requiresAuth: true,
       requiresAdmin: true,
       title: 'Usage Records',
@@ -679,6 +713,7 @@ const routes: RouteRecordRaw[] = [
     name: 'AdminAffiliateInvites',
     component: () => import('@/views/admin/affiliates/AdminAffiliateInvitesView.vue'),
     meta: {
+      workspaceLayout: true,
       requiresAuth: true,
       requiresAdmin: true,
       title: 'Affiliate Invite Records',
@@ -691,6 +726,7 @@ const routes: RouteRecordRaw[] = [
     name: 'AdminAffiliateRebates',
     component: () => import('@/views/admin/affiliates/AdminAffiliateRebatesView.vue'),
     meta: {
+      workspaceLayout: true,
       requiresAuth: true,
       requiresAdmin: true,
       title: 'Affiliate Rebate Records',
@@ -703,6 +739,7 @@ const routes: RouteRecordRaw[] = [
     name: 'AdminAffiliateTransfers',
     component: () => import('@/views/admin/affiliates/AdminAffiliateTransfersView.vue'),
     meta: {
+      workspaceLayout: true,
       requiresAuth: true,
       requiresAdmin: true,
       title: 'Affiliate Transfer Records',
@@ -718,6 +755,7 @@ const routes: RouteRecordRaw[] = [
     name: 'AdminPaymentDashboard',
     component: () => import('@/views/admin/orders/AdminPaymentDashboardView.vue'),
     meta: {
+      workspaceLayout: true,
       requiresAuth: true,
       requiresAdmin: true,
       title: 'Payment Dashboard',
@@ -730,6 +768,7 @@ const routes: RouteRecordRaw[] = [
     name: 'AdminOrders',
     component: () => import('@/views/admin/orders/AdminOrdersView.vue'),
     meta: {
+      workspaceLayout: true,
       requiresAuth: true,
       requiresAdmin: true,
       title: 'Order Management',
@@ -742,6 +781,7 @@ const routes: RouteRecordRaw[] = [
     name: 'AdminPaymentPlans',
     component: () => import('@/views/admin/orders/AdminPaymentPlansView.vue'),
     meta: {
+      workspaceLayout: true,
       requiresAuth: true,
       requiresAdmin: true,
       title: 'Subscription Plans',
@@ -766,7 +806,7 @@ const routes: RouteRecordRaw[] = [
  */
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
-  routes,
+  routes: withWorkspaceLayout(routes),
   scrollBehavior(_to, _from, savedPosition) {
     // Scroll to saved position when using browser back/forward
     if (savedPosition) {
