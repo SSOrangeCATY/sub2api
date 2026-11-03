@@ -2,6 +2,8 @@
 
 FRONTEND_CRITICAL_VITEST := \
 	src/views/user/__tests__/WelfareView.spec.ts \
+	src/views/user/__tests__/ChannelStatusV2View.refresh.spec.ts \
+	src/views/admin/__tests__/BackupView.spec.ts \
 	src/views/admin/__tests__/QQWelfareView.spec.ts \
 	src/components/user/profile/__tests__/ProfileQQWelfareCard.spec.ts \
 	src/i18n/__tests__/localeKeyCompleteness.spec.ts \

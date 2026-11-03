@@ -3,7 +3,7 @@
     <main class="welfare-page welfare-center">
       <header class="welfare-section-head">
         <div><span class="welfare-eyebrow">// WELFARE CENTER</span><h1>{{ t('qqWelfare.centerTitle') }}</h1></div>
-        <button class="ef-btn" :disabled="loading || busy" @click="load">{{ t('qqWelfare.refresh') }}</button>
+        <button class="ef-btn" :disabled="refreshing || busy" @click="load()">{{ t('qqWelfare.refresh') }}</button>
       </header>
       <p v-if="error" role="alert" class="welfare-notice">{{ error }}</p>
       <p v-if="message" role="status" class="welfare-notice">{{ message }}</p>
@@ -12,7 +12,7 @@
       <template v-else-if="snapshot">
         <section class="welfare-account" :aria-label="t('qqWelfare.myPoints')">
           <div><span class="welfare-eyebrow">// MY POINTS</span><strong>{{ snapshot.points }}<small>{{ t('qqWelfare.pointsUnit') }}</small></strong></div>
-          <div><button class="ef-btn go" :disabled="busy || snapshot.checked_in" @click="checkIn">{{ t(snapshot.checked_in ? 'qqWelfare.checkedIn' : 'qqWelfare.checkIn') }}</button><p>{{ t('qqWelfare.checkinHint') }}</p></div>
+          <div><button class="ef-btn go" :disabled="busy || refreshing || snapshot.checked_in" @click="checkIn">{{ t(snapshot.checked_in ? 'qqWelfare.checkedIn' : 'qqWelfare.checkIn') }}</button><p>{{ t('qqWelfare.checkinHint') }}</p></div>
         </section>
         <section class="welfare-panel" aria-labelledby="welfare-products">
           <div class="welfare-section-head"><div><span class="welfare-eyebrow">// POINT REWARDS</span><h2 id="welfare-products">{{ t('qqWelfare.products') }}</h2></div></div>
@@ -21,7 +21,7 @@
             <span class="welfare-row-id">{{ String(product.id).padStart(2, '0') }}</span>
             <div><h3>{{ product.title }}</h3><p>${{ product.balance_value }} / {{ t('qqWelfare.stock') }} {{ product.stock }}</p></div>
             <strong>{{ product.points_cost }} {{ t('qqWelfare.pointsUnit') }}</strong>
-            <button class="ef-btn" :disabled="busy || snapshot.points < product.points_cost" @click="selected = product">{{ t('qqWelfare.exchange') }}</button>
+            <button class="ef-btn" :disabled="busy || refreshing || snapshot.points < product.points_cost" @click="selected = product">{{ t('qqWelfare.exchange') }}</button>
           </article>
           <p>{{ t('qqWelfare.autoCredit') }}</p>
         </section>
@@ -30,7 +30,7 @@
           <form class="welfare-claim-form" @submit.prevent="claim">
             <label class="sr-only" for="welfare-code">{{ t('qqWelfare.code') }}</label>
             <input id="welfare-code" v-model="coupon" type="text" required minlength="3" maxlength="32" autocomplete="off" :placeholder="t('qqWelfare.enterCode')" :disabled="busy" />
-            <button class="ef-btn go" :disabled="busy || !coupon.trim()">{{ t('qqWelfare.claim') }}</button>
+            <button class="ef-btn go" :disabled="busy || refreshing || !coupon.trim()">{{ t('qqWelfare.claim') }}</button>
           </form><p>{{ t('qqWelfare.oncePerAccount') }}</p>
         </section>
         <section class="welfare-panel" aria-labelledby="welfare-orders">
@@ -59,7 +59,10 @@ import '@/styles/endfield/qq-welfare.css'
 const { t, locale } = useI18n()
 const auth = useAuthStore()
 const loading = ref(true), busy = ref(false), verified = ref(false), error = ref(''), message = ref(''), coupon = ref('')
+const refreshing = ref(false)
 const snapshot = ref<WelfareSnapshot | null>(null), selected = ref<WelfareProduct | null>(null)
+const RETURN_REFRESH_MS = 60_000
+let active = true, hasLoaded = false, lastRefreshedAt = 0, loadedDay = ''
 // Persist an unresolved request across refreshes so retrying cannot purchase twice.
 const pendingKey = (payload: string) => `welfare-request:${auth.user?.id}:${payload}`
 function requestID(action: string, target: string) {
@@ -70,15 +73,32 @@ function requestID(action: string, target: string) {
   sessionStorage.setItem(pendingKey(payload), JSON.stringify({ payload, id }))
   return id
 }
-async function load() {
-  loading.value = true; error.value = ''
-  try { const binding = await qqWelfare.binding(); verified.value = binding.verified && binding.ready; if (verified.value) snapshot.value = (await qqWelfare.center()).snapshot ?? null }
-  catch (err) { error.value = extractApiErrorMessage(err) || t('qqWelfare.failure') }
-  finally { loading.value = false }
+async function load(silent = false) {
+  if (!active || refreshing.value || busy.value) return
+  loading.value = !hasLoaded; refreshing.value = true
+  if (!silent) error.value = ''
+  const requestedDay = beijingDay(new Date())
+  try {
+    const binding = await qqWelfare.binding()
+    if (!active) return
+    verified.value = binding.verified && binding.ready
+    if (verified.value) {
+      const result = await qqWelfare.center()
+      if (!active) return
+      snapshot.value = result.snapshot ?? null
+    } else {
+      snapshot.value = null; selected.value = null
+    }
+    loadedDay = requestedDay; lastRefreshedAt = Date.now()
+  } catch (err) {
+    if (active && !silent) error.value = extractApiErrorMessage(err) || t('qqWelfare.failure')
+  } finally {
+    if (active) { hasLoaded = true; loading.value = false; refreshing.value = false }
+  }
 }
 async function unlock() { if (!verified.value) await load() }
 async function perform(action: 'checkin' | 'exchange' | 'claim', target = '', version = 0) {
-  if (busy.value) return
+  if (!active || busy.value || refreshing.value) return
   busy.value = true; error.value = ''; message.value = ''
   try {
     const id = action === 'checkin' ? '' : requestID(action, target)
@@ -89,6 +109,7 @@ async function perform(action: 'checkin' | 'exchange' | 'claim', target = '', ve
     snapshot.value = null
     try {
       snapshot.value = (await qqWelfare.center()).snapshot ?? null
+      loadedDay = beijingDay(new Date()); lastRefreshedAt = Date.now()
       if (action !== 'checkin') await auth.refreshUser()
     } catch { error.value = t('qqWelfare.refreshFailed') }
   } catch (err) { error.value = extractApiErrorMessage(err) || t('qqWelfare.failure') }
@@ -99,12 +120,16 @@ const exchange = () => selected.value && perform('exchange', String(selected.val
 const claim = () => perform('claim', coupon.value.trim().toUpperCase())
 const formatTime = (value: string) => new Intl.DateTimeFormat(locale.value, { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Shanghai' }).format(new Date(value))
 const beijingDay = (date: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit' }).format(date)
-let loadedDay = beijingDay(new Date()), dayTimer: ReturnType<typeof setInterval> | undefined
-function refreshOnReturn() { if (!busy.value && !loading.value && !selected.value && !document.hidden) { loadedDay = beijingDay(new Date()); void load() } }
+let dayTimer: ReturnType<typeof setInterval> | undefined
+function refreshOnReturn() {
+  if (!active || document.hidden || !verified.value || busy.value || refreshing.value || selected.value) return
+  if (beijingDay(new Date()) !== loadedDay || Date.now() - lastRefreshedAt >= RETURN_REFRESH_MS) void load(true)
+}
 onMounted(() => {
   void load()
   window.addEventListener('focus', refreshOnReturn)
+  document.addEventListener('visibilitychange', refreshOnReturn)
   dayTimer = setInterval(() => { if (beijingDay(new Date()) !== loadedDay) refreshOnReturn() }, 30000)
 })
-onUnmounted(() => { window.removeEventListener('focus', refreshOnReturn); clearInterval(dayTimer) })
+onUnmounted(() => { active = false; window.removeEventListener('focus', refreshOnReturn); document.removeEventListener('visibilitychange', refreshOnReturn); clearInterval(dayTimer) })
 </script>

@@ -719,7 +719,7 @@ async function loadDimensions(signal?: AbortSignal, id = sequence) {
   dimensions.value = next
 }
 
-async function loadMetrics(signal?: AbortSignal, id = sequence) {
+async function loadMetrics(signal?: AbortSignal, id = sequence, silent = false) {
   const [nextSnapshot, nextMatrix] = await Promise.all([
     api.getSnapshot(filter.value, isAdmin.value, signal),
     api.getMatrix(filter.value, matrixGroupBy.value, isAdmin.value, signal),
@@ -728,7 +728,7 @@ async function loadMetrics(signal?: AbortSignal, id = sequence) {
   snapshot.value = nextSnapshot
   matrix.value = nextMatrix
   scheduleAutoRefresh()
-  await loadTab(signal, id)
+  await loadTab(signal, id, silent)
 }
 
 async function reload(silent = true) {
@@ -742,7 +742,7 @@ async function reload(silent = true) {
     // Catalog + metrics in parallel; catalog ignores dimension filters so options never shrink.
     await Promise.all([
       loadDimensions(request.signal, id),
-      loadMetrics(request.signal, id),
+      loadMetrics(request.signal, id, silent),
     ])
   } catch (error) {
     if ((error as { name?: string }).name !== 'CanceledError') {
@@ -766,7 +766,7 @@ async function reloadMetricsOnly(silent = true) {
   refreshing.value = true
   if (!silent) loading.value = true
   try {
-    await loadMetrics(request.signal, id)
+    await loadMetrics(request.signal, id, silent)
   } catch (error) {
     if ((error as { name?: string }).name !== 'CanceledError') {
       appStore.showError(extractApiErrorMessage(error, t('channelMonitorV2.loadFailed')))
@@ -779,8 +779,8 @@ async function reloadMetricsOnly(silent = true) {
     }
   }
 }
-async function loadTab(signal?: AbortSignal, id = sequence) {
-  tabLoading.value = true
+async function loadTab(signal?: AbortSignal, id = sequence, silent = false) {
+  tabLoading.value = !silent
   try {
     if (activeTab.value === 'models') {
       modelRows.value = (await api.getModels(filter.value, isAdmin.value, signal)).items || []
@@ -821,7 +821,7 @@ function scheduleAutoRefresh() {
     ? 10
     : snapshot.value?.config?.refresh_interval_seconds || 300
   autoRefreshTimer = window.setInterval(() => {
-    if (!loading.value && !refreshing.value) {
+    if (!document.hidden && !loading.value && !refreshing.value) {
       void reload(true)
     }
   }, Math.max(bootstrapActive.value ? 10 : 60, seconds) * 1000)

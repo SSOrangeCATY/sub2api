@@ -11,6 +11,9 @@ const {
   deleteBackup,
   listBackups,
   getDownloadURL,
+  getBackup,
+  createBackup,
+  restoreBackup,
 } = vi.hoisted(() => ({
   getS3Config: vi.fn(),
   getImageStorageConfig: vi.fn(),
@@ -19,6 +22,9 @@ const {
   deleteBackup: vi.fn(),
   listBackups: vi.fn(),
   getDownloadURL: vi.fn(),
+  getBackup: vi.fn(),
+  createBackup: vi.fn(),
+  restoreBackup: vi.fn(),
 }))
 
 vi.mock('@/api', () => ({
@@ -32,12 +38,12 @@ vi.mock('@/api', () => ({
       testImageStorageConnection: vi.fn(),
       getSchedule,
       updateSchedule,
-      createBackup: vi.fn(),
+      createBackup,
       listBackups,
-      getBackup: vi.fn(),
+      getBackup,
       deleteBackup,
       getDownloadURL,
-      restoreBackup: vi.fn(),
+      restoreBackup,
     },
   },
 }))
@@ -92,6 +98,7 @@ function mountBackupView() {
 
 describe('admin BackupView', () => {
   beforeEach(() => {
+    vi.clearAllMocks()
     getS3Config.mockResolvedValue({})
     getImageStorageConfig.mockResolvedValue({ config: {}, secret_configured: false })
     getSchedule.mockResolvedValue({ enabled: false, cron_expr: '', retain_days: 14, retain_count: 10 })
@@ -99,13 +106,201 @@ describe('admin BackupView', () => {
     deleteBackup.mockReset().mockResolvedValue(undefined)
     listBackups.mockResolvedValue({ items: [] })
     getDownloadURL.mockReset()
+    getBackup.mockReset()
+    createBackup.mockReset()
+    restoreBackup.mockReset()
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
   })
 
   afterEach(() => {
     wrappers.splice(0).forEach(wrapper => wrapper.unmount())
     vi.restoreAllMocks()
+    vi.useRealTimers()
     document.body.innerHTML = ''
+  })
+
+  it('keeps a recent backup list when returning to the tab', async () => {
+    listBackups.mockResolvedValue({ items: [baseRecord('recent')] })
+    const wrapper = mountBackupView(); await flushPromises()
+    vi.spyOn(document, 'hidden', 'get').mockReturnValue(true)
+    document.dispatchEvent(new Event('visibilitychange'))
+    vi.spyOn(document, 'hidden', 'get').mockReturnValue(false)
+    document.dispatchEvent(new Event('visibilitychange')); await flushPromises()
+    expect(listBackups).toHaveBeenCalledOnce()
+    expect(wrapper.get('tbody').text()).toContain('recent')
+  })
+
+  it('silently deduplicates stale return refreshes and preserves unsaved settings', async () => {
+    vi.useFakeTimers(); vi.setSystemTime(new Date('2026-11-03T10:00:00Z'))
+    listBackups.mockResolvedValue({ items: [baseRecord('existing')] })
+    const wrapper = mountBackupView(); await flushPromises()
+    const field = wrapper.get('[data-testid="backup-retain-days"]')
+    await field.setValue(27)
+    let finish!: (value: object) => void
+    listBackups.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+    vi.setSystemTime(new Date('2026-11-03T10:02:00Z'))
+    vi.spyOn(document, 'hidden', 'get').mockReturnValue(false)
+    document.dispatchEvent(new Event('visibilitychange')); await flushPromises()
+    document.dispatchEvent(new Event('visibilitychange')); await flushPromises()
+    expect(listBackups).toHaveBeenCalledTimes(2)
+    expect(wrapper.text()).not.toContain('common.loading')
+    expect(wrapper.get('tbody').text()).toContain('existing')
+    expect((field.element as HTMLInputElement).value).toBe('27')
+    finish({ items: [baseRecord('updated')] }); await flushPromises()
+    expect(wrapper.get('tbody').text()).toContain('updated')
+    expect(getS3Config).toHaveBeenCalledOnce(); expect(getSchedule).toHaveBeenCalledOnce()
+  })
+
+  it.each(['backup', 'restore'])('reconciles completed %s work on return and clears busy controls', async (operation) => {
+    vi.useFakeTimers()
+    listBackups.mockResolvedValueOnce({ items: [{ ...baseRecord('running'),
+      status: operation === 'backup' ? 'running' : 'completed',
+      restore_status: operation === 'restore' ? 'running' : undefined,
+    }] })
+    const wrapper = mountBackupView(); await flushPromises()
+    vi.spyOn(document, 'hidden', 'get').mockReturnValue(true)
+    document.dispatchEvent(new Event('visibilitychange'))
+    listBackups.mockResolvedValue({ items: [baseRecord('running')] })
+    vi.spyOn(document, 'hidden', 'get').mockReturnValue(false)
+    document.dispatchEvent(new Event('visibilitychange')); await flushPromises()
+    expect(listBackups).toHaveBeenCalledTimes(2)
+    expect(wrapper.text()).not.toContain('common.loading')
+    expect(wrapper.findAll('button').find(b => b.text() === 'admin.backup.operations.createBackup')!.attributes('disabled')).toBeUndefined()
+    expect(vi.getTimerCount()).toBe(0)
+    expect(getBackup).not.toHaveBeenCalled()
+  })
+
+  it.each(['backup', 'restore'])('keeps pending %s commands busy across a return refresh', async (operation) => {
+    vi.useFakeTimers()
+    vi.spyOn(document, 'hidden', 'get').mockReturnValue(false)
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    vi.spyOn(window, 'prompt').mockReturnValue('synthetic-password')
+    listBackups.mockResolvedValue({ items: [baseRecord('existing')] })
+    let finish!: (value: object) => void
+    const command = operation === 'backup' ? createBackup : restoreBackup
+    command.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+    const wrapper = mountBackupView(); await flushPromises()
+    const action = () => wrapper.findAll('button').find(b => b.text() === (operation === 'backup'
+      ? 'admin.backup.operations.createBackup' : 'admin.backup.actions.restore'))!
+    const button = action()
+    await button.trigger('click'); await flushPromises()
+    vi.spyOn(document, 'hidden', 'get').mockReturnValue(true)
+    document.dispatchEvent(new Event('visibilitychange'))
+    vi.spyOn(document, 'hidden', 'get').mockReturnValue(false)
+    document.dispatchEvent(new Event('visibilitychange')); await flushPromises()
+    expect(listBackups).toHaveBeenCalledTimes(2)
+    expect(button.attributes('disabled')).toBeDefined()
+    let finishList!: (value: object) => void
+    listBackups.mockImplementationOnce(() => new Promise(resolve => { finishList = resolve }))
+    document.dispatchEvent(new Event('visibilitychange')); await flushPromises()
+    finish({ ...baseRecord('existing'), status: operation === 'backup' ? 'running' : 'completed',
+      restore_status: operation === 'restore' ? 'running' : undefined })
+    await flushPromises()
+    finishList({ items: [baseRecord('existing')] }); await flushPromises()
+    expect(button.attributes('disabled')).toBeDefined()
+    expect(command).toHaveBeenCalledOnce()
+    expect(vi.getTimerCount()).toBe(1)
+    if (operation === 'backup') expect(wrapper.get('tbody').text()).toContain('admin.backup.status.running')
+  })
+
+  it('fetches a fresh list after deletion overlapping a delayed return refresh', async () => {
+    vi.useFakeTimers(); vi.setSystemTime(new Date('2026-11-03T10:00:00Z'))
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    listBackups.mockResolvedValue({ items: [baseRecord('deleted')] })
+    const wrapper = mountBackupView(); await flushPromises()
+    let finish!: (value: object) => void
+    listBackups.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+    listBackups.mockResolvedValue({ items: [] })
+    vi.setSystemTime(new Date('2026-11-03T10:02:00Z'))
+    vi.spyOn(document, 'hidden', 'get').mockReturnValue(false)
+    document.dispatchEvent(new Event('visibilitychange')); await flushPromises()
+    await wrapper.findAll('button').find(b => b.text() === 'common.delete')!.trigger('click')
+    await flushPromises()
+    expect(deleteBackup).toHaveBeenCalledWith('deleted', false)
+    finish({ items: [baseRecord('deleted')] }); await flushPromises()
+    expect(listBackups).toHaveBeenCalledTimes(3)
+    expect(wrapper.get('tbody').text()).not.toContain('deleted.sql.gz')
+    expect(wrapper.findAll('button').some(b => b.text() === 'common.delete')).toBe(false)
+  })
+
+  it('retries a required post-delete list invalidated by a failed create command', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    listBackups.mockResolvedValueOnce({ items: [baseRecord('deleted')] })
+    const wrapper = mountBackupView(); await flushPromises()
+    let finish!: (value: object) => void
+    listBackups.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+    listBackups.mockResolvedValue({ items: [] })
+    await wrapper.findAll('button').find(b => b.text() === 'common.delete')!.trigger('click')
+    await flushPromises()
+    createBackup.mockRejectedValueOnce(new Error('synthetic command failure'))
+    await wrapper.findAll('button').find(b => b.text() === 'admin.backup.operations.createBackup')!.trigger('click')
+    await flushPromises()
+    finish({ items: [] }); await flushPromises()
+    expect(listBackups).toHaveBeenCalledTimes(3)
+    expect(wrapper.get('tbody').text()).not.toContain('deleted.sql.gz')
+  })
+
+  it('retries initial loading invalidated by a failed create command', async () => {
+    let finish!: (value: object) => void
+    listBackups.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+    listBackups.mockResolvedValue({ items: [baseRecord('existing')] })
+    const wrapper = mountBackupView(); await flushPromises()
+    createBackup.mockRejectedValueOnce(new Error('synthetic command failure'))
+    await wrapper.findAll('button').find(b => b.text() === 'admin.backup.operations.createBackup')!.trigger('click')
+    await flushPromises()
+    finish({ items: [baseRecord('existing')] }); await flushPromises()
+    expect(listBackups).toHaveBeenCalledTimes(2)
+    expect(wrapper.get('tbody').text()).toContain('existing.sql.gz')
+  })
+
+  it('resumes paused backup polling after a failed restore invalidates the return list', async () => {
+    vi.useFakeTimers()
+    vi.spyOn(document, 'hidden', 'get').mockReturnValue(false)
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    vi.spyOn(window, 'prompt').mockReturnValue('synthetic-password')
+    const records = [{ ...baseRecord('running'), status: 'running' }, baseRecord('existing')]
+    listBackups.mockResolvedValue({ items: records })
+    const wrapper = mountBackupView(); await flushPromises()
+    vi.spyOn(document, 'hidden', 'get').mockReturnValue(true)
+    document.dispatchEvent(new Event('visibilitychange'))
+    expect(vi.getTimerCount()).toBe(0)
+    let finish!: (value: object) => void
+    listBackups.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+    vi.spyOn(document, 'hidden', 'get').mockReturnValue(false)
+    document.dispatchEvent(new Event('visibilitychange')); await flushPromises()
+    restoreBackup.mockRejectedValueOnce(new Error('synthetic command failure'))
+    await wrapper.findAll('button').find(b => b.text() === 'admin.backup.actions.restore')!.trigger('click')
+    await flushPromises()
+    finish({ items: records }); await flushPromises()
+    expect(listBackups).toHaveBeenCalledTimes(3)
+    expect(vi.getTimerCount()).toBe(1)
+    getBackup.mockResolvedValue({ ...baseRecord('running'), status: 'running' })
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(getBackup).toHaveBeenCalledWith('running')
+  })
+
+  it.each(['backup', 'restore'])('resumes known %s polling after a temporary return-list failure', async (operation) => {
+    vi.useFakeTimers()
+    vi.spyOn(document, 'hidden', 'get').mockReturnValue(false)
+    listBackups.mockResolvedValue({ items: [{ ...baseRecord('running'),
+      status: operation === 'backup' ? 'running' : 'completed',
+      restore_status: operation === 'restore' ? 'running' : undefined,
+    }] })
+    const wrapper = mountBackupView(); await flushPromises()
+    vi.spyOn(document, 'hidden', 'get').mockReturnValue(true)
+    document.dispatchEvent(new Event('visibilitychange'))
+    expect(vi.getTimerCount()).toBe(0)
+    listBackups.mockRejectedValueOnce(new Error('synthetic temporary list failure'))
+    vi.spyOn(document, 'hidden', 'get').mockReturnValue(false)
+    document.dispatchEvent(new Event('visibilitychange')); await flushPromises()
+    expect(vi.getTimerCount()).toBe(1)
+    expect(listBackups).toHaveBeenCalledTimes(2)
+    listBackups.mockResolvedValue({ items: [baseRecord('running')] })
+    getBackup.mockResolvedValue({ ...baseRecord('running'), restore_status: 'completed' })
+    await vi.advanceTimersByTimeAsync(2000); await flushPromises()
+    expect(getBackup).toHaveBeenCalledWith('running')
+    expect(vi.getTimerCount()).toBe(0)
+    expect(wrapper.findAll('button').find(b => b.text() === 'admin.backup.operations.createBackup')!.attributes('disabled')).toBeUndefined()
   })
 
   it.each(['backup', 'restore'])('does not resume %s polling after navigation during initial loading', async (operation) => {
