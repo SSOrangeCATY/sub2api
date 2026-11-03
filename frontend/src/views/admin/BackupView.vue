@@ -194,7 +194,7 @@
             <button type="button" class="btn btn-primary btn-sm" :disabled="creatingBackup" @click="createBackup">
               {{ creatingBackup ? t('admin.backup.operations.backing') : t('admin.backup.operations.createBackup') }}
             </button>
-            <button type="button" class="btn btn-secondary btn-sm" :disabled="loadingBackups" @click="loadBackups">
+            <button type="button" class="btn btn-secondary btn-sm" :disabled="fetchingBackups" @click="loadBackups()">
               {{ loadingBackups ? t('common.loading') : t('common.refresh') }}
             </button>
           </div>
@@ -527,6 +527,9 @@ const retentionPreview = computed(() => {
 // Backups
 const backups = ref<BackupRecord[]>([])
 const loadingBackups = ref(false)
+const fetchingBackups = ref(false)
+let listRequest: Promise<void> | null = null
+let lastBackupsLoadedAt = 0
 const creatingBackup = ref(false)
 const restoringId = ref('')
 const manualExpireDays = ref(14)
@@ -547,7 +550,7 @@ function updateRecordInList(updated: BackupRecord) {
 }
 
 function startPolling(backupId: string) {
-  if (disposed) return
+  if (disposed || document.hidden) return
   stopPolling()
   let count = 0
   pollingTimer.value = setInterval(async () => {
@@ -559,6 +562,7 @@ function startPolling(backupId: string) {
     }
     try {
       const record = await adminAPI.backup.getBackup(backupId)
+      if (disposed || document.hidden) return
       updateRecordInList(record)
       if (record.status === 'completed' || record.status === 'failed') {
         stopPolling()
@@ -584,7 +588,7 @@ function stopPolling() {
 }
 
 function startRestorePolling(backupId: string) {
-  if (disposed) return
+  if (disposed || document.hidden) return
   stopRestorePolling()
   let count = 0
   restoringPollingTimer.value = setInterval(async () => {
@@ -596,6 +600,7 @@ function startRestorePolling(backupId: string) {
     }
     try {
       const record = await adminAPI.backup.getBackup(backupId)
+      if (disposed || document.hidden) return
       updateRecordInList(record)
       if (record.restore_status === 'completed' || record.restore_status === 'failed') {
         stopRestorePolling()
@@ -625,16 +630,18 @@ function handleVisibilityChange() {
     stopPolling()
     stopRestorePolling()
   } else {
-    // 标签页恢复时刷新列表，检查是否仍有活跃操作
-    loadBackups().then(() => {
+    // Reconcile active work immediately; ordinary short tab switches need no request.
+    if (!creatingBackup.value && !restoringId.value && Date.now() - lastBackupsLoadedAt < 60_000) return
+    void loadBackups(true).then(() => {
+      if (disposed || document.hidden) return
       const running = backups.value.find(r => r.status === 'running')
+      creatingBackup.value = !!running
       if (running) {
-        creatingBackup.value = true
         startPolling(running.id)
       }
       const restoring = backups.value.find(r => r.restore_status === 'running')
+      restoringId.value = restoring?.id || ''
       if (restoring) {
-        restoringId.value = restoring.id
         startRestorePolling(restoring.id)
       }
     })
@@ -788,16 +795,24 @@ async function saveSchedule() {
   }
 }
 
-async function loadBackups() {
-  loadingBackups.value = true
-  try {
-    const result = await adminAPI.backup.listBackups()
-    backups.value = result.items || []
-  } catch (error) {
-    appStore.showError((error as { message?: string })?.message || t('errors.networkError'))
-  } finally {
-    loadingBackups.value = false
-  }
+async function loadBackups(silent = false): Promise<void> {
+  if (disposed) return
+  if (listRequest) return listRequest
+  fetchingBackups.value = true
+  if (!silent) loadingBackups.value = true
+  listRequest = (async () => {
+    try {
+      const result = await adminAPI.backup.listBackups()
+      if (disposed) return
+      backups.value = result.items || []
+      lastBackupsLoadedAt = Date.now()
+    } catch (error) {
+      if (!disposed && !silent) appStore.showError((error as { message?: string })?.message || t('errors.networkError'))
+    } finally {
+      loadingBackups.value = false; fetchingBackups.value = false; listRequest = null
+    }
+  })()
+  return listRequest
 }
 
 async function createBackup() {
