@@ -52,7 +52,13 @@ func TestCyberPolicyAccountPersistenceAndScheduling(t *testing.T) {
 func TestCyberPolicyAccountConcurrentPersistence(t *testing.T) {
 	ctx := context.Background()
 	a := mustCreateAccount(t, integrationEntClient, &service.Account{Name: "cyber-concurrent", Status: service.StatusActive, Schedulable: true})
-	t.Cleanup(func() { _, _ = integrationDB.ExecContext(ctx, "DELETE FROM accounts WHERE id = $1", a.ID) })
+	t.Cleanup(func() {
+		for _, query := range []string{"DELETE FROM scheduler_outbox WHERE account_id=$1", "DELETE FROM accounts WHERE id=$1"} {
+			if _, err := integrationDB.ExecContext(context.Background(), query, a.ID); err != nil {
+				t.Errorf("cleanup account %d: %v", a.ID, err)
+			}
+		}
+	})
 	repo := newAccountRepositoryWithSQL(integrationEntClient, integrationDB, nil)
 	var wg sync.WaitGroup
 	errors := make(chan error, 24)
