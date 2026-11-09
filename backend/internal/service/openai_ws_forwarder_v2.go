@@ -39,6 +39,7 @@ func (s *OpenAIGatewayService) forwardOpenAIWSV2(
 		return nil, wrapOpenAIWSFallback("invalid_state", errors.New("service or account is nil"))
 	}
 	responseModelObserver := &upstreamResponseModelObserver{}
+	cyberAccountObservation := NewCyberPolicyAccountObservation(ctx, s.accountRepo, s.cfg, account.ID)
 
 	wsURL, err := s.buildOpenAIResponsesWSURL(account)
 	if err != nil {
@@ -666,6 +667,7 @@ readLoop:
 		}
 		imageCounter.AddSSEData(message)
 
+		cyberAccountObservation.ObserveEvent(message)
 		if eventType == "error" || eventType == "response.failed" {
 			markOpenAICyberPolicyEvent(c, message, http.StatusOK, usage)
 		}

@@ -147,6 +147,7 @@ docs/*
 !docs/channel-monitor-v2-safe-defaults.md
 !docs/MONITOR_DRIVEN_FALLBACK.md
 !docs/codex-credits.md
+!docs/cyber-policy-account-disable.md
 !docs/legal/
 !docs/legal/*.md
 !docs/screenshots/

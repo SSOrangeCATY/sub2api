@@ -230,6 +230,11 @@ security:
 # 网关配置
 # =============================================================================
 gateway:
+  # Passive observation of upstream errors only; no detection API or API key.
+  # Per-account cumulative count is persisted in extra.cyber_policy_error_count.
+  # Disable at 10 errors (0 = count only). Restart after changing this setting.
+  # 被动检测上游错误，按账号累计持久化；达到 10 次停用，0 表示只计数。
+  cyber_policy_disable_threshold: 10
   # Minimum max_output_tokens when converting Chat Completions or Anthropic requests to Responses (minimum 16, default 128)
   # Chat Completions 或 Anthropic 请求转换为 Responses 时的最小 max_output_tokens（最小 16，默认 128）
   min_output_tokens: 128
