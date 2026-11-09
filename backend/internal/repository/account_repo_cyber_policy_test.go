@@ -24,7 +24,7 @@ func TestRecordCyberPolicyErrorPersistsThresholdAndReturnsState(t *testing.T) {
 		t.Run(fmt.Sprintf("threshold_%d_count_%d", tc.threshold, tc.count), func(t *testing.T) {
 			db, mock, err := sqlmock.New()
 			require.NoError(t, err)
-			defer db.Close()
+			defer func() { _ = db.Close() }()
 			repo := &accountRepository{sql: db}
 			mock.ExpectQuery(regexp.QuoteMeta(recordCyberPolicyErrorSQL)).WithArgs(int64(7), tc.threshold, service.StatusError, sqlmock.AnyArg(), service.SchedulerOutboxEventAccountChanged).
 				WillReturnRows(sqlmock.NewRows([]string{"count", "disabled"}).AddRow(tc.count, tc.disabled))
@@ -40,7 +40,7 @@ func TestRecordCyberPolicyErrorPersistsThresholdAndReturnsState(t *testing.T) {
 func TestRecordCyberPolicyErrorPropagatesStorageFailureAndMissingAccount(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	repo := &accountRepository{sql: db}
 	storageErr := errors.New("database down")
 	mock.ExpectQuery(regexp.QuoteMeta(recordCyberPolicyErrorSQL)).WillReturnError(storageErr)
@@ -55,9 +55,9 @@ func TestRecordCyberPolicyErrorPropagatesStorageFailureAndMissingAccount(t *test
 func TestCyberPolicyCountSurvivesStaleAccountEdit(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	client := dbent.NewClient(dbent.Driver(entsql.OpenDB(dialect.Postgres, db)))
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 	mock.ExpectQuery(`(?s)SELECT.*FOR NO KEY UPDATE`).WillReturnRows(sqlmock.NewRows(openCodeGoMergeMockColumns()).
 		AddRow(false, false, false, nil, nil, nil, nil, nil, nil, false, nil, nil, nil, nil, []byte(`{"count":9}`)))
 	account := &service.Account{ID: 7, Extra: map[string]any{service.CyberPolicyErrorCountExtraKey: 0, "note": "edited"}}

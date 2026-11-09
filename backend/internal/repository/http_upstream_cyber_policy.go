@@ -15,7 +15,7 @@ import (
 // ProvideHTTPUpstream adds passive account observation to the shared upstream
 // client. The constructor remains usable without persistence in transport tests.
 func ProvideHTTPUpstream(cfg *config.Config, accounts service.AccountRepository) service.HTTPUpstream {
-	upstream := NewHTTPUpstream(cfg).(*httpUpstreamService)
+	upstream := newHTTPUpstream(cfg)
 	upstream.accounts = accounts
 	return upstream
 }

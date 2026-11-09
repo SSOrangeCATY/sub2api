@@ -91,13 +91,15 @@ func TestPassiveCyberPolicyResponseBodyShapesAndChunkBoundaries(t *testing.T) {
 			}
 			upstream := &httpUpstreamService{cfg: &config.Config{}, accounts: repo}
 			upstream.observeCyberPolicyResponse(t.Context(), 1, resp)
-			b := resp.Body.(*cyberPolicyResponseBody)
+			b, ok := resp.Body.(*cyberPolicyResponseBody)
+			require.True(t, ok)
 			var got strings.Builder
 			// Split JSON fields, CRLF and event boundaries across reads.
 			buffer := make([]byte, 17)
 			for {
 				n, err := b.Read(buffer)
-				got.Write(buffer[:n])
+				_, errWrite := got.Write(buffer[:n])
+				require.NoError(t, errWrite)
 				if err == io.EOF {
 					break
 				}
