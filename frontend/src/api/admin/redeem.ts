@@ -70,11 +70,13 @@ export async function generate(
   value: number,
   groupId?: number | null,
   validityDays?: number,
-  expiresInDays?: number | null
+  expiresInDays?: number | null,
+ balanceSource: 'gift' | 'paid' = 'gift'
 ): Promise<RedeemCode[]> {
   const payload: GenerateRedeemCodesRequest = {
     count,
     type,
+    balance_source: type === 'balance' ? balanceSource : 'gift',
     value
   }
 

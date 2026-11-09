@@ -4,19 +4,21 @@ export interface WelfareProduct {
   id: number; version: number; title: string; points_cost: number; balance_value: number; stock: number; enabled: boolean; expires_at: string | null
 }
 export interface WelfareCoupon {
-  id: number; code: string; title: string; balance_value: number; max_claims: number; claimed: number; enabled: boolean; expires_at: string | null
+  id: number; code: string; title: string; balance_value: number; min_paid_balance: number; max_claims: number; claimed: number; enabled: boolean; expires_at: string | null
 }
 export interface WelfareOrder {
   id: string; user_id: number; title: string; points_cost: number; balance_value: number; created_at: string
 }
 export interface WelfareConfig {
-  enabled: boolean; group_number: string; group_open_id: string; last_bot_seen_at: string | null
+  enabled: boolean; require_qq_for_api: boolean; group_number: string; group_open_id: string; last_bot_seen_at: string | null
 }
+export interface WelfareAdminOrder extends WelfareOrder { username: string; email: string; coupon_id: number | null; coupon_code: string }
+export interface WelfareCouponClaims { orders: WelfareAdminOrder[]; total: number }
 export interface WelfareAdmin {
-  config: WelfareConfig; products: WelfareProduct[]; coupons: WelfareCoupon[]; orders: WelfareOrder[]; verified_accounts: number
+  config: WelfareConfig; products: WelfareProduct[]; coupons: WelfareCoupon[]; orders: WelfareAdminOrder[]; verified_accounts: number
 }
-export interface WelfareBinding { verified: boolean; ready: boolean; group_number: string }
-export interface WelfareSnapshot { points: number; checked_in: boolean; group_number: string; products: WelfareProduct[]; orders: WelfareOrder[]; generated_at: string }
+export interface WelfareBinding { require_qq_for_api?: boolean; verified: boolean; ready: boolean; group_number: string }
+export interface WelfareSnapshot { paid_balance_total: number; points: number; checked_in: boolean; group_number: string; products: WelfareProduct[]; orders: WelfareOrder[]; generated_at: string }
 export interface WelfareResult { message: string; snapshot?: WelfareSnapshot }
 export const qqWelfare = {
   async center() { return (await apiClient.get<WelfareResult>('/user/qq-welfare/center')).data },
@@ -24,7 +26,8 @@ export const qqWelfare = {
   async binding() { return (await apiClient.get<WelfareBinding>('/user/qq-welfare')).data },
   async bindingCode() { return (await apiClient.post<{code: string; expires_in: number}>('/user/qq-welfare/code')).data },
   async admin() { return (await apiClient.get<WelfareAdmin>('/admin/qq-welfare')).data },
-  async config(enabled: boolean, group_number: string) { return (await apiClient.put('/admin/qq-welfare/config', {enabled, group_number})).data },
+  async config(enabled: boolean, group_number: string, require_qq_for_api = false) { return (await apiClient.put('/admin/qq-welfare/config', {enabled, group_number, require_qq_for_api})).data },
+  async couponClaims(id: number, page = 1) { return (await apiClient.get<WelfareCouponClaims>(`/admin/qq-welfare/coupons/${id}/claims`, {params:{page,page_size:20}})).data },
   async groupCode() { return (await apiClient.post<{code: string; expires_in: number}>('/admin/qq-welfare/group-code')).data },
   async product(product: WelfareProduct) { return (await apiClient.post<WelfareProduct>('/admin/qq-welfare/products', product)).data },
   async coupon(coupon: WelfareCoupon) { return (await apiClient.post<WelfareCoupon>('/admin/qq-welfare/coupons', coupon)).data },

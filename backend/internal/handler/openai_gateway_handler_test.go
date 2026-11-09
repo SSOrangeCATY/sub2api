@@ -3173,7 +3173,24 @@ func runOpenAIResponsesWebSocketUsageLogCase(t *testing.T, tc openAIResponsesWSU
 			require.Contains(t, closeErr.Reason, reason)
 			require.Len(t, upstreamPayloadCh, turnCount-1, "rejected turn must not reach upstream")
 			_ = clientConn.CloseNow()
-			return openAIResponsesWSUsageLogResult{}
+			// Return completed turns so callers can also verify billing on rejection.
+			usageLogs := make([]*service.UsageLog, 0, turnCount-1)
+			upstreamPayloads := make([][]byte, 0, turnCount-1)
+			for len(usageLogs) < turnCount-1 {
+				select {
+				case usageLog := <-usageRepo.created:
+					require.NotNil(t, usageLog)
+					usageLogs = append(usageLogs, usageLog)
+				case <-time.After(3 * time.Second):
+					t.Fatal("timed out waiting for completed turn usage log")
+				}
+				upstreamPayloads = append(upstreamPayloads, <-upstreamPayloadCh)
+			}
+			return openAIResponsesWSUsageLogResult{
+				log: usageLogs[0], logs: usageLogs,
+				upstreamFirstPayload: upstreamPayloads[0], upstreamPayloads: upstreamPayloads,
+				clientEvents: clientEvents,
+			}
 		}
 		readCompleted()
 	}

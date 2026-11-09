@@ -1,4 +1,18 @@
 export default {
+  balanceSource: 'Balance source',
+  sourcePaid: 'Paid',
+  sourceGift: 'Gift',
+  sourceUnknown: 'Historical / unclassified',
+  paidHint: 'Only explicitly paid, successfully credited balances qualify for welfare thresholds. Gifts are excluded.',
+  minPaidBalance: 'Minimum cumulative paid credit (USD, 0 for no minimum)',
+  paidBalanceTotal: 'Cumulative paid credits',
+  requireQQForAPI: 'Require QQ verification before API access',
+  apiGateHint: 'This setting is independent of welfare. Unverified users cannot call APIs while it is enabled; verification remains available with welfare disabled.',
+  claimDetails: 'Claim details',
+  close: 'Close',
+  previous: 'Previous',
+  next: 'Next',
+
   refreshFailed: 'The operation succeeded, but data refresh failed. Refresh to view your current points and history.',
   confirmExchange: 'Confirm exchange',
   autoCredit: 'The reward is credited to your website balance automatically.',

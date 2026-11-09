@@ -365,6 +365,19 @@ func NewAPIKeyService(
 	return svc
 }
 
+// CheckQQAPIAccess reads current persisted policy even when the key came from cache.
+func (s *APIKeyService) CheckQQAPIAccess(ctx context.Context, uid int64) error {
+	if s == nil {
+		return nil
+	}
+	if gate, ok := s.userRepo.(interface {
+		CheckQQAPIAccess(context.Context, int64) error
+	}); ok {
+		return gate.CheckQQAPIAccess(ctx, uid)
+	}
+	return nil
+}
+
 // SetRateLimitCacheInvalidator sets the optional rate limit cache invalidator.
 // Called after construction (e.g. in wire) to avoid circular dependencies.
 func (s *APIKeyService) SetRateLimitCacheInvalidator(inv RateLimitCacheInvalidator) {

@@ -33,7 +33,7 @@ func (s *scopedUserResponseService) ListUsers(_ context.Context, _, _ int, filte
 func (s *scopedUserResponseService) GetUser(context.Context, int64) (*service.User, error) {
 	return s.user(), nil
 }
-func (s *scopedUserResponseService) UpdateUserBalance(context.Context, int64, float64, string, string) (*service.User, error) {
+func (s *scopedUserResponseService) UpdateUserBalance(context.Context, int64, float64, string, string, ...string) (*service.User, error) {
 	s.writes++
 	return s.user(), nil
 }

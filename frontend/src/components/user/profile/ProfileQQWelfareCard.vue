@@ -1,7 +1,7 @@
 <template>
   <section class="welfare-panel" aria-labelledby="qq-welfare-title">
     <div class="welfare-section-head"><div><span class="welfare-eyebrow">// QQ VERIFICATION</span><h2 id="qq-welfare-title">{{ t('qqWelfare.bindingTitle') }}</h2></div><span v-if="status" class="welfare-tag">{{ t(status.verified ? 'qqWelfare.verified' : 'qqWelfare.notVerified') }}</span></div>
-    <p>{{ t('qqWelfare.bindingDescription') }}</p>
+    <p>{{ t('qqWelfare.bindingDescription') }}</p><p v-if="status?.require_qq_for_api" class="welfare-notice">{{ t('qqWelfare.requireQQForAPI') }}</p>
     <p v-if="error" role="alert" class="welfare-notice">{{ error }}</p>
     <p v-if="loading" aria-live="polite">{{ t('qqWelfare.loading') }}</p>
     <template v-else-if="status">

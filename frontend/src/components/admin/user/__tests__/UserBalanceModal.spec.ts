@@ -25,3 +25,15 @@ describe('balance operation error feedback', () => {
     expect(w.get('button[type="submit"]').attributes('disabled')).toBeUndefined()
   })
 })
+
+it('classifies administrator deposits and resets the source for the next user',async()=>{
+ mocks.updateBalance.mockResolvedValue({})
+ const w=mount(UserBalanceModal,{props:{show:true,operation:'add',user:{id:1,email:'a@example.com',balance:5} as AdminUser},global:{stubs:{BaseDialog:{template:'<div><slot /><slot name="footer" /></div>'}}}})
+ expect((w.get('select').element as HTMLSelectElement).value).toBe('gift')
+ await w.get('input[type=number]').setValue('10');await w.get('select').setValue('paid')
+ await w.get('form').trigger('submit');await flushPromises()
+ expect(mocks.updateBalance).toHaveBeenLastCalledWith(1,10,'add','','paid')
+ await w.setProps({show:false});await w.setProps({show:true})
+ expect((w.get('select').element as HTMLSelectElement).value).toBe('gift')
+ await w.setProps({operation:'subtract'});expect(w.find('select').exists()).toBe(false)
+})
