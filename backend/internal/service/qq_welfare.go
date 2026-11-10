@@ -28,11 +28,12 @@ var (
 )
 
 type QQWelfareConfig struct {
-	Enabled       bool       `json:"enabled"`
-	GroupNumber   string     `json:"group_number"`
-	GroupOpenID   string     `json:"group_open_id"`
-	LastBotSeenAt *time.Time `json:"last_bot_seen_at"`
-	BotKey        string     `json:"-"`
+	RequireQQForAPI bool       `json:"require_qq_for_api"`
+	Enabled         bool       `json:"enabled"`
+	GroupNumber     string     `json:"group_number"`
+	GroupOpenID     string     `json:"group_open_id"`
+	LastBotSeenAt   *time.Time `json:"last_bot_seen_at"`
+	BotKey          string     `json:"-"`
 }
 type QQWelfareProduct struct {
 	ID           int64      `json:"id"`
@@ -45,19 +46,21 @@ type QQWelfareProduct struct {
 	ExpiresAt    *time.Time `json:"expires_at"`
 }
 type QQWelfareCoupon struct {
-	ID           int64      `json:"id"`
-	Code         string     `json:"code"`
-	Title        string     `json:"title"`
-	BalanceValue float64    `json:"balance_value"`
-	MaxClaims    int        `json:"max_claims"`
-	Claimed      int        `json:"claimed"`
-	Enabled      bool       `json:"enabled"`
-	ExpiresAt    *time.Time `json:"expires_at"`
+	MinPaidBalance float64    `json:"min_paid_balance"`
+	ID             int64      `json:"id"`
+	Code           string     `json:"code"`
+	Title          string     `json:"title"`
+	BalanceValue   float64    `json:"balance_value"`
+	MaxClaims      int        `json:"max_claims"`
+	Claimed        int        `json:"claimed"`
+	Enabled        bool       `json:"enabled"`
+	ExpiresAt      *time.Time `json:"expires_at"`
 }
 type QQWelfareBinding struct {
-	Verified    bool   `json:"verified"`
-	GroupNumber string `json:"group_number"`
-	Ready       bool   `json:"ready"`
+	RequireQQForAPI bool   `json:"require_qq_for_api"`
+	Verified        bool   `json:"verified"`
+	GroupNumber     string `json:"group_number"`
+	Ready           bool   `json:"ready"`
 }
 type QQWelfareOrder struct {
 	ID           string    `json:"id"`
@@ -68,19 +71,31 @@ type QQWelfareOrder struct {
 	CreatedAt    time.Time `json:"created_at"`
 }
 type QQWelfareSnapshot struct {
-	Points      int64              `json:"points"`
-	CheckedIn   bool               `json:"checked_in"`
-	GroupNumber string             `json:"group_number"`
-	Products    []QQWelfareProduct `json:"products"`
-	Orders      []QQWelfareOrder   `json:"orders"`
-	GeneratedAt time.Time          `json:"generated_at"`
+	PaidBalanceTotal float64            `json:"paid_balance_total"`
+	Points           int64              `json:"points"`
+	CheckedIn        bool               `json:"checked_in"`
+	GroupNumber      string             `json:"group_number"`
+	Products         []QQWelfareProduct `json:"products"`
+	Orders           []QQWelfareOrder   `json:"orders"`
+	GeneratedAt      time.Time          `json:"generated_at"`
+}
+type QQWelfareAdminOrder struct {
+	QQWelfareOrder
+	Username   string `json:"username"`
+	Email      string `json:"email"`
+	CouponID   *int64 `json:"coupon_id"`
+	CouponCode string `json:"coupon_code"`
+}
+type QQWelfareCouponClaims struct {
+	Orders []QQWelfareAdminOrder `json:"orders"`
+	Total  int64                 `json:"total"`
 }
 type QQWelfareAdmin struct {
-	Config           *QQWelfareConfig   `json:"config"`
-	Products         []QQWelfareProduct `json:"products"`
-	Coupons          []QQWelfareCoupon  `json:"coupons"`
-	Orders           []QQWelfareOrder   `json:"orders"`
-	VerifiedAccounts int64              `json:"verified_accounts"`
+	Config           *QQWelfareConfig      `json:"config"`
+	Products         []QQWelfareProduct    `json:"products"`
+	Coupons          []QQWelfareCoupon     `json:"coupons"`
+	Orders           []QQWelfareAdminOrder `json:"orders"`
+	VerifiedAccounts int64                 `json:"verified_accounts"`
 }
 type QQWelfareEvent struct {
 	IsWebsite      bool   `json:"-"`
@@ -106,7 +121,8 @@ type QQWelfarePoints struct {
 type QQWelfareRepository interface {
 	UserIdentity(context.Context, int64) (*QQWelfareEvent, error)
 	Config(context.Context) (*QQWelfareConfig, error)
-	UpdateConfig(context.Context, bool, string) error
+	UpdateConfig(context.Context, bool, string, ...bool) error
+	CouponClaims(context.Context, int64, int, int) (*QQWelfareCouponClaims, error)
 	GroupCode(context.Context, string, time.Time) error
 	BindGroup(context.Context, string, string) error
 	Binding(context.Context, int64) (*QQWelfareBinding, error)
@@ -164,15 +180,22 @@ func (s *QQWelfareService) Admin(ctx context.Context) (*QQWelfareAdmin, error) {
 	return s.repo.Admin(ctx)
 }
 
+func (s *QQWelfareService) CouponClaims(ctx context.Context, id int64, page, size int) (*QQWelfareCouponClaims, error) {
+	if id <= 0 || page < 1 || page > 1000000 || size < 1 || size > 100 {
+		return nil, infraerrors.BadRequest("WELFARE_INVALID_PAGE", "无效的详情分页。")
+	}
+	return s.repo.CouponClaims(ctx, id, page, size)
+}
+
 var welfareGroupPattern = regexp.MustCompile(`^[0-9]{5,16}$`)
 var welfareCouponPattern = regexp.MustCompile(`^[A-Z0-9_-]{3,32}$`)
 
-func (s *QQWelfareService) UpdateConfig(ctx context.Context, enabled bool, group string) error {
+func (s *QQWelfareService) UpdateConfig(ctx context.Context, enabled bool, group string, requireQQ ...bool) error {
 	group = strings.TrimSpace(group)
 	if !welfareGroupPattern.MatchString(group) {
 		return infraerrors.BadRequest("WELFARE_INVALID_GROUP", "请输入有效的 QQ 群号。")
 	}
-	return s.repo.UpdateConfig(ctx, enabled, group)
+	return s.repo.UpdateConfig(ctx, enabled, group, requireQQ...)
 }
 func (s *QQWelfareService) GroupCode(ctx context.Context) (string, error) {
 	code, err := welfareToken(16)
@@ -207,6 +230,10 @@ func (s *QQWelfareService) SaveCoupon(ctx context.Context, p *QQWelfareCoupon) e
 	p.Title = strings.TrimSpace(p.Title)
 	if err := validateWelfareValue(p.Title, p.BalanceValue, p.ExpiresAt, p.Enabled); err != nil {
 		return err
+	}
+	paidDecimal := strings.SplitN(strconv.FormatFloat(p.MinPaidBalance, 'f', -1, 64), ".", 2)
+	if (len(paidDecimal) == 2 && len(paidDecimal[1]) > 8) || math.IsNaN(p.MinPaidBalance) || math.IsInf(p.MinPaidBalance, 0) || p.MinPaidBalance < 0 || p.MinPaidBalance > 100000000 {
+		return infraerrors.BadRequest("WELFARE_INVALID_PAID_THRESHOLD", "付费门槛须为 0–100000000。")
 	}
 	if p.ID < 0 || !welfareCouponPattern.MatchString(p.Code) || p.MaxClaims < 0 || p.MaxClaims > 1000000 {
 		return infraerrors.BadRequest("WELFARE_INVALID_COUPON", "兑换码限 3–32 位字母、数字、下划线或短横线，领取上限为 0–1000000（0 为不限）。")

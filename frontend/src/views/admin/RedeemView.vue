@@ -113,6 +113,7 @@
             </div>
           </template>
 
+          <template #cell-balance_source="{ value }"><span>{{ t(value === 'paid' ? 'qqWelfare.sourcePaid' : value === 'gift' ? 'qqWelfare.sourceGift' : 'qqWelfare.sourceUnknown') }}</span></template>
           <template #cell-type="{ value }">
             <span
               :class="[
@@ -288,6 +289,7 @@
               <Select v-model="generateForm.type" :options="typeOptions" />
             </div>
             <!-- 余额/并发类型：显示数值输入 -->
+            <div v-if="generateForm.type === 'balance'"><label class="input-label">{{ t('qqWelfare.balanceSource') }}</label><select v-model="generateForm.balance_source" class="input"><option value="gift">{{ t('qqWelfare.sourceGift') }}</option><option value="paid">{{ t('qqWelfare.sourcePaid') }}</option></select><p>{{ t('qqWelfare.paidHint') }}</p></div>
             <div v-if="generateForm.type !== 'subscription' && generateForm.type !== 'invitation'">
               <label class="input-label">
                 {{
@@ -731,6 +733,7 @@ const columns = computed<Column[]>(() => [
   { key: 'select', label: '' },
   { key: 'code', label: t('admin.redeem.columns.code') },
   { key: 'type', label: t('admin.redeem.columns.type'), sortable: true },
+  { key: 'balance_source', label: t('qqWelfare.balanceSource') },
   { key: 'value', label: t('admin.redeem.columns.value'), sortable: true },
   { key: 'status', label: t('admin.redeem.columns.status'), sortable: true },
   { key: 'used_by', label: t('admin.redeem.columns.usedBy') },
@@ -836,6 +839,7 @@ const redeemCodeExpiryOptions = computed<{ value: RedeemCodeExpiryOption; label:
 ])
 
 const generateForm = reactive({
+ balance_source: 'gift' as 'gift' | 'paid',
   type: 'balance' as RedeemCodeType,
   value: 10,
   count: 1,
@@ -1046,12 +1050,14 @@ const handleGenerateCodes = async () => {
       generateForm.value,
       generateForm.type === 'subscription' ? generateForm.group_id : undefined,
       generateForm.type === 'subscription' ? generateForm.validity_days : undefined,
-      expiresInDays
+      expiresInDays,
+      generateForm.type === 'balance' ? generateForm.balance_source : 'gift'
     )
     showGenerateDialog.value = false
     generatedCodes.value = result
     showResultDialog.value = true
     // 重置表单
+    generateForm.balance_source = 'gift'
     generateForm.group_id = null
     generateForm.validity_days = 30
     generateForm.expiry_option = 'never'

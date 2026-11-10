@@ -534,7 +534,29 @@ func (s *adminServiceImpl) BatchUpdateLimits(ctx context.Context, userIDs []int6
 	return affected, nil
 }
 
-func (s *adminServiceImpl) UpdateUserBalance(ctx context.Context, userID int64, balance float64, operation string, notes string) (*User, error) {
+func (s *adminServiceImpl) UpdateUserBalance(ctx context.Context, userID int64, balance float64, operation string, notes string, sources ...string) (*User, error) {
+	sourceInput := ""
+	if len(sources) > 0 {
+		sourceInput = sources[0]
+	}
+	source, sourceErr := NormalizeBalanceSource(sourceInput, AdjustmentTypeAdminBalance, balance)
+	if sourceErr != nil {
+		return nil, sourceErr
+	}
+	if source == BalanceSourcePaid && operation != "add" {
+		return nil, infraerrors.BadRequest("PAID_RECHARGE_ADD_REQUIRED", "付费充值仅支持增加余额。")
+	}
+	originalCtx := ctx
+	var tx *dbent.Tx
+	if s.entClient != nil {
+		var txErr error
+		tx, txErr = s.entClient.Tx(ctx)
+		if txErr != nil {
+			return nil, txErr
+		}
+		defer func() { _ = tx.Rollback() }()
+		ctx = dbent.NewTxContext(ctx, tx)
+	}
 	// 余额调整必须走原子接口：先读后整行写回会把并发的计费扣款覆盖掉。
 	var (
 		change BalanceChange
@@ -557,12 +579,50 @@ func (s *adminServiceImpl) UpdateUserBalance(ctx context.Context, userID int64, 
 		return nil, err
 	}
 
+	balanceDiff := change.New - change.Old
+	// Preserve the exact credited delta. Subtracting two large float64 balances
+	// can round away a small deposit or invent an extra 0.00000001 of paid credit.
+	if operation == "add" {
+		balanceDiff = balance
+	}
+	if operation == "subtract" {
+		balanceDiff = -balance
+	}
+
+	if balanceDiff != 0 {
+		code, err := GenerateRedeemCode()
+		if err != nil {
+			return nil, err
+		}
+
+		adjustmentRecord := &RedeemCode{
+			Code:          code,
+			Type:          AdjustmentTypeAdminBalance,
+			Value:         balanceDiff,
+			Status:        StatusUsed,
+			UsedBy:        &userID,
+			BalanceSource: source,
+			Notes:         notes,
+		}
+		now := time.Now()
+		adjustmentRecord.UsedAt = &now
+
+		if err := s.redeemCodeRepo.Create(ctx, adjustmentRecord); err != nil {
+			return nil, err
+		}
+	}
+
+	if tx != nil {
+		if err := tx.Commit(); err != nil {
+			return nil, err
+		}
+	}
+	ctx = originalCtx
 	user, err := s.userRepo.GetByID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
 
-	balanceDiff := change.New - change.Old
 	if s.authCacheInvalidator != nil && balanceDiff != 0 {
 		s.authCacheInvalidator.InvalidateAuthCacheByUserID(ctx, userID)
 	}
@@ -576,29 +636,6 @@ func (s *adminServiceImpl) UpdateUserBalance(ctx context.Context, userID int64, 
 				logger.LegacyPrintf("service.admin", "invalidate user balance cache failed: user_id=%d err=%v", userID, err)
 			}
 		}()
-	}
-
-	if balanceDiff != 0 {
-		code, err := GenerateRedeemCode()
-		if err != nil {
-			logger.LegacyPrintf("service.admin", "failed to generate adjustment redeem code: %v", err)
-			return user, nil
-		}
-
-		adjustmentRecord := &RedeemCode{
-			Code:   code,
-			Type:   AdjustmentTypeAdminBalance,
-			Value:  balanceDiff,
-			Status: StatusUsed,
-			UsedBy: &user.ID,
-			Notes:  notes,
-		}
-		now := time.Now()
-		adjustmentRecord.UsedAt = &now
-
-		if err := s.redeemCodeRepo.Create(ctx, adjustmentRecord); err != nil {
-			logger.LegacyPrintf("service.admin", "failed to create balance adjustment redeem code: %v", err)
-		}
 	}
 
 	return user, nil
@@ -1274,6 +1311,10 @@ func (s *adminServiceImpl) GetRedeemCode(ctx context.Context, id int64) (*Redeem
 }
 
 func (s *adminServiceImpl) GenerateRedeemCodes(ctx context.Context, input *GenerateRedeemCodesInput) ([]RedeemCode, error) {
+	source, err := NormalizeBalanceSource(input.BalanceSource, input.Type, input.Value)
+	if err != nil {
+		return nil, err
+	}
 	if input.ExpiresAt != nil && !input.ExpiresAt.After(time.Now()) {
 		return nil, ErrRedeemCodeExpired
 	}
@@ -1300,11 +1341,12 @@ func (s *adminServiceImpl) GenerateRedeemCodes(ctx context.Context, input *Gener
 			return nil, err
 		}
 		code := RedeemCode{
-			Code:      codeValue,
-			Type:      input.Type,
-			Value:     input.Value,
-			Status:    StatusUnused,
-			ExpiresAt: input.ExpiresAt,
+			Code:          codeValue,
+			Type:          input.Type,
+			BalanceSource: source,
+			Value:         input.Value,
+			Status:        StatusUnused,
+			ExpiresAt:     input.ExpiresAt,
 		}
 		// 订阅类型专用字段
 		if input.Type == RedeemTypeSubscription {

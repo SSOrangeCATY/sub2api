@@ -270,6 +270,14 @@ func (s *RedeemService) CreateCode(ctx context.Context, code *RedeemCode) error 
 		return ErrRedeemCodeExpired
 	}
 
+	if code.BalanceSource == "" {
+		code.BalanceSource = BalanceSourceUnknown
+	}
+	source, err := NormalizeBalanceSource(code.BalanceSource, code.Type, code.Value)
+	if err != nil {
+		return err
+	}
+	code.BalanceSource = source
 	if err := s.redeemRepo.Create(ctx, code); err != nil {
 		return fmt.Errorf("create redeem code: %w", err)
 	}

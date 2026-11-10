@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/adminaccess"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
@@ -122,14 +123,15 @@ func (h *QQWelfareHandler) Config(c *gin.Context) {
 		return
 	}
 	var req struct {
-		Enabled     bool   `json:"enabled"`
-		GroupNumber string `json:"group_number"`
+		Enabled         bool   `json:"enabled"`
+		RequireQQForAPI bool   `json:"require_qq_for_api"`
+		GroupNumber     string `json:"group_number"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, "配置格式错误。")
 		return
 	}
-	if err := h.svc.UpdateConfig(c.Request.Context(), req.Enabled, req.GroupNumber); err != nil {
+	if err := h.svc.UpdateConfig(c.Request.Context(), req.Enabled, req.GroupNumber, req.RequireQQForAPI); err != nil {
 		response.ErrorFrom(c, err)
 		return
 	}
@@ -176,4 +178,23 @@ func (h *QQWelfareHandler) Coupon(c *gin.Context) {
 		return
 	}
 	response.Success(c, p)
+}
+
+func (h *QQWelfareHandler) CouponClaims(c *gin.Context) {
+	if !welfareFullAdmin(c) {
+		return
+	}
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "无效的福利码编号。")
+		return
+	}
+	page, size := response.ParsePagination(c)
+	data, err := h.svc.CouponClaims(c.Request.Context(), id, page, size)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	c.Header("Cache-Control", "no-store")
+	response.Success(c, data)
 }

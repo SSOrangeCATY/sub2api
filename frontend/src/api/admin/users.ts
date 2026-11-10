@@ -177,12 +177,14 @@ export async function updateBalance(
   id: number,
   balance: number,
   operation: 'set' | 'add' | 'subtract' = 'set',
-  notes?: string
+  notes?: string,
+ balance_source: 'gift' | 'paid' = 'gift'
 ): Promise<AdminUser> {
   const { data } = await apiClient.post<AdminUser>(`/admin/users/${id}/balance`, {
     balance,
     operation,
-    notes: notes || ''
+    notes: notes || '',
+ balance_source
   })
   return data
 }
@@ -256,6 +258,7 @@ export async function getUserUsageStats(
  * Balance history item returned from the API
  */
 export interface BalanceHistoryItem {
+ balance_source?: 'unknown' | 'gift' | 'paid'
   id: number
   code: string
   type: string

@@ -49,7 +49,7 @@ func TestQQWelfareHTTPBoundaries(t *testing.T) {
 		r.ServeHTTP(w, httptest.NewRequest("GET", "/user", nil))
 		require.Equal(t, http.StatusUnauthorized, w.Code)
 	}
-	for _, handler := range []gin.HandlerFunc{h.Admin, h.Config, h.GroupCode, h.Product, h.Coupon} {
+	for _, handler := range []gin.HandlerFunc{h.Admin, h.Config, h.GroupCode, h.Product, h.Coupon, h.CouponClaims} {
 		r := gin.New()
 		r.POST("/admin", handler)
 		w := httptest.NewRecorder()

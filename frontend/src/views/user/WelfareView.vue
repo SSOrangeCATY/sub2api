@@ -27,6 +27,7 @@
         </section>
         <section class="welfare-panel" aria-labelledby="welfare-coupon">
           <span class="welfare-eyebrow">// SHARED CODES</span><h2 id="welfare-coupon">{{ t('qqWelfare.coupons') }}</h2>
+          <p>{{ t('qqWelfare.paidBalanceTotal') }}: ${{ snapshot.paid_balance_total ?? 0 }}</p><p>{{ t('qqWelfare.paidHint') }}</p>
           <form class="welfare-claim-form" @submit.prevent="claim">
             <label class="sr-only" for="welfare-code">{{ t('qqWelfare.code') }}</label>
             <input id="welfare-code" v-model="coupon" type="text" required minlength="3" maxlength="32" autocomplete="off" :placeholder="t('qqWelfare.enterCode')" :disabled="busy" />

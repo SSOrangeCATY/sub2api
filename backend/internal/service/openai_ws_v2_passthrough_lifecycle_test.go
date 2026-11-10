@@ -435,6 +435,48 @@ func TestPassthroughLifecycle_CyberSkipsFailureAccountSideEffects(t *testing.T) 
 	}
 }
 
+func TestPassthroughLifecycle_CyberCountsEachTurnWithoutResponseCreated(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	controlCtx, cancelControl := context.WithCancelCause(context.Background())
+	defer cancelControl(context.Canceled)
+	upstream := newStagedPassthroughConn()
+	cfg := passthroughLifecycleConfig()
+	cfg.Gateway.CyberPolicyDisableThreshold = 10
+	repo := &cyberPolicyAccountTestRepo{counts: map[int64]int64{}}
+	svc := newPassthroughLifecycleService(cfg, upstream)
+	svc.accountRepo = repo
+	account := passthroughLifecycleAccount()
+	server, serverErr := startPassthroughLifecycleServer(t, controlCtx, svc, account)
+	defer server.Close()
+	clientConn := dialPassthroughLifecycleClient(t, server)
+	defer func() { _ = clientConn.CloseNow() }()
+
+	for turn := 0; turn < 2; turn++ {
+		if turn > 0 {
+			err := clientConn.Write(controlCtx, coderws.MessageText, []byte(`{"type":"response.create","model":"gpt-5.5","input":"next turn"}`))
+			require.NoError(t, err)
+		}
+		select {
+		case <-upstream.writes:
+		case <-time.After(3 * time.Second):
+			t.Fatal("response.create did not reach upstream")
+		}
+		upstream.Send(fmt.Sprintf(`{"type":"response.failed","response":{"id":"cyber-turn-%d","error":{"code":"cyber_policy","message":"blocked"}}}`, turn))
+		event, err := readPassthroughLifecycleFrame(t, clientConn, 3*time.Second)
+		require.NoError(t, err)
+		require.Equal(t, "response.failed", gjson.GetBytes(event, "type").String())
+	}
+	require.NoError(t, clientConn.Close(coderws.StatusNormalClosure, "done"))
+	select {
+	case <-serverErr:
+	case <-time.After(3 * time.Second):
+		t.Fatal("passthrough did not exit")
+	}
+	repo.mu.Lock()
+	defer repo.mu.Unlock()
+	require.EqualValues(t, 2, repo.counts[account.ID])
+}
+
 func TestPassthroughLifecycle_CloseReasonTruncationPreservesUTF8(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	controlCtx, cancelControl := context.WithCancelCause(context.Background())

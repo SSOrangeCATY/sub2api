@@ -462,15 +462,16 @@ func TestAPIContracts(t *testing.T) {
 				// 普通用户兑换历史不应包含 notes 等内部字段。
 				deps.redeemRepo.SetByUser(1, []service.RedeemCode{
 					{
-						ID:        900,
-						Code:      "CODE-123",
-						Type:      service.RedeemTypeBalance,
-						Value:     1.25,
-						Status:    service.StatusUsed,
-						UsedBy:    ptr(int64(1)),
-						UsedAt:    ptr(deps.now),
-						Notes:     "internal-note",
-						CreatedAt: deps.now,
+						ID:            900,
+						BalanceSource: service.BalanceSourcePaid,
+						Code:          "CODE-123",
+						Type:          service.RedeemTypeBalance,
+						Value:         1.25,
+						Status:        service.StatusUsed,
+						UsedBy:        ptr(int64(1)),
+						UsedAt:        ptr(deps.now),
+						Notes:         "internal-note",
+						CreatedAt:     deps.now,
 					},
 				})
 			},
@@ -484,6 +485,7 @@ func TestAPIContracts(t *testing.T) {
 					{
 						"id": 900,
 						"code": "CODE-123",
+						"balance_source": "paid",
 						"type": "balance",
 						"value": 1.25,
 						"status": "used",

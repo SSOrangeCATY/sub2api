@@ -126,7 +126,7 @@
               </div>
             </div>
             <!-- Right: value -->
-            <div class="text-right">
+            <div class="text-right"><p v-if="isBalanceType(item.type)" class="text-xs">{{ t(item.balance_source === 'paid' ? 'qqWelfare.sourcePaid' : item.balance_source === 'gift' ? 'qqWelfare.sourceGift' : 'qqWelfare.sourceUnknown') }}</p>
               <p :class="['text-sm font-semibold', getValueColor(item)]">
                 {{ formatValue(item) }}
               </p>

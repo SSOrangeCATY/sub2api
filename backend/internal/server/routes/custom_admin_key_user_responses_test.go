@@ -45,7 +45,7 @@ func (*scopedUserResponses) GetUser(context.Context, int64) (*service.User, erro
 func (*scopedUserResponses) GetUserIncludeDeleted(context.Context, int64) (*service.User, error) {
 	return scopedUserFixture(), nil
 }
-func (*scopedUserResponses) UpdateUserBalance(context.Context, int64, float64, string, string) (*service.User, error) {
+func (*scopedUserResponses) UpdateUserBalance(context.Context, int64, float64, string, string, ...string) (*service.User, error) {
 	return scopedUserFixture(), nil
 }
 

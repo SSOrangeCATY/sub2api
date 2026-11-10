@@ -2521,6 +2521,12 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 		closeOpenAIClientWS(wsConn, coderws.StatusPolicyViolation, "missing first response.create message")
 		return
 	}
+	// A connection may wait for its first frame while administrators change
+	// the QQ policy. Recheck before any per-request billing or upstream work.
+	if err := h.apiKeyService.CheckQQAPIAccess(ctx, subject.UserID); err != nil {
+		closeOpenAIClientWS(wsConn, coderws.StatusPolicyViolation, "QQ verification required or verification check unavailable")
+		return
+	}
 	firstTurnStartedAt := time.Now()
 	if msgType != coderws.MessageText && msgType != coderws.MessageBinary {
 		closeOpenAIClientWS(wsConn, coderws.StatusPolicyViolation, "unsupported websocket message type")
@@ -3007,6 +3013,9 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 			ReasoningEffortMappings:     reasoningEffortMappings,
 			TurnStarted:                 recordTurnStart,
 			BeforeRequest: func(turn int, payload []byte, originalModel string) error {
+				if err := h.apiKeyService.CheckQQAPIAccess(ctx, apiKey.User.ID); err != nil {
+					return service.NewOpenAIWSClientCloseError(coderws.StatusPolicyViolation, "QQ verification required or verification check unavailable", err)
+				}
 				c.Set(securityAuditWSTurnContextKey, turn)
 				service.BeginOpsStreamTurn(c, turn)
 				setCyberTurnBody(turn, payload)
