@@ -39,6 +39,7 @@ func RegisterAdminRoutes(
 		welfare.POST("/group-code", h.QQWelfare.GroupCode)
 		welfare.POST("/products", h.QQWelfare.Product)
 		welfare.POST("/coupons", h.QQWelfare.Coupon)
+		welfare.GET("/coupons/:id/claims", h.QQWelfare.CouponClaims)
 	}
 	{
 		// 部署与运营合规确认

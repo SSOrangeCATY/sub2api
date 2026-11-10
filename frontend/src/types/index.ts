@@ -1937,6 +1937,7 @@ export interface UsageCleanupTask {
 }
 
 export interface RedeemCode {
+  balance_source?: 'unknown' | 'gift' | 'paid'
   id: number
   code: string
   type: RedeemCodeType
@@ -1955,6 +1956,7 @@ export interface RedeemCode {
 }
 
 export interface GenerateRedeemCodesRequest {
+  balance_source?: 'gift' | 'paid'
   count: number
   type: RedeemCodeType
   value: number

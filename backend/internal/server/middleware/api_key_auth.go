@@ -158,6 +158,11 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 			AbortWithError(c, 401, "USER_INACTIVE", "User account is not active")
 			return
 		}
+		if err := apiKeyService.CheckQQAPIAccess(c.Request.Context(), apiKey.User.ID); err != nil {
+			AbortWithError(c, infraerrors.Code(err), infraerrors.Reason(err), infraerrors.Message(err))
+			return
+		}
+
 		if abortIfAPIKeyGroupUnavailable(c, apiKey) {
 			return
 		}

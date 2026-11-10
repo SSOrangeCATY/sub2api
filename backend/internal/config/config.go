@@ -1030,6 +1030,9 @@ const (
 
 // GatewayConfig API网关相关配置
 type GatewayConfig struct {
+	// CyberPolicyDisableThreshold: cumulative upstream Cyber Policy errors per
+	// account before disabling. 0 counts only; positive values enable disabling.
+	CyberPolicyDisableThreshold int `mapstructure:"cyber_policy_disable_threshold"`
 	// MinOutputTokens is the minimum max_output_tokens used when
 	// converting Chat Completions or Anthropic requests to Responses.
 	MinOutputTokens int `mapstructure:"min_output_tokens"`
@@ -2478,6 +2481,7 @@ func setDefaults() {
 
 	// Gateway
 	viper.SetDefault("gateway.response_header_timeout", 600) // 600秒(10分钟)等待上游响应头，LLM高负载时可能排队较久
+	viper.SetDefault("gateway.cyber_policy_disable_threshold", 10)
 	viper.SetDefault("gateway.openai_response_header_timeout", 0)
 	viper.SetDefault("gateway.grok_response_header_timeout", 120)
 	viper.SetDefault("gateway.openai_first_output_timeout_seconds", 0)
@@ -3422,6 +3426,9 @@ func (c *Config) Validate() error {
 	}
 	if c.Gateway.ResponseHeaderTimeout < 0 {
 		return fmt.Errorf("gateway.response_header_timeout must be non-negative")
+	}
+	if c.Gateway.CyberPolicyDisableThreshold < 0 {
+		return fmt.Errorf("gateway.cyber_policy_disable_threshold must be non-negative")
 	}
 	if c.Gateway.OpenAIResponseHeaderTimeout < 0 {
 		return fmt.Errorf("gateway.openai_response_header_timeout must be non-negative")

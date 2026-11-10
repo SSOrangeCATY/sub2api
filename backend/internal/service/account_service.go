@@ -344,6 +344,10 @@ func (s *AccountService) Update(ctx context.Context, id int64, req UpdateAccount
 		delete(extra, OllamaCloudUsageSessionExtraKey)
 		delete(extra, OllamaCloudUsageAutoRefreshExtraKey)
 		delete(extra, OllamaCloudUsageSnapshotExtraKey)
+		delete(extra, CyberPolicyErrorCountExtraKey)
+		if count, ok := account.Extra[CyberPolicyErrorCountExtraKey]; ok {
+			extra[CyberPolicyErrorCountExtraKey] = count
+		}
 		account.Extra = prepareCodexFingerprintExtraForUpdate(account, extra)
 	} else {
 		account.Extra = prepareCodexFingerprintExtraForUpdate(account, account.Extra)

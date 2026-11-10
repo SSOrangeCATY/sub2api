@@ -114,6 +114,11 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 			abortWithGoogleError(c, 401, "User account is not active")
 			return
 		}
+		if err := apiKeyService.CheckQQAPIAccess(c.Request.Context(), apiKey.User.ID); err != nil {
+			abortWithGoogleError(c, infraerrors.Code(err), infraerrors.Message(err))
+			return
+		}
+
 		if code, message, ok := validateAPIKeyGroupAvailable(apiKey); !ok {
 			service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonAPIKeyGroupUnavailable)
 			if code == "GROUP_DELETED" {

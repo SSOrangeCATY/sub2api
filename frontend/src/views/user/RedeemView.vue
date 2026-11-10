@@ -303,7 +303,7 @@
                   ]"
                 >
                   {{ formatHistoryValue(item) }}
-                </p>
+                </p><p v-if="isBalanceType(item.type)" class="text-xs text-gray-500">{{ t(item.balance_source === 'paid' ? 'qqWelfare.sourcePaid' : item.balance_source === 'gift' ? 'qqWelfare.sourceGift' : 'qqWelfare.sourceUnknown') }}</p>
                 <p
                   v-if="!isAdminAdjustment(item.type)"
                   class="font-mono text-xs text-gray-400 dark:text-dark-500"

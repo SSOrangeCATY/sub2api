@@ -39216,6 +39216,7 @@ type RedeemCodeMutation struct {
 	_type            *string
 	value            *float64
 	addvalue         *float64
+	balance_source   *string
 	status           *string
 	used_at          *time.Time
 	notes            *string
@@ -39457,6 +39458,42 @@ func (m *RedeemCodeMutation) AddedValue() (r float64, exists bool) {
 func (m *RedeemCodeMutation) ResetValue() {
 	m.value = nil
 	m.addvalue = nil
+}
+
+// SetBalanceSource sets the "balance_source" field.
+func (m *RedeemCodeMutation) SetBalanceSource(s string) {
+	m.balance_source = &s
+}
+
+// BalanceSource returns the value of the "balance_source" field in the mutation.
+func (m *RedeemCodeMutation) BalanceSource() (r string, exists bool) {
+	v := m.balance_source
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldBalanceSource returns the old "balance_source" field's value of the RedeemCode entity.
+// If the RedeemCode object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RedeemCodeMutation) OldBalanceSource(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldBalanceSource is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldBalanceSource requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldBalanceSource: %w", err)
+	}
+	return oldValue.BalanceSource, nil
+}
+
+// ResetBalanceSource resets all changes to the "balance_source" field.
+func (m *RedeemCodeMutation) ResetBalanceSource() {
+	m.balance_source = nil
 }
 
 // SetStatus sets the "status" field.
@@ -39933,7 +39970,7 @@ func (m *RedeemCodeMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *RedeemCodeMutation) Fields() []string {
-	fields := make([]string, 0, 11)
+	fields := make([]string, 0, 12)
 	if m.code != nil {
 		fields = append(fields, redeemcode.FieldCode)
 	}
@@ -39942,6 +39979,9 @@ func (m *RedeemCodeMutation) Fields() []string {
 	}
 	if m.value != nil {
 		fields = append(fields, redeemcode.FieldValue)
+	}
+	if m.balance_source != nil {
+		fields = append(fields, redeemcode.FieldBalanceSource)
 	}
 	if m.status != nil {
 		fields = append(fields, redeemcode.FieldStatus)
@@ -39981,6 +40021,8 @@ func (m *RedeemCodeMutation) Field(name string) (ent.Value, bool) {
 		return m.GetType()
 	case redeemcode.FieldValue:
 		return m.Value()
+	case redeemcode.FieldBalanceSource:
+		return m.BalanceSource()
 	case redeemcode.FieldStatus:
 		return m.Status()
 	case redeemcode.FieldUsedBy:
@@ -40012,6 +40054,8 @@ func (m *RedeemCodeMutation) OldField(ctx context.Context, name string) (ent.Val
 		return m.OldType(ctx)
 	case redeemcode.FieldValue:
 		return m.OldValue(ctx)
+	case redeemcode.FieldBalanceSource:
+		return m.OldBalanceSource(ctx)
 	case redeemcode.FieldStatus:
 		return m.OldStatus(ctx)
 	case redeemcode.FieldUsedBy:
@@ -40057,6 +40101,13 @@ func (m *RedeemCodeMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetValue(v)
+		return nil
+	case redeemcode.FieldBalanceSource:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetBalanceSource(v)
 		return nil
 	case redeemcode.FieldStatus:
 		v, ok := value.(string)
@@ -40231,6 +40282,9 @@ func (m *RedeemCodeMutation) ResetField(name string) error {
 		return nil
 	case redeemcode.FieldValue:
 		m.ResetValue()
+		return nil
+	case redeemcode.FieldBalanceSource:
+		m.ResetBalanceSource()
 		return nil
 	case redeemcode.FieldStatus:
 		m.ResetStatus()

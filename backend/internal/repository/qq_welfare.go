@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
@@ -22,7 +23,7 @@ func NewQQWelfareRepository(db *sql.DB) service.QQWelfareRepository {
 
 func (r *qqWelfareRepository) Config(ctx context.Context) (*service.QQWelfareConfig, error) {
 	c := &service.QQWelfareConfig{}
-	err := r.db.QueryRowContext(ctx, `SELECT enabled,group_number,group_open_id,bot_key,last_bot_seen_at FROM qq_welfare_config WHERE id=1`).Scan(&c.Enabled, &c.GroupNumber, &c.GroupOpenID, &c.BotKey, &c.LastBotSeenAt)
+	err := r.db.QueryRowContext(ctx, `SELECT require_qq_for_api,enabled,group_number,group_open_id,bot_key,last_bot_seen_at FROM qq_welfare_config WHERE id=1`).Scan(&c.RequireQQForAPI, &c.Enabled, &c.GroupNumber, &c.GroupOpenID, &c.BotKey, &c.LastBotSeenAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		b := make([]byte, 32)
 		if _, err = rand.Read(b); err != nil {
@@ -35,11 +36,15 @@ func (r *qqWelfareRepository) Config(ctx context.Context) (*service.QQWelfareCon
 	}
 	return c, err
 }
-func (r *qqWelfareRepository) UpdateConfig(ctx context.Context, enabled bool, number string) error {
+func (r *qqWelfareRepository) UpdateConfig(ctx context.Context, enabled bool, number string, requireQQ ...bool) error {
 	if _, err := r.Config(ctx); err != nil {
 		return err
 	}
-	_, err := r.db.ExecContext(ctx, `UPDATE qq_welfare_config SET enabled=$1,group_open_id=CASE WHEN group_number=$2 THEN group_open_id ELSE '' END,group_number=$2,group_code_hash=NULL,group_code_expires=NULL,updated_at=now() WHERE id=1`, enabled, number)
+	required := false
+	if len(requireQQ) > 0 {
+		required = requireQQ[0]
+	}
+	_, err := r.db.ExecContext(ctx, `UPDATE qq_welfare_config SET require_qq_for_api=$3,enabled=$1,group_open_id=CASE WHEN group_number=$2 THEN group_open_id ELSE '' END,group_number=$2,group_code_hash=NULL,group_code_expires=NULL,updated_at=now() WHERE id=1`, enabled, number, required)
 	return err
 }
 func (r *qqWelfareRepository) GroupCode(ctx context.Context, hash string, expiry time.Time) error {
@@ -55,7 +60,7 @@ func (r *qqWelfareRepository) Binding(ctx context.Context, uid int64) (*service.
 	if err != nil {
 		return nil, err
 	}
-	out := &service.QQWelfareBinding{GroupNumber: cfg.GroupNumber, Ready: cfg.Enabled && cfg.GroupOpenID != ""}
+	out := &service.QQWelfareBinding{RequireQQForAPI: cfg.RequireQQForAPI, GroupNumber: cfg.GroupNumber, Ready: (cfg.Enabled || cfg.RequireQQForAPI) && cfg.GroupOpenID != ""}
 	err = r.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM qq_welfare_accounts WHERE user_id=$1 AND group_id=$2)`, uid, cfg.GroupOpenID).Scan(&out.Verified)
 	out.Verified = out.Verified && out.Ready
 	return out, err
@@ -72,7 +77,7 @@ func (r *qqWelfareRepository) CreateBinding(ctx context.Context, uid int64, hash
 	}
 	defer func() { _ = tx.Rollback() }()
 	var group string
-	if err = tx.QueryRowContext(ctx, `SELECT group_open_id FROM qq_welfare_config WHERE id=1 AND enabled AND group_open_id<>'' FOR SHARE`).Scan(&group); err != nil {
+	if err = tx.QueryRowContext(ctx, `SELECT group_open_id FROM qq_welfare_config WHERE id=1 AND (enabled OR require_qq_for_api) AND group_open_id<>'' FOR SHARE`).Scan(&group); err != nil {
 		return welfareMissing(err, service.ErrWelfareUnavailable)
 	}
 	var active int64
@@ -109,7 +114,7 @@ func (r *qqWelfareRepository) Verify(ctx context.Context, e service.QQWelfareEve
 		return err
 	}
 	defer func() { _ = tx.Rollback() }()
-	if err = welfareGroupTx(ctx, tx, e.GroupID); err != nil {
+	if err = welfareBindingGroupTx(ctx, tx, e.GroupID); err != nil {
 		return err
 	}
 	var uid int64
@@ -197,6 +202,9 @@ func (r *qqWelfareRepository) Snapshot(ctx context.Context, e service.QQWelfareE
 	if err != nil {
 		return nil, err
 	}
+	if err = tx.QueryRowContext(ctx, `SELECT COALESCE(sum(amount),0) FROM paid_balance_credits WHERE user_id=$1`, uid).Scan(&snap.PaidBalanceTotal); err != nil {
+		return nil, err
+	}
 	snap.Orders, err = welfareOrders(ctx, tx, uid, 100)
 	if err != nil {
 		return nil, err
@@ -243,9 +251,17 @@ func (r *qqWelfareRepository) Fulfill(ctx context.Context, e service.QQWelfareEv
 	} else {
 		var cid int64
 		var maxClaims, claimed int
-		err = tx.QueryRowContext(ctx, `SELECT id,title,balance_value,max_claims,claimed FROM qq_welfare_coupons WHERE code=$1 AND enabled AND (expires_at IS NULL OR expires_at>now()) FOR UPDATE`, e.Code).Scan(&cid, &order.Title, &order.BalanceValue, &maxClaims, &claimed)
+		var minPaid float64
+		err = tx.QueryRowContext(ctx, `SELECT id,title,balance_value,max_claims,claimed,min_paid_balance FROM qq_welfare_coupons WHERE code=$1 AND enabled AND (expires_at IS NULL OR expires_at>now()) FOR UPDATE`, e.Code).Scan(&cid, &order.Title, &order.BalanceValue, &maxClaims, &claimed, &minPaid)
 		if err != nil {
 			return nil, welfareMissing(err, service.ErrWelfareSoldOut)
+		}
+		var qualified bool
+		if err = tx.QueryRowContext(ctx, `SELECT COALESCE(sum(amount),0) >= $2::numeric FROM paid_balance_credits WHERE user_id=$1`, uid, minPaid).Scan(&qualified); err != nil {
+			return nil, err
+		}
+		if !qualified {
+			return nil, infraerrors.Forbidden("WELFARE_PAID_BALANCE_REQUIRED", fmt.Sprintf("累计付费充值需达到 $%s 才能领取此福利码。", strconv.FormatFloat(minPaid, 'f', -1, 64)))
 		}
 		couponID = &cid
 		var used bool
@@ -264,7 +280,7 @@ func (r *qqWelfareRepository) Fulfill(ctx context.Context, e service.QQWelfareEv
 	}
 	// The individual code is consumed in this same transaction: a group message never exposes a usable bearer code.
 	var redeemID int64
-	err = tx.QueryRowContext(ctx, `INSERT INTO redeem_codes(code,type,value,status,used_by,used_at,notes,created_at,validity_days) VALUES($1,'admin_balance',$2,'used',$3,now(),$4,now(),0) RETURNING id`, code, order.BalanceValue, uid, "QQ 福利："+order.Title).Scan(&redeemID)
+	err = tx.QueryRowContext(ctx, `INSERT INTO redeem_codes(code,type,value,status,used_by,used_at,notes,created_at,validity_days,balance_source) VALUES($1,'admin_balance',$2,'used',$3,now(),$4,now(),0,'gift') RETURNING id`, code, order.BalanceValue, uid, "QQ 福利："+order.Title).Scan(&redeemID)
 	if err != nil {
 		return nil, err
 	}
@@ -335,13 +351,13 @@ func (r *qqWelfareRepository) Admin(ctx context.Context) (*service.QQWelfareAdmi
 	if err != nil {
 		return nil, err
 	}
-	rows, err = r.db.QueryContext(ctx, `SELECT id,code,title,balance_value,max_claims,claimed,enabled,expires_at FROM qq_welfare_coupons ORDER BY id DESC LIMIT 1000`)
+	rows, err = r.db.QueryContext(ctx, `SELECT id,code,title,balance_value,max_claims,claimed,enabled,expires_at,min_paid_balance FROM qq_welfare_coupons ORDER BY id DESC LIMIT 1000`)
 	if err != nil {
 		return nil, err
 	}
 	for rows.Next() {
 		var p service.QQWelfareCoupon
-		if err = rows.Scan(&p.ID, &p.Code, &p.Title, &p.BalanceValue, &p.MaxClaims, &p.Claimed, &p.Enabled, &p.ExpiresAt); err != nil {
+		if err = rows.Scan(&p.ID, &p.Code, &p.Title, &p.BalanceValue, &p.MaxClaims, &p.Claimed, &p.Enabled, &p.ExpiresAt, &p.MinPaidBalance); err != nil {
 			_ = rows.Close()
 			return nil, err
 		}
@@ -352,7 +368,7 @@ func (r *qqWelfareRepository) Admin(ctx context.Context) (*service.QQWelfareAdmi
 	if err != nil {
 		return nil, err
 	}
-	out.Orders, err = welfareOrders(ctx, r.db, 0, 100)
+	out.Orders, err = welfareAdminOrders(ctx, r.db, 0, 100, 0)
 	return out, err
 }
 func (r *qqWelfareRepository) SaveProduct(ctx context.Context, p *service.QQWelfareProduct) error {
@@ -364,11 +380,11 @@ func (r *qqWelfareRepository) SaveProduct(ctx context.Context, p *service.QQWelf
 }
 func (r *qqWelfareRepository) SaveCoupon(ctx context.Context, p *service.QQWelfareCoupon) error {
 	if p.ID == 0 {
-		err := r.db.QueryRowContext(ctx, `INSERT INTO qq_welfare_coupons(code,title,balance_value,max_claims,enabled,expires_at) VALUES($1,$2,$3,$4,$5,$6) RETURNING id`, p.Code, p.Title, p.BalanceValue, p.MaxClaims, p.Enabled, p.ExpiresAt).Scan(&p.ID)
+		err := r.db.QueryRowContext(ctx, `INSERT INTO qq_welfare_coupons(code,title,balance_value,max_claims,enabled,expires_at,min_paid_balance) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id`, p.Code, p.Title, p.BalanceValue, p.MaxClaims, p.Enabled, p.ExpiresAt, p.MinPaidBalance).Scan(&p.ID)
 		return welfareUnique(err, infraerrors.Conflict("WELFARE_CODE_EXISTS", "此兑换码已存在，请编辑原兑换码。"))
 	}
 	// A campaign's public code is immutable, so renaming cannot reset per-account claim identity.
-	result, err := r.db.ExecContext(ctx, `UPDATE qq_welfare_coupons SET title=$1,balance_value=$2,max_claims=$3,enabled=$4,expires_at=$5,updated_at=now() WHERE id=$6 AND code=$7 AND ($3=0 OR $3>=claimed)`, p.Title, p.BalanceValue, p.MaxClaims, p.Enabled, p.ExpiresAt, p.ID, p.Code)
+	result, err := r.db.ExecContext(ctx, `UPDATE qq_welfare_coupons SET title=$1,balance_value=$2,max_claims=$3,enabled=$4,expires_at=$5,min_paid_balance=$8,updated_at=now() WHERE id=$6 AND code=$7 AND ($3=0 OR $3>=claimed)`, p.Title, p.BalanceValue, p.MaxClaims, p.Enabled, p.ExpiresAt, p.ID, p.Code, p.MinPaidBalance)
 	return welfareAffected(result, err, infraerrors.Conflict("WELFARE_INVALID_UPDATE", "兑换码不可改名，领取上限不可小于已领取数量。"))
 }
 func (r *qqWelfareRepository) TouchAndLimit(ctx context.Context, e service.QQWelfareEvent) error {

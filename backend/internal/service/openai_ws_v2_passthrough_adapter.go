@@ -951,6 +951,8 @@ func (s *OpenAIGatewayService) proxyResponsesWebSocketV2Passthrough(
 	}
 
 	completedTurns := atomic.Int32{}
+	var cyberAccountObservation atomic.Pointer[CyberPolicyAccountObservation]
+	cyberAccountObservation.Store(NewCyberPolicyAccountObservation(ctx, s.accountRepo, s.cfg, account.ID))
 	turnLifecycle := newOpenAIWSPassthroughTurnLifecycle(true)
 	var acceptedTurnStartedAt atomic.Pointer[time.Time]
 	clientFrameConn := &openAIWSClientFrameConn{
@@ -1111,6 +1113,9 @@ func (s *OpenAIGatewayService) proxyResponsesWebSocketV2Passthrough(
 			//     覆盖（Store(nil)），因为 OpenAI 上游对该帧实际不传
 			//     service_tier 时按 default 处理，billing 应如实反映。
 			if policyErr == nil && blocked == nil && isResponseCreate {
+				// A turn can fail before response.created. Reset at the accepted
+				// client request boundary, shared safely with the upstream reader.
+				cyberAccountObservation.Store(NewCyberPolicyAccountObservation(ctx, s.accountRepo, s.cfg, account.ID))
 				usageMeta.updateFromResponseCreate(out, model, requestModelForThisFrame)
 				_, actualModel := usageMeta.turnModels(requestModelForThisFrame)
 				SetOpsUpstreamModel(c, actualModel)
@@ -1283,6 +1288,7 @@ func (s *OpenAIGatewayService) proxyResponsesWebSocketV2Passthrough(
 				if eventType == "response.created" {
 					failureAccountSideEffectsApplied = false
 				}
+				cyberAccountObservation.Load().ObserveEvent(payload)
 				if (eventType == "error" || eventType == "response.failed") && markOpenAIWSV2PassthroughCyberPolicy(c, payload) {
 					return nil
 				}

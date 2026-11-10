@@ -34,6 +34,7 @@ func NewRedeemHandler(adminService service.AdminService, redeemService *service.
 
 // GenerateRedeemCodesRequest represents generate redeem codes request
 type GenerateRedeemCodesRequest struct {
+	BalanceSource string     `json:"balance_source" binding:"omitempty,oneof=gift paid"`
 	Count         int        `json:"count" binding:"required,min=1,max=100"`
 	Type          string     `json:"type" binding:"required,oneof=balance concurrency subscription invitation"`
 	Value         float64    `json:"value"`
@@ -46,6 +47,7 @@ type GenerateRedeemCodesRequest struct {
 // CreateAndRedeemCodeRequest represents creating a fixed code and redeeming it for a target user.
 // Type 为 omitempty 而非 required 是为了向后兼容旧版调用方（不传 type 时默认 balance）。
 type CreateAndRedeemCodeRequest struct {
+	BalanceSource string     `json:"balance_source" binding:"omitempty,oneof=gift paid"`
 	Code          string     `json:"code" binding:"required,min=3,max=128"`
 	Type          string     `json:"type" binding:"omitempty,oneof=balance concurrency subscription invitation"` // 不传时默认 balance（向后兼容）
 	Value         float64    `json:"value" binding:"required"`
@@ -144,12 +146,13 @@ func (h *RedeemHandler) Generate(c *gin.Context) {
 
 	executeAdminIdempotentJSON(c, "admin.redeem_codes.generate", req, service.DefaultWriteIdempotencyTTL(), func(ctx context.Context) (any, error) {
 		codes, execErr := h.adminService.GenerateRedeemCodes(ctx, &service.GenerateRedeemCodesInput{
-			Count:        req.Count,
-			Type:         req.Type,
-			Value:        req.Value,
-			GroupID:      req.GroupID,
-			ValidityDays: req.ValidityDays,
-			ExpiresAt:    expiresAt,
+			Count:         req.Count,
+			BalanceSource: req.BalanceSource,
+			Type:          req.Type,
+			Value:         req.Value,
+			GroupID:       req.GroupID,
+			ValidityDays:  req.ValidityDays,
+			ExpiresAt:     expiresAt,
 		})
 		if execErr != nil {
 			return nil, execErr
@@ -210,14 +213,15 @@ func (h *RedeemHandler) CreateAndRedeem(c *gin.Context) {
 		}
 
 		createErr := h.redeemService.CreateCode(ctx, &service.RedeemCode{
-			Code:         req.Code,
-			Type:         req.Type,
-			Value:        req.Value,
-			Status:       service.StatusUnused,
-			Notes:        req.Notes,
-			GroupID:      req.GroupID,
-			ValidityDays: req.ValidityDays,
-			ExpiresAt:    expiresAt,
+			BalanceSource: req.BalanceSource,
+			Code:          req.Code,
+			Type:          req.Type,
+			Value:         req.Value,
+			Status:        service.StatusUnused,
+			Notes:         req.Notes,
+			GroupID:       req.GroupID,
+			ValidityDays:  req.ValidityDays,
+			ExpiresAt:     expiresAt,
 		})
 		if createErr != nil {
 			// Unique code race: if code now exists, use idempotent semantics by used_by.

@@ -1,4 +1,18 @@
 export default {
+  balanceSource: '余额来源',
+  sourcePaid: '付费',
+  sourceGift: '赠送',
+  sourceUnknown: '历史 / 未分类',
+  paidHint: '只有明确标记为付费且成功入账的余额才计入福利码门槛；赠送不计入。',
+  minPaidBalance: '累计付费门槛（USD，0 为不限）',
+  paidBalanceTotal: '累计付费充值',
+  requireQQForAPI: '使用 API 前必须完成 QQ 认证',
+  apiGateHint: '此开关独立于福利中心，开启后未认证账号无法调用 API；关闭福利中心仍可完成认证。',
+  claimDetails: '领取详情',
+  close: '关闭',
+  previous: '上一页',
+  next: '下一页',
+
   refreshFailed: '操作已成功，但数据刷新失败，请点击刷新查看最新积分与记录。',
   confirmExchange: '确认兑换',
   autoCredit: '兑换后余额自动存入当前网站账号。',

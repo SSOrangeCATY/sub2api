@@ -7,6 +7,7 @@ import { apiClient } from './client'
 import type { PaginatedResponse, RedeemCodeRequest } from '@/types'
 
 export interface RedeemHistoryItem {
+  balance_source?: 'unknown' | 'gift' | 'paid'
   id: number
   code: string
   type: string
