@@ -87,16 +87,25 @@
             </label>
             <Select
               :modelValue="entry.billing_mode"
-              @update:modelValue="emit('update', {
-                ...entry,
-                billing_mode: $event as BillingMode,
-                intervals: [],
-                time_pricing: { ...entry.time_pricing, periods: [] },
-              })"
+              @update:modelValue="onBillingModeUpdate($event as BillingMode)"
               :options="billingModeOptions"
               class="mt-1"
             />
           </div>
+        </div>
+
+        <div class="mt-3 rounded border border-gray-200 p-2 dark:border-dark-600">
+          <label class="text-xs font-medium" :for="currencyInputId">{{ t('admin.channels.form.sourceCurrency') }}</label>
+          <div class="mt-1 flex flex-wrap items-center gap-2">
+            <select :id="currencyInputId" data-testid="source-currency" :value="entry.source_currency || 'USD'" class="input w-32 text-sm" @change="onCurrencyUpdate(($event.target as HTMLSelectElement).value)">
+              <option v-for="currency in sourceCurrencies" :key="currency" :value="currency">{{ currency }}</option>
+            </select>
+            <button v-if="entry.billing_mode === 'token'" data-testid="load-source-price" type="button" class="btn btn-secondary text-xs" :disabled="entry.models.length !== 1 || loadingSourcePrice" @click="loadPricePreset(entry.models)">
+              {{ t('admin.channels.form.loadSourcePrice') }}
+            </button>
+          </div>
+          <p class="mt-1 text-xs text-gray-500">{{ t('admin.channels.form.nominalPriceHint', { currency: entry.source_currency || 'USD' }) }}</p>
+          <p v-if="sourcePriceMessage" role="status" class="mt-1 text-xs text-gray-500">{{ sourcePriceMessage }}</p>
         </div>
 
         <!-- Token mode -->
@@ -305,7 +314,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, useId } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Select from '@/components/common/Select.vue'
 import Icon from '@/components/icons/Icon.vue'
@@ -319,6 +328,11 @@ import type { BillingMode } from '@/api/admin/channels'
 import channelsAPI from '@/api/admin/channels'
 
 const { t } = useI18n()
+const currencyInputId = useId()
+const sourceCurrencies = ['USD', 'CNY', 'EUR', 'GBP', 'JPY', 'KRW', 'HKD', 'SGD', 'AUD', 'CAD', 'CHF']
+const loadingSourcePrice = ref(false)
+const sourcePriceMessage = ref('')
+let priceRequestVersion = 0
 
 const props = withDefaults(defineProps<{
   entry: PricingFormEntry
@@ -367,6 +381,7 @@ function updateReasoningEffortMultiplier(effort: ReasoningEffortLevel, value: st
 }
 
 function emitField(field: keyof PricingFormEntry, value: string) {
+  invalidatePriceRequest()
   emit('update', { ...props.entry, [field]: value === '' ? null : value })
 }
 
@@ -415,44 +430,74 @@ function removeInterval(idx: number) {
   emit('update', { ...props.entry, intervals })
 }
 
-async function onModelsUpdate(newModels: string[]) {
-  const oldModels = props.entry.models
-  emit('update', { ...props.entry, models: newModels })
+function invalidatePriceRequest() {
+  priceRequestVersion++
+  loadingSourcePrice.value = false
+}
 
-  // 仅在「空条目首次加入单个模型」时自动填充默认价：
-  // 条目已有模型时（即使价格留空、按各模型的官方默认价回退）追加模型不应改写整条价格，
-  // 一次加入多个模型也不应把第一个模型的价格套用到整条，否则条目内所有模型都会被静默改价。
-  const addedModels = newModels.filter(m => !oldModels.includes(m))
-  if (oldModels.length !== 0 || addedModels.length !== 1) return
+function onBillingModeUpdate(mode: BillingMode) {
+  invalidatePriceRequest()
+  emit('update', { ...props.entry, billing_mode: mode, intervals: [], time_pricing: { ...props.entry.time_pricing, periods: [] } })
+}
 
-  // 检查是否所有价格字段都为空
-  const e = props.entry
-  const hasPrice = e.input_price != null || e.output_price != null ||
-                   e.cache_write_price != null || e.cache_write_1h_price != null || e.cache_write_12h_price != null || e.cache_read_price != null
-  if (hasPrice) return
+function onCurrencyUpdate(currency: string) {
+  invalidatePriceRequest()
+  sourcePriceMessage.value = ''
+  loadingSourcePrice.value = false
+  emit('update', { ...props.entry, source_currency: currency })
+}
 
-  // 查询第一个新增模型的默认价格
+const priceFields = ['input_price', 'output_price', 'cache_write_price', 'cache_write_1h_price', 'cache_write_12h_price', 'cache_read_price', 'image_input_price', 'image_output_price'] as const
+const priceFingerprint = (entry: PricingFormEntry) => JSON.stringify(priceFields.map(field => entry[field] ?? null))
+
+async function loadPricePreset(models: string[]) {
+  if (models.length !== 1 || props.entry.billing_mode !== 'token') return
+  const version = ++priceRequestVersion
+  const currency = props.entry.source_currency || 'USD'
+  const previousModels = JSON.stringify(props.entry.models)
+  const pricesBefore = priceFingerprint(props.entry)
+  loadingSourcePrice.value = true
+  sourcePriceMessage.value = ''
   try {
-    const result = await channelsAPI.getModelDefaultPricing(addedModels[0])
-    if (result.found) {
-      emit('update', {
-        ...props.entry,
-        models: newModels,
-        input_price: perTokenToMTok(result.input_price ?? null),
-        output_price: perTokenToMTok(result.output_price ?? null),
-        cache_write_price: perTokenToMTok(result.cache_write_price ?? null),
-        cache_write_1h_price: perTokenToMTok(result.cache_write_1h_price ?? null),
-        cache_write_12h_price: perTokenToMTok(result.cache_write_12h_price ?? null),
-        cache_read_price: perTokenToMTok(result.cache_read_price ?? null),
-        image_input_price: perTokenToMTok(result.image_input_price ?? null),
-        image_output_price: perTokenToMTok(result.image_output_price ?? null),
-        reasoning_effort_multipliers: props.entry.reasoning_effort_multipliers ?? result.reasoning_effort_multipliers ?? null,
-      })
+    const result = currency === 'USD'
+      ? await channelsAPI.getModelDefaultPricing(models[0])
+      : await channelsAPI.getModelDefaultPricing(models[0], currency)
+    const currentModels = JSON.stringify(props.entry.models)
+    if (props.entry.billing_mode !== 'token' || version !== priceRequestVersion || (props.entry.source_currency || 'USD') !== currency || priceFingerprint(props.entry) !== pricesBefore || (currentModels !== previousModels && currentModels !== JSON.stringify(models))) return
+    if (!result.found) {
+      sourcePriceMessage.value = t('admin.channels.form.sourcePriceUnavailable', { currency })
+      return
     }
+    emit('update', {
+      ...props.entry, models, source_currency: currency,
+      input_price: perTokenToMTok(result.input_price ?? null),
+      output_price: perTokenToMTok(result.output_price ?? null),
+      cache_write_price: perTokenToMTok(result.cache_write_price ?? null),
+      cache_write_1h_price: perTokenToMTok(result.cache_write_1h_price ?? null),
+      cache_write_12h_price: perTokenToMTok(result.cache_write_12h_price ?? null),
+      cache_read_price: perTokenToMTok(result.cache_read_price ?? null),
+      image_input_price: perTokenToMTok(result.image_input_price ?? null),
+      image_output_price: perTokenToMTok(result.image_output_price ?? null),
+      reasoning_effort_multipliers: props.entry.reasoning_effort_multipliers ?? result.reasoning_effort_multipliers ?? null,
+    })
+    sourcePriceMessage.value = t('admin.channels.form.sourcePriceLoaded', { date: result.verified_at || 'USD' })
   } catch {
-    // 查询失败不影响用户操作
+    if (version === priceRequestVersion) sourcePriceMessage.value = t('admin.channels.form.sourcePriceLoadFailed')
+  } finally {
+    if (version === priceRequestVersion) loadingSourcePrice.value = false
   }
 }
+
+async function onModelsUpdate(newModels: string[]) {
+  invalidatePriceRequest()
+  const oldModels = props.entry.models
+  emit('update', { ...props.entry, models: newModels })
+  const addedModels = newModels.filter(m => !oldModels.includes(m))
+  if (oldModels.length !== 0 || addedModels.length !== 1 || newModels.length !== 1) return
+  if (priceFields.some(field => props.entry[field] != null)) return
+  await loadPricePreset(newModels)
+}
+
 </script>
 
 <style scoped>

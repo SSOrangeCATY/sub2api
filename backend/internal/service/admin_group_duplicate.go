@@ -94,6 +94,10 @@ func cloneGroupMessagesDispatchModelConfig(value OpenAIMessagesDispatchModelConf
 }
 
 func cloneGroupForDuplicate(source *Group, operationID string) *Group {
+	pricing := make([]ChannelModelPricing, len(source.ModelPricing))
+	for i := range source.ModelPricing {
+		pricing[i] = source.ModelPricing[i].Clone()
+	}
 	return &Group{
 		Name:                            duplicateGroupName(source.Name, 1),
 		Description:                     source.Description,
@@ -103,6 +107,8 @@ func cloneGroupForDuplicate(source *Group, operationID string) *Group {
 		FallbackGroupIDs:                append([]int64(nil), source.FallbackGroupIDs...),
 		FallbackRateMultiplier:          cloneGroupValuePointer(source.FallbackRateMultiplier),
 		RateMultiplier:                  source.RateMultiplier,
+		ModelPricing:                    pricing,
+		LongContextPricingEnabled:       source.LongContextPricingEnabled,
 		PeakRateEnabled:                 source.PeakRateEnabled,
 		PeakStart:                       source.PeakStart,
 		PeakEnd:                         source.PeakEnd,

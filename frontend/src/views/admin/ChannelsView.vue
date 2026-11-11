@@ -1104,6 +1104,7 @@ function accountStatsRulesToAPI(): AccountStatsPricingRule[] {
           .map(p => ({
             platform: section.platform,
             models: p.models,
+            source_currency: p.source_currency || undefined,
             billing_mode: p.billing_mode,
             input_price: mTokToPerToken(p.input_price),
             output_price: mTokToPerToken(p.output_price),
@@ -1149,6 +1150,7 @@ function formToAPI(): { group_ids: number[], model_pricing: ChannelModelPricing[
       model_pricing.push({
         platform: section.platform,
         models: entry.models,
+        source_currency: entry.source_currency || undefined,
         billing_mode: entry.billing_mode,
         input_price: mTokToPerToken(entry.input_price),
         output_price: mTokToPerToken(entry.output_price),
@@ -1251,6 +1253,7 @@ function apiToForm(channel: Channel): PlatformSection[] {
       .filter(p => (p.platform || 'anthropic') === platform)
       .map(p => ({
         models: p.models || [],
+        source_currency: p.source_currency || undefined,
         billing_mode: p.billing_mode,
         input_price: perTokenToMTok(p.input_price),
         output_price: perTokenToMTok(p.output_price),
@@ -1446,6 +1449,7 @@ function distributeRulesToPlatforms(apiRules: AccountStatsPricingRule[]) {
       account_ids: [...(apiRule.account_ids || [])],
       pricing: (apiRule.pricing || []).map(p => ({
         models: [...(p.models || [])],
+        source_currency: p.source_currency || undefined,
         billing_mode: p.billing_mode,
         input_price: perTokenToMTok(p.input_price),
         output_price: perTokenToMTok(p.output_price),

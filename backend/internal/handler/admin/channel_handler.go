@@ -58,6 +58,7 @@ type updateChannelRequest struct {
 }
 
 type channelModelPricingRequest struct {
+	SourceCurrency             string                     `json:"source_currency"`
 	Platform                   string                     `json:"platform" binding:"omitempty,max=50"`
 	Models                     []string                   `json:"models" binding:"required,min=1,max=100"`
 	BillingMode                string                     `json:"billing_mode" binding:"omitempty,oneof=token per_request image"`
@@ -133,6 +134,7 @@ type channelResponse struct {
 }
 
 type channelModelPricingResponse struct {
+	SourceCurrency             string                      `json:"source_currency,omitempty"`
 	ID                         int64                       `json:"id"`
 	Platform                   string                      `json:"platform"`
 	Models                     []string                    `json:"models"`
@@ -265,6 +267,7 @@ func pricingToResponse(p *service.ChannelModelPricing) channelModelPricingRespon
 		intervals = append(intervals, intervalToResponse(iv))
 	}
 	return channelModelPricingResponse{
+		SourceCurrency:             p.SourceCurrency,
 		ID:                         p.ID,
 		Platform:                   platform,
 		Models:                     models,
@@ -367,6 +370,7 @@ func pricingRequestToService(reqs []channelModelPricingRequest, allowChannelMult
 			flexMultiplier = r.FlexMultiplier
 		}
 		result = append(result, service.ChannelModelPricing{
+			SourceCurrency:             r.SourceCurrency,
 			Platform:                   platform,
 			Models:                     r.Models,
 			BillingMode:                billingMode,
@@ -609,6 +613,21 @@ func (h *ChannelHandler) GetModelDefaultPricing(c *gin.Context) {
 	if model == "" {
 		response.ErrorFrom(c, infraerrors.BadRequest("MISSING_PARAMETER", "model parameter is required").
 			WithMetadata(map[string]string{"param": "model"}))
+		return
+	}
+
+	currency := strings.TrimSpace(c.Query("source_currency"))
+	if !service.IsValidPricingSourceCurrency(currency) {
+		response.ErrorFrom(c, infraerrors.BadRequest("INVALID_PRICING_SOURCE_CURRENCY", "source_currency must be an uppercase three-letter currency code"))
+		return
+	}
+	if currency != "" && currency != "USD" {
+		quote, found := service.LookupNominalPricePreset(model, currency)
+		if !found {
+			response.Success(c, gin.H{"found": false, "source_currency": currency, "settlement_currency": "USD", "unit_policy": "nominal"})
+			return
+		}
+		response.Success(c, quote)
 		return
 	}
 
