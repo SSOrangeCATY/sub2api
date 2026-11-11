@@ -88,6 +88,8 @@ type AccountStatsPricingRule struct {
 
 // ChannelModelPricing 渠道模型定价条目
 type ChannelModelPricing struct {
+	// SourceCurrency records the denomination whose numbers were imported 1:1 as USD overrides. It never applies FX.
+	SourceCurrency             string              `json:"source_currency,omitempty"`
 	ID                         int64               `json:"id,omitempty"`
 	ChannelID                  int64               `json:"channel_id,omitempty"`
 	Platform                   string              `json:"platform"` // 所属平台（anthropic/openai/gemini/...）

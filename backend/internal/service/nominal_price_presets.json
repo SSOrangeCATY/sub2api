@@ -1,0 +1,38 @@
+{
+  "deepseek-flash": {
+    "CNY": {
+      "verified_at": "2026-11-02",
+      "input_price": 1e-06,
+      "output_price": 4e-06,
+      "cache_read_price": 2e-08,
+      "cache_write_price": 0
+    }
+  },
+  "deepseek-v4-flash": {
+    "CNY": {
+      "verified_at": "2026-11-02",
+      "input_price": 1e-06,
+      "output_price": 4e-06,
+      "cache_read_price": 2e-08,
+      "cache_write_price": 0
+    }
+  },
+  "deepseek-v4.1-flash": {
+    "CNY": {
+      "verified_at": "2026-11-02",
+      "input_price": 1e-06,
+      "output_price": 4e-06,
+      "cache_read_price": 2e-08,
+      "cache_write_price": 0
+    }
+  },
+  "deepseek-v4-pro": {
+    "CNY": {
+      "verified_at": "2026-11-02",
+      "input_price": 4.5e-06,
+      "output_price": 1.35e-05,
+      "cache_read_price": 1.5e-07,
+      "cache_write_price": 0
+    }
+  }
+}

@@ -31,7 +31,7 @@ func reasoningPricingRow(multipliers any) *sqlmock.Rows {
 	return sqlmock.NewRows(channelModelPricingTimePricingColumns).AddRow(
 		int64(11), int64(7), "openai", `["custom-model"]`, service.BillingModeToken,
 		nil, nil, nil, nil, nil, nil, nil, nil, multipliers, nil, nil, nil, nil,
-		time.Time{}, time.Time{},
+		time.Time{}, time.Time{}, "CNY",
 	)
 }
 
@@ -51,14 +51,14 @@ func TestChannelReasoningEffortMultipliersRoundTrip(t *testing.T) {
 				repo, mock := newChannelModelPricingTimePricingRepo(t)
 				ctx := context.Background()
 				pricing := &service.ChannelModelPricing{
-					ID: 11, ChannelID: 7, Platform: "openai", Models: []string{"custom-model"},
+					SourceCurrency: "CNY", ID: 11, ChannelID: 7, Platform: "openai", Models: []string{"custom-model"},
 					ReasoningEffortMultipliers: tt.multipliers,
 				}
 				stored := &capturedReasoningMultipliersJSON{}
 				if operation == "update" {
-					mock.ExpectExec(`(?s)UPDATE channel_model_pricing.*reasoning_effort_multipliers = \$11.*WHERE id = \$17`).
+					mock.ExpectExec(`(?s)UPDATE channel_model_pricing.*reasoning_effort_multipliers = \$11.*WHERE id = \$18`).
 						WithArgs([]byte(`["custom-model"]`), service.BillingModeToken,
-							nil, nil, nil, nil, nil, nil, nil, nil, stored, nil, nil, nil, nil, "openai", int64(11)).
+							nil, nil, nil, nil, nil, nil, nil, nil, stored, nil, nil, nil, nil, "openai", "CNY", int64(11)).
 						WillReturnResult(sqlmock.NewResult(0, 1))
 					require.NoError(t, repo.UpdateModelPricing(ctx, pricing))
 				} else {
@@ -69,7 +69,7 @@ func TestChannelReasoningEffortMultipliersRoundTrip(t *testing.T) {
 					}
 					mock.ExpectQuery(`INSERT INTO channel_model_pricing .*reasoning_effort_multipliers`).
 						WithArgs(int64(7), "openai", []byte(`["custom-model"]`), service.BillingModeToken,
-							nil, nil, nil, nil, nil, nil, nil, nil, stored, nil, nil, nil, nil).
+							nil, nil, nil, nil, nil, nil, nil, nil, stored, nil, nil, nil, nil, "CNY").
 						WillReturnRows(sqlmock.NewRows([]string{"id", "created_at", "updated_at"}).AddRow(int64(11), time.Time{}, time.Time{}))
 					if operation == "replace" {
 						mock.ExpectCommit()
@@ -86,6 +86,7 @@ func TestChannelReasoningEffortMultipliersRoundTrip(t *testing.T) {
 				loaded, err := repo.ListModelPricing(ctx, 7)
 				require.NoError(t, err)
 				require.Len(t, loaded, 1)
+				require.Equal(t, "CNY", loaded[0].SourceCurrency)
 				if len(tt.multipliers) == 0 {
 					require.Empty(t, loaded[0].ReasoningEffortMultipliers)
 				} else {
@@ -139,7 +140,7 @@ func TestAccountStatsReasoningEffortMultipliersRoundTrip(t *testing.T) {
 	repo, mock := newChannelModelPricingTimePricingRepo(t)
 	ctx := context.Background()
 	pricing := &service.ChannelModelPricing{
-		Platform: "anthropic", Models: []string{"custom-model"},
+		SourceCurrency: "CNY", Platform: "anthropic", Models: []string{"custom-model"},
 		ReasoningEffortMultipliers: map[string]float64{"medium": 0.5, "high": 2},
 	}
 	stored := &capturedReasoningMultipliersJSON{}
@@ -148,7 +149,7 @@ func TestAccountStatsReasoningEffortMultipliersRoundTrip(t *testing.T) {
 	require.NoError(t, err)
 	mock.ExpectQuery(`INSERT INTO channel_account_stats_model_pricing .*reasoning_effort_multipliers`).
 		WithArgs(int64(9), "anthropic", []byte(`["custom-model"]`), service.BillingModeToken,
-			nil, nil, nil, nil, nil, nil, stored, nil, nil).
+			nil, nil, nil, nil, nil, nil, stored, nil, nil, "CNY").
 		WillReturnRows(sqlmock.NewRows([]string{"id", "created_at", "updated_at"}).AddRow(int64(11), time.Time{}, time.Time{}))
 	require.NoError(t, createAccountStatsModelPricingTx(ctx, tx, 9, pricing))
 	mock.ExpectCommit()
@@ -158,18 +159,19 @@ func TestAccountStatsReasoningEffortMultipliersRoundTrip(t *testing.T) {
 	columns := []string{
 		"id", "rule_id", "platform", "models", "billing_mode", "input_price", "output_price",
 		"cache_write_price", "cache_write_1h_price", "cache_write_12h_price", "cache_read_price", "reasoning_effort_multipliers",
-		"image_output_price", "per_request_price", "created_at", "updated_at",
+		"image_output_price", "per_request_price", "created_at", "updated_at", "source_currency",
 	}
 	mock.ExpectQuery(`(?s)SELECT .*reasoning_effort_multipliers.*FROM channel_account_stats_model_pricing`).
 		WithArgs(pq.Array([]int64{9})).WillReturnRows(sqlmock.NewRows(columns).AddRow(
 		int64(11), int64(9), "anthropic", `["custom-model"]`, service.BillingModeToken,
-		nil, nil, nil, nil, nil, nil, stored.value, nil, nil, time.Time{}, time.Time{},
+		nil, nil, nil, nil, nil, nil, stored.value, nil, nil, time.Time{}, time.Time{}, "CNY",
 	))
 	mock.ExpectQuery(`(?s)SELECT .*FROM channel_account_stats_pricing_intervals`).
 		WithArgs(pq.Array([]int64{11})).WillReturnRows(sqlmock.NewRows([]string{"id"}))
 	loaded, err := repo.batchLoadAccountStatsModelPricing(ctx, []int64{9})
 	require.NoError(t, err)
 	require.Len(t, loaded[9], 1)
+	require.Equal(t, "CNY", loaded[9][0].SourceCurrency)
 	require.Equal(t, pricing.ReasoningEffortMultipliers, loaded[9][0].ReasoningEffortMultipliers)
 	require.NoError(t, mock.ExpectationsWereMet())
 }

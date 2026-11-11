@@ -40,6 +40,7 @@ export interface ChannelTimePricing {
 }
 
 export interface ChannelModelPricing {
+  source_currency?: string
   id?: number
   platform: string
   models: string[]
@@ -174,6 +175,10 @@ export async function remove(id: number): Promise<void> {
 }
 
 export interface ModelDefaultPricing {
+  source_currency?: string
+  settlement_currency?: string
+  unit_policy?: string
+  verified_at?: string
   found: boolean
   input_price?: number    // per-token price
   output_price?: number
@@ -186,9 +191,9 @@ export interface ModelDefaultPricing {
   reasoning_effort_multipliers?: Record<string, number> | null
 }
 
-export async function getModelDefaultPricing(model: string): Promise<ModelDefaultPricing> {
+export async function getModelDefaultPricing(model: string, sourceCurrency?: string): Promise<ModelDefaultPricing> {
   const { data } = await apiClient.get<ModelDefaultPricing>('/admin/channels/model-pricing', {
-    params: { model }
+    params: { model, ...(sourceCurrency ? { source_currency: sourceCurrency } : {}) }
   })
   return data
 }
