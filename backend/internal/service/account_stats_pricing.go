@@ -231,12 +231,13 @@ func calculateTokenStatsCost(pricing *ChannelModelPricing, tokens UsageTokens) *
 		totalTokens := tokens.InputTokens + tokens.OutputTokens + tokens.CacheCreationTokens + tokens.CacheReadTokens
 		if iv := FindMatchingInterval(pricing.Intervals, totalTokens); iv != nil {
 			p = &ChannelModelPricing{
-				InputPrice:        iv.InputPrice,
-				OutputPrice:       iv.OutputPrice,
-				CacheWritePrice:   iv.CacheWritePrice,
-				CacheWrite1hPrice: iv.CacheWrite1hPrice,
-				CacheReadPrice:    iv.CacheReadPrice,
-				PerRequestPrice:   iv.PerRequestPrice,
+				InputPrice:         iv.InputPrice,
+				OutputPrice:        iv.OutputPrice,
+				CacheWritePrice:    iv.CacheWritePrice,
+				CacheWrite1hPrice:  iv.CacheWrite1hPrice,
+				CacheWrite12hPrice: iv.CacheWrite12hPrice,
+				CacheReadPrice:     iv.CacheReadPrice,
+				PerRequestPrice:    iv.PerRequestPrice,
 			}
 		}
 	}
@@ -253,6 +254,9 @@ func calculateTokenStatsCost(pricing *ChannelModelPricing, tokens UsageTokens) *
 			cacheCreationCost = float64(cache5m)*deref(p.CacheWritePrice) +
 				float64(cache1h)*deref(p.CacheWrite1hPrice)
 		}
+	}
+	if cost, ok := openAICacheCreationTTLCost(tokens, deref(p.CacheWritePrice), p.CacheWrite12hPrice); ok {
+		cacheCreationCost = cost
 	}
 	cost := float64(tokens.InputTokens)*deref(p.InputPrice) +
 		float64(tokens.OutputTokens)*deref(p.OutputPrice) +
@@ -275,6 +279,11 @@ func hasStatsTokenUsage(tokens UsageTokens) bool {
 }
 
 func hasStatsTokenPriceForUsage(pricing *ChannelModelPricing, tokens UsageTokens) bool {
+	// Only recognize the 12h price when the reported TTL buckets match the
+	// aggregate; malformed or absent details still use the generic write price.
+	if _, valid := openAICacheCreationTTLCost(tokens, 0, nil); valid && tokens.CacheCreation12hTokens > 0 && pricing.CacheWrite12hPrice != nil {
+		return true
+	}
 	return (tokens.InputTokens > 0 && pricing.InputPrice != nil) ||
 		(tokens.OutputTokens > 0 && pricing.OutputPrice != nil) ||
 		((tokens.CacheCreationTokens > 0 || tokens.CacheCreation5mTokens > 0) && pricing.CacheWritePrice != nil) ||
