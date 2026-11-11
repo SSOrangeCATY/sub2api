@@ -15,7 +15,7 @@ func TestNominalCurrencyChannelAndProcurementPersistence(t *testing.T) {
 	price := 1e-6
 	channel := &service.Channel{
 		ModelPricing:             []service.ChannelModelPricing{{Platform: service.PlatformOpenAI, Models: []string{"nominal-model"}, SourceCurrency: "CNY", InputPrice: &price}},
-		AccountStatsPricingRules: []service.AccountStatsPricingRule{{Name: "nominal procurement", Pricing: []service.ChannelModelPricing{{Platform: service.PlatformOpenAI, Models: []string{"nominal-model"}, SourceCurrency: "EUR", InputPrice: &price}}}},
+		AccountStatsPricingRules: []service.AccountStatsPricingRule{{Name: "nominal procurement", GroupIDs: []int64{}, AccountIDs: []int64{}, Pricing: []service.ChannelModelPricing{{Platform: service.PlatformOpenAI, Models: []string{"nominal-model"}, SourceCurrency: "EUR", InputPrice: &price}}}},
 	}
 	repo := newReasoningPricingIntegrationChannel(t, channel)
 	loaded, err := repo.GetByID(ctx, channel.ID)
