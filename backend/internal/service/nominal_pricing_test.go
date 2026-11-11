@@ -24,6 +24,18 @@ func TestNominalPricePresetUsesNativeNumbersWithoutFX(t *testing.T) {
 	}
 }
 
+func TestNominalGroupDuplicatePreservesPricing(t *testing.T) {
+	source := &Group{LongContextPricingEnabled: true, ModelPricing: []ChannelModelPricing{{Models: []string{"generic-model"}, SourceCurrency: "CNY", InputPrice: float64Ptr(1e-6), ReasoningEffortMultipliers: map[string]float64{"high": 2}}}}
+	copy := cloneGroupForDuplicate(source, "nominal-copy")
+	require.True(t, copy.LongContextPricingEnabled)
+	require.Equal(t, "CNY", copy.ModelPricing[0].SourceCurrency)
+	require.Equal(t, 1e-6, *copy.ModelPricing[0].InputPrice)
+	copy.ModelPricing[0].Models[0] = "changed"
+	copy.ModelPricing[0].ReasoningEffortMultipliers["high"] = 3
+	require.Equal(t, "generic-model", source.ModelPricing[0].Models[0])
+	require.Equal(t, 2.0, source.ModelPricing[0].ReasoningEffortMultipliers["high"])
+}
+
 func TestNominalCurrencyUsesExistingPriceAndSettlementPaths(t *testing.T) {
 	for _, currency := range []string{"", "USD", "CNY", "EUR", "JPY"} {
 		t.Run(currency, func(t *testing.T) {
