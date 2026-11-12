@@ -54,8 +54,10 @@ func TestListPlazaGroups_DiscoversDirectAccountsWithoutChannelOrPriceEdits(t *te
 	require.Equal(t, int64(30), limited[0].ID)
 }
 
-func TestListPlazaGroups_ChannelCatalogRemainsAuthoritative(t *testing.T) {
-	s := newPlazaService([]Channel{plazaPricedChannel(1, "configured", []int64{1}, PlatformOpenAI, "allowed-model")}, []Group{{ID: 1, Platform: PlatformOpenAI}}, nil)
+func TestListPlazaGroups_RestrictedChannelCatalogRemainsAuthoritative(t *testing.T) {
+	channel := plazaPricedChannel(1, "configured", []int64{1}, PlatformOpenAI, "allowed-model")
+	channel.RestrictModels = true
+	s := newPlazaService([]Channel{channel}, []Group{{ID: 1, Platform: PlatformOpenAI}}, nil)
 	repo := &plazaDiscoveryAccounts{err: errors.New("must not query")}
 	s.accountRepo = repo
 	out, err := s.ListGroups(context.Background())
