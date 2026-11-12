@@ -1066,6 +1066,14 @@ func (s *BillingService) initFallbackPricing() {
 // getFallbackPricing 根据模型系列获取回退价格
 func (s *BillingService) getFallbackPricing(model string) *ModelPricing {
 	modelLower := normalizeAntigravityClaudeTierAlias(strings.ToLower(model))
+	if isGPT62PricingModel(modelLower) {
+		p := openAIGPT62FallbackPricing
+		return &ModelPricing{
+			InputPricePerToken: p.InputCostPerToken, OutputPricePerToken: p.OutputCostPerToken,
+			CacheReadPricePerToken:     p.CacheReadInputTokenCost,
+			CacheCreationPriceExplicit: true,
+		}
+	}
 	if modelLower == "gpt-image-2.6-flare" || modelLower == "gpt-image-2.6-sunburst" {
 		p := openAIGPTImage25FallbackPricing
 		return &ModelPricing{

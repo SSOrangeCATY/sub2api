@@ -18,8 +18,25 @@ This local copy serves as a fallback when the remote file cannot be downloaded d
 ## Update Process
 The pricingService will:
 1. First attempt to download the latest version from GitHub
-2. If download fails, use this local copy as fallback
-3. Log a warning when using the fallback file
+2. Merge models missing from the downloaded catalog from this local fallback
+3. If download fails, load this local copy instead
+4. Apply an explicitly configured override file at the highest catalog priority
+
+## GPT-6.2 default card (2026-11-12)
+
+The operator supplied a shared USD card for `gpt-6.2-astra`, `gpt-6.2-sol`,
+`gpt-6.2-astra-pro` and `gpt-6.2-sol-pro`: input $5, output $30 and cached input
+$0.50 per million tokens. Their entries prevent a missing catalog key from
+falling through to an older GPT model's prices. This is an operator-provided
+default, not a claim of independently verified provider pricing.
+
+The same card is used by the narrow static fallbacks if the dynamic pricing
+service or its fallback file is unavailable. Explicit remote/override entries
+and group/channel pricing keep their existing priority. No long-context
+threshold or additional service-tier rate is inferred from the supplied base
+card. Zero image fields retain the existing unconfigured-field semantics;
+they do not introduce free image-token billing. Previous model entries and
+historical usage records are unchanged.
 
 ## Manual Update
 To manually update this file with the latest pricing data (if automation is unavailable):
@@ -34,4 +51,4 @@ The file contains JSON data with model pricing information including:
 - Context window sizes
 - Model capabilities
 
-Last updated: 2025-08-10
+Last updated: 2026-11-12

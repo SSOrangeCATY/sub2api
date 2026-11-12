@@ -1,4 +1,48 @@
 {
+  "gpt-6.2-astra": {
+    "input_cost_per_token": 5e-06,
+    "output_cost_per_token": 3e-05,
+    "cache_read_input_token_cost": 5e-07,
+    "cache_creation_input_token_cost": 0,
+    "input_cost_per_image_token": 0,
+    "output_cost_per_image_token": 0,
+    "litellm_provider": "openai",
+    "mode": "chat",
+    "supports_prompt_caching": true
+  },
+  "gpt-6.2-sol": {
+    "input_cost_per_token": 5e-06,
+    "output_cost_per_token": 3e-05,
+    "cache_read_input_token_cost": 5e-07,
+    "cache_creation_input_token_cost": 0,
+    "input_cost_per_image_token": 0,
+    "output_cost_per_image_token": 0,
+    "litellm_provider": "openai",
+    "mode": "chat",
+    "supports_prompt_caching": true
+  },
+  "gpt-6.2-astra-pro": {
+    "input_cost_per_token": 5e-06,
+    "output_cost_per_token": 3e-05,
+    "cache_read_input_token_cost": 5e-07,
+    "cache_creation_input_token_cost": 0,
+    "input_cost_per_image_token": 0,
+    "output_cost_per_image_token": 0,
+    "litellm_provider": "openai",
+    "mode": "chat",
+    "supports_prompt_caching": true
+  },
+  "gpt-6.2-sol-pro": {
+    "input_cost_per_token": 5e-06,
+    "output_cost_per_token": 3e-05,
+    "cache_read_input_token_cost": 5e-07,
+    "cache_creation_input_token_cost": 0,
+    "input_cost_per_image_token": 0,
+    "output_cost_per_image_token": 0,
+    "litellm_provider": "openai",
+    "mode": "chat",
+    "supports_prompt_caching": true
+  },
   "gpt-6.1-terra": {
     "cache_creation_input_token_cost": 1.25e-06,
     "cache_read_input_token_cost": 5e-08,

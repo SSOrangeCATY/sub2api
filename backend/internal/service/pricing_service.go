@@ -57,6 +57,14 @@ var (
 		Mode:                    "chat",
 		SupportsPromptCaching:   true,
 	}
+	// Operator-provided default card for the four named GPT-6.2 SKUs.
+	// Keep older-model premiums and unspecified context tiers out of this card.
+	openAIGPT62FallbackPricing = &LiteLLMModelPricing{
+		InputCostPerToken: 5e-6, OutputCostPerToken: 30e-6,
+		CacheReadInputTokenCost:             .5e-6,
+		CacheCreationInputTokenCostExplicit: true,
+		LiteLLMProvider:                     "openai", Mode: "chat", SupportsPromptCaching: true,
+	}
 	openAIGPT6AstraFallbackPricing = &LiteLLMModelPricing{
 		InputCostPerToken:                   1e-05,
 		InputCostPerTokenPriority:           2e-05,
@@ -1612,6 +1620,9 @@ func (s *PricingService) matchByModelFamily(model string) *LiteLLMModelPricing {
 // 5. gpt-5.4* -> 业务静态兜底价
 // 6. 最终回退到 DefaultTestModel (gpt-5.1-codex)
 func (s *PricingService) matchOpenAIModel(model string) *LiteLLMModelPricing {
+	if isGPT62PricingModel(model) {
+		return openAIGPT62FallbackPricing
+	}
 	if strings.HasPrefix(model, "gpt-5.3-codex-spark") {
 		if pricing, ok := s.pricingData["gpt-5.1-codex"]; ok {
 			logger.LegacyPrintf("service.pricing", "[Pricing][SparkBilling] %s -> %s billing", model, "gpt-5.1-codex")
@@ -1737,6 +1748,19 @@ func (s *PricingService) matchOpenAIModel(model string) *LiteLLMModelPricing {
 	}
 
 	return nil
+}
+
+// Match only the four configured SKUs (plus the existing resource/date forms),
+// never an unknown future model merely sharing the gpt-6.2 prefix.
+func isGPT62PricingModel(model string) bool {
+	model = strings.ToLower(strings.TrimSpace(model))
+	model = openAIModelDatePattern.ReplaceAllString(lastSegment(model), "")
+	switch model {
+	case "gpt-6.2-astra", "gpt-6.2-sol", "gpt-6.2-astra-pro", "gpt-6.2-sol-pro":
+		return true
+	default:
+		return false
+	}
 }
 
 // generateOpenAIModelVariants 生成 OpenAI 模型的回退变体列表
