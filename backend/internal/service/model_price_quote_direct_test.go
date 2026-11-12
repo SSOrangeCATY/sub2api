@@ -25,18 +25,20 @@ func TestDirectGroupQuote_AccountTierAndExemptionMatchActualUnifiedCost(t *testi
 				t.Run(accountType+"/group="+boolLabel(groupLong)+"/account="+boolLabel(accountLong), func(t *testing.T) {
 					g := &Group{ID: 10, Platform: PlatformOpenAI, LongContextPricingEnabled: groupLong}
 					a := &Account{ID: 1, Platform: PlatformOpenAI, Type: accountType, RateMultiplier: testPtrFloat64(.5), Extra: map[string]any{openAILongContextBillingEnabledKey: accountLong}}
-					v := s.accountVariant(context.Background(), g, nil, a, "gpt-6.1-sol", "gpt-6.1-sol")
-					require.NotNil(t, v)
-					for _, input := range []int{100, 300000} {
-						gate := openAILongContextBillingGate(a)
-						exempt := openAISubscriptionLongContextExempt(a, &OpenAIForwardResult{UpstreamModel: "gpt-6.1-sol"})
-						actual, err := bs.CalculateCostUnified(CostInput{Ctx: context.Background(), Model: "gpt-6.1-sol", Group: g, GroupID: &g.ID, Resolver: resolver, Tokens: UsageTokens{InputTokens: input, OutputTokens: 100}, RateMultiplier: 1, PricingAt: at, LongContextBillingEnabled: gate, DisableModelLongContextPricing: exempt})
-						require.NoError(t, err)
-						p := v.Pricing
-						if iv := FindMatchingInterval(p.Intervals, input); iv != nil {
-							p = &ChannelModelPricing{InputPrice: iv.InputPrice, OutputPrice: iv.OutputPrice}
+					for _, candidateChannel := range []*Channel{nil, {Status: StatusActive, ApplyPricingToAccountStats: true}} {
+						v := s.accountVariant(context.Background(), g, candidateChannel, a, "gpt-6.1-sol", "gpt-6.1-sol")
+						require.NotNil(t, v)
+						for _, input := range []int{100, 300000} {
+							gate := openAILongContextBillingGate(a)
+							exempt := openAISubscriptionLongContextExempt(a, &OpenAIForwardResult{UpstreamModel: "gpt-6.1-sol"})
+							actual, err := bs.CalculateCostUnified(CostInput{Ctx: context.Background(), Model: "gpt-6.1-sol", Group: g, GroupID: &g.ID, Resolver: resolver, Tokens: UsageTokens{InputTokens: input, OutputTokens: 100}, RateMultiplier: 1, PricingAt: at, LongContextBillingEnabled: gate, DisableModelLongContextPricing: exempt})
+							require.NoError(t, err)
+							p := v.Pricing
+							if iv := FindMatchingInterval(p.Intervals, input); iv != nil {
+								p = &ChannelModelPricing{InputPrice: iv.InputPrice, OutputPrice: iv.OutputPrice}
+							}
+							require.InDelta(t, actual.ActualCost*.5, float64(input)**p.InputPrice+100**p.OutputPrice, 1e-8)
 						}
-						require.InDelta(t, actual.ActualCost*.5, float64(input)**p.InputPrice+100**p.OutputPrice, 1e-8)
 					}
 				})
 			}
