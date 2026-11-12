@@ -16,7 +16,21 @@ export interface ContentModerationModelFilter {
   models: string[]
 }
 
+export interface CyberPolicyUserRestrictionRule {
+  threshold: number
+  duration_hours: number
+  admin_release: boolean
+}
+
+export interface CyberPolicyUserRestrictionPolicy {
+  enabled: boolean
+  window_days: number
+  actions: CyberPolicyUserRestrictionRule[]
+}
+
 export interface ContentModerationConfig {
+  revision?: number
+  cyber_policy_user_restriction?: CyberPolicyUserRestrictionPolicy
   engine?: ModerationEngine
   engine_configs?: Record<ModerationEngine, ContentModerationConfig>
   enabled: boolean
@@ -101,6 +115,8 @@ export interface ContentModerationTestAuditResult {
 }
 
 export interface UpdateContentModerationConfig {
+  expected_revision: number
+  cyber_policy_user_restriction?: CyberPolicyUserRestrictionPolicy
   engine?: ModerationEngine
   engine_configs?: Partial<Record<ModerationEngine, UpdateModerationEngineConfig>>
   enabled?: boolean
@@ -306,7 +322,137 @@ export async function clearFlaggedHashes(): Promise<ClearFlaggedHashesResponse> 
   return data
 }
 
+export interface UserRiskListParams {
+  cursor?: string
+  page_size?: number
+  user_id?: number
+  search?: string
+  release_mode?: '' | 'manual' | 'temporary'
+  action?: string
+}
+
+export interface UserRiskCursorPage {
+  total: number
+  page: number
+  page_size: number
+  pages: number
+  next_cursor: string
+  has_more: boolean
+  /** Database read time for this page; traversal membership is not frozen. */
+  as_of: string
+}
+
+export interface UserRiskRestriction {
+  user_id: number
+  email: string
+  username: string
+  base_status: string
+  policy_key: string
+  scope: string
+  generation: number
+  version: number
+  window_hit_count: number
+  decision_hit_count: number
+  threshold: number
+  admin_release: boolean
+  restricted_at: string
+  expires_at?: string
+  policy_revision: number
+}
+
+export interface UserRiskRestrictionPage extends UserRiskCursorPage {
+  window_days: number
+  policy_revision: number
+  items: UserRiskRestriction[]
+}
+
+export interface UserRiskDecision {
+  event_id: string
+  user_id: number
+  policy_key: string
+  scope: string
+  policy_revision: number
+  generation: number
+  hit_count: number
+  threshold: number
+  restricted: boolean
+  admin_release: boolean
+  newly_applied: boolean
+  expires_at?: string
+  restriction_version: number
+  ignored_reason?: string
+  recorded_at: string
+  duplicate?: boolean
+  released?: boolean
+  base_status?: string
+  actor_id?: number
+  actor_label?: string
+}
+
+export interface UserRiskAction {
+  id: number
+  user_id: number
+  email: string
+  username: string
+  policy_key: string
+  generation: number
+  action: string
+  actor_id?: number
+  reason: string
+  decision: UserRiskDecision
+  created_at: string
+}
+
+export interface UserRiskActionPage extends UserRiskCursorPage {
+  items: UserRiskAction[]
+}
+
+export interface UserRiskReleasePayload {
+  operation_id: string
+  expected_version: number
+  reason: string
+}
+
+export interface UserRiskReleaseResult {
+  released: boolean
+  user_id: number
+  policy_key: string
+  generation: number
+  version: number
+  base_status: string
+}
+
+export async function listUserRestrictions(
+  params: UserRiskListParams = {}
+): Promise<UserRiskRestrictionPage> {
+  const { data } = await apiClient.get<UserRiskRestrictionPage>(
+    '/admin/risk-control/user-restrictions', { params }
+  )
+  return data
+}
+
+export async function listUserRestrictionActions(
+  params: UserRiskListParams = {}
+): Promise<UserRiskActionPage> {
+  const { data } = await apiClient.get<UserRiskActionPage>(
+    '/admin/risk-control/user-restriction-actions', { params }
+  )
+  return data
+}
+
+export async function releaseUserRestriction(
+  userID: number, payload: UserRiskReleasePayload
+): Promise<UserRiskReleaseResult> {
+  const { data } = await apiClient.post<UserRiskReleaseResult>(
+    '/admin/risk-control/users/' + userID + '/restriction-release', payload
+  )
+  return data
+}
+
 export const riskControlAPI = {
+  listUserRestrictions,
+  listUserRestrictionActions,
+  releaseUserRestriction,
   getConfig,
   updateConfig,
   getStatus,

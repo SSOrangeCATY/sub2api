@@ -2,11 +2,13 @@ package routes
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/handler"
@@ -33,6 +35,15 @@ func (r *keyBillingRouteAPIKeyRepo) GetByKeyForAuth(_ context.Context, key strin
 type keyBillingRouteRateRepo struct {
 	service.UserGroupRateRepository
 	lookupCalls int
+}
+
+type keyBillingRouteUserRepo struct {
+	service.UserRepository
+}
+
+func (*keyBillingRouteUserRepo) BeginUserRiskRequest(_ context.Context, userID int64, policy, scope string) (service.UserRiskAdmission, error) {
+	return service.UserRiskAdmission{UserID: userID, PolicyKey: policy, Scope: scope,
+		EventID: rand.Text(), Generation: 1, AdmittedAt: time.Now()}, nil
 }
 
 func (r *keyBillingRouteRateRepo) GetByUserAndGroup(context.Context, int64, int64) (*float64, error) {
@@ -73,7 +84,7 @@ func newKeyBillingRouteTestRouter(runMode string) (*gin.Engine, *keyBillingRoute
 	cfg := &config.Config{RunMode: runMode}
 	rateRepo := &keyBillingRouteRateRepo{}
 	apiKeyService := service.NewAPIKeyService(
-		&keyBillingRouteAPIKeyRepo{apiKey: apiKey}, nil, nil, nil, rateRepo, nil, cfg,
+		&keyBillingRouteAPIKeyRepo{apiKey: apiKey}, &keyBillingRouteUserRepo{}, nil, nil, rateRepo, nil, cfg,
 	)
 	gatewayService := service.NewGatewayService(
 		nil, nil, nil, nil, nil, nil, rateRepo, nil, cfg, nil, nil, nil, nil, nil,

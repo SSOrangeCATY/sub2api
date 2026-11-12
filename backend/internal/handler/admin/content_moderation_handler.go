@@ -20,12 +20,13 @@ func NewContentModerationHandler(svc *service.ContentModerationService) *Content
 }
 
 type contentModerationConfigRequest struct {
-	Engine        *string                                               `json:"engine"`
-	EngineConfigs map[string]service.UpdateContentModerationEngineInput `json:"engine_configs"`
-	Enabled       *bool                                                 `json:"enabled"`
-	Mode          *string                                               `json:"mode"`
-	BaseURL       *string                                               `json:"base_url"`
-	Model         *string                                               `json:"model"`
+	ExpectedRevision *int64                                                `json:"expected_revision"`
+	Engine           *string                                               `json:"engine"`
+	EngineConfigs    map[string]service.UpdateContentModerationEngineInput `json:"engine_configs"`
+	Enabled          *bool                                                 `json:"enabled"`
+	Mode             *string                                               `json:"mode"`
+	BaseURL          *string                                               `json:"base_url"`
+	Model            *string                                               `json:"model"`
 	// 审计请求使用的代理服务器：null 不修改；0 清除（直连）；>0 指定代理。
 	ProxyID              *int64              `json:"proxy_id"`
 	APIKey               *string             `json:"api_key"`
@@ -49,14 +50,15 @@ type contentModerationConfigRequest struct {
 	ViolationWindowHours *int                `json:"violation_window_hours"`
 	// cyber_policy 命中是否排除出自动封号计数；前端 RiskControlView 已发送该字段，
 	// service.UpdateContentModerationConfigInput 已支持，此前 handler 层缺透传导致开关静默失效。
-	CyberPolicyExcludeFromBanCount *bool                                 `json:"cyber_policy_exclude_from_ban_count"`
-	RetryCount                     *int                                  `json:"retry_count"`
-	HitRetentionDays               *int                                  `json:"hit_retention_days"`
-	NonHitRetentionDays            *int                                  `json:"non_hit_retention_days"`
-	PreHashCheckEnabled            *bool                                 `json:"pre_hash_check_enabled"`
-	BlockedKeywords                *[]string                             `json:"blocked_keywords"`
-	KeywordBlockingMode            *string                               `json:"keyword_blocking_mode"`
-	ModelFilter                    *service.ContentModerationModelFilter `json:"model_filter"`
+	CyberPolicyExcludeFromBanCount *bool                                     `json:"cyber_policy_exclude_from_ban_count"`
+	CyberPolicyUserRestriction     *service.CyberPolicyUserRestrictionPolicy `json:"cyber_policy_user_restriction"`
+	RetryCount                     *int                                      `json:"retry_count"`
+	HitRetentionDays               *int                                      `json:"hit_retention_days"`
+	NonHitRetentionDays            *int                                      `json:"non_hit_retention_days"`
+	PreHashCheckEnabled            *bool                                     `json:"pre_hash_check_enabled"`
+	BlockedKeywords                *[]string                                 `json:"blocked_keywords"`
+	KeywordBlockingMode            *string                                   `json:"keyword_blocking_mode"`
+	ModelFilter                    *service.ContentModerationModelFilter     `json:"model_filter"`
 }
 
 type contentModerationAPIKeyTestRequest struct {
@@ -90,8 +92,13 @@ func (h *ContentModerationHandler) UpdateConfig(c *gin.Context) {
 		response.BadRequest(c, "Invalid request: "+err.Error())
 		return
 	}
+	if req.ExpectedRevision == nil || *req.ExpectedRevision < 1 {
+		response.BadRequest(c, "A positive expected_revision from the last configuration read is required")
+		return
+	}
 	cfg, err := h.service.UpdateConfig(c.Request.Context(), service.UpdateContentModerationConfigInput{
-		Engine: req.Engine, EngineConfigs: req.EngineConfigs,
+		ExpectedRevision: req.ExpectedRevision,
+		Engine:           req.Engine, EngineConfigs: req.EngineConfigs,
 		Enabled:                        req.Enabled,
 		Mode:                           req.Mode,
 		BaseURL:                        req.BaseURL,
@@ -117,6 +124,7 @@ func (h *ContentModerationHandler) UpdateConfig(c *gin.Context) {
 		BanThreshold:                   req.BanThreshold,
 		ViolationWindowHours:           req.ViolationWindowHours,
 		CyberPolicyExcludeFromBanCount: req.CyberPolicyExcludeFromBanCount,
+		CyberPolicyUserRestriction:     req.CyberPolicyUserRestriction,
 		RetryCount:                     req.RetryCount,
 		HitRetentionDays:               req.HitRetentionDays,
 		NonHitRetentionDays:            req.NonHitRetentionDays,

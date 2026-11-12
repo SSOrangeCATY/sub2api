@@ -2585,6 +2585,15 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 		closeOpenAIClientWS(wsConn, coderws.StatusPolicyViolation, "QQ verification required or verification check unavailable")
 		return
 	}
+	if err := h.prepareUserRiskTurn(c, ctx, subject.UserID, 1); err != nil {
+		var closeErr *service.OpenAIWSClientCloseError
+		if errors.As(err, &closeErr) && closeErr != nil {
+			closeOpenAIClientWS(wsConn, closeErr.StatusCode(), closeErr.Reason())
+		} else {
+			closeOpenAIClientWS(wsConn, coderws.StatusPolicyViolation, "API access is restricted")
+		}
+		return
+	}
 	firstTurnStartedAt := time.Now()
 	if msgType != coderws.MessageText && msgType != coderws.MessageBinary {
 		closeOpenAIClientWS(wsConn, coderws.StatusPolicyViolation, "unsupported websocket message type")
@@ -3071,6 +3080,9 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 			ReasoningEffortMappings:     reasoningEffortMappings,
 			TurnStarted:                 recordTurnStart,
 			BeforeRequest: func(turn int, payload []byte, originalModel string) error {
+				if err := h.prepareUserRiskTurn(c, ctx, subject.UserID, turn); err != nil {
+					return err
+				}
 				if err := h.apiKeyService.CheckQQAPIAccess(ctx, apiKey.User.ID); err != nil {
 					return service.NewOpenAIWSClientCloseError(coderws.StatusPolicyViolation, "QQ verification required or verification check unavailable", err)
 				}
@@ -3215,6 +3227,7 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 				return checkSimpleModeTurnBilling()
 			},
 			AfterTurn: func(turn int, result *service.OpenAIForwardResult, turnErr error) {
+				defer finishUserRiskTurn(c, turnErr)
 				turnStart := getTurnStart(turn)
 				cyberBlockBody := takeCyberTurnBody(turn)
 				// 每次 attempt 都清 cyber mark；failover 链结束前保留 recorded guard，
@@ -4592,6 +4605,37 @@ func (h *OpenAIGatewayHandler) recordCyberPolicyIfMarked(c *gin.Context, apiKey 
 		CreatedAt:       time.Now(),
 	}
 	cyberLogOnly := h.cyberPolicyLogOnly(c, apiKey)
+	admissionValue, _ := c.Get(service.UserRiskAdmissionKey)
+	admission, _ := admissionValue.(service.UserRiskAdmission)
+	cyberInput := service.CyberPolicyRecordInput{
+		LogOnly:         cyberLogOnly,
+		RequestID:       requestID,
+		UserID:          userID,
+		UserEmail:       userEmail,
+		APIKeyID:        apiKeyID,
+		APIKeyName:      apiKeyName,
+		GroupID:         groupID,
+		GroupName:       groupName,
+		Endpoint:        inboundEndpoint,
+		Model:           model,
+		UpstreamMessage: mark.Message,
+		UpstreamBody:    mark.Body,
+		UpstreamStatus:  mark.UpstreamStatus,
+		UpstreamInTok:   mark.UpstreamInTok,
+		UpstreamOutTok:  mark.UpstreamOutTok,
+		EventID:         admission.EventID,
+	}
+	decision, durableErr := observeUserRiskCyber(c, requestCtx, cmSvc, cyberInput)
+	if durableErr != nil {
+		logger.LegacyPrintf("handler.openai", "[UserRisk] durable Cyber Policy observation unavailable: %v", durableErr)
+	} else {
+		cyberInput.Decision = decision
+		if decision != nil {
+			cyberLogOnly = decision.IgnoredReason != ""
+			cyberInput.LogOnly = cyberLogOnly
+		}
+	}
+
 	if gwSvc != nil && apiKey != nil && !cyberLogOnly {
 		block := buildCyberSessionBlock(apiKey.ID, c, cyberBlockBody)
 		if len(block.Keys) > 0 {
@@ -4604,23 +4648,7 @@ func (h *OpenAIGatewayHandler) recordCyberPolicyIfMarked(c *gin.Context, apiKey 
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 		if cmSvc != nil {
-			cmSvc.RecordCyberPolicyEvent(ctx, service.CyberPolicyRecordInput{
-				LogOnly:         cyberLogOnly,
-				RequestID:       requestID,
-				UserID:          userID,
-				UserEmail:       userEmail,
-				APIKeyID:        apiKeyID,
-				APIKeyName:      apiKeyName,
-				GroupID:         groupID,
-				GroupName:       groupName,
-				Endpoint:        inboundEndpoint,
-				Model:           model,
-				UpstreamMessage: mark.Message,
-				UpstreamBody:    mark.Body,
-				UpstreamStatus:  mark.UpstreamStatus,
-				UpstreamInTok:   mark.UpstreamInTok,
-				UpstreamOutTok:  mark.UpstreamOutTok,
-			})
+			cmSvc.RecordCyberPolicyEvent(ctx, cyberInput)
 		}
 		if forwardErrored && gwSvc != nil {
 			gwSvc.RecordCyberPolicyUsageLog(ctx, service.CyberPolicyUsageInput{

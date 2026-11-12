@@ -109,6 +109,7 @@ func TestRecordCyberPolicyEvent_WritesLogWhenEnabled(t *testing.T) {
 	)
 
 	svc.RecordCyberPolicyEvent(context.Background(), CyberPolicyRecordInput{
+		Decision:        &UserRiskDecision{HitCount: 1},
 		UserID:          1,
 		UserEmail:       "u@x.com",
 		Model:           "gpt-5",
@@ -149,8 +150,8 @@ func TestRecordCyberPolicyEvent_WritesLogWhenEnabled(t *testing.T) {
 	// endpoint
 	require.Equal(t, "/v1/responses", log.Endpoint)
 
-	// violation count >= 1 (side-effects ran)
-	require.GreaterOrEqual(t, log.ViolationCount, 1)
+	// Supplementary evidence copies the committed count exactly.
+	require.Equal(t, 1, log.ViolationCount)
 
 	// Error field should also contain the upstream body JSON
 	require.True(t, strings.Contains(log.Error, "cyber_policy") || strings.Contains(log.Error, "flagged"),
@@ -194,9 +195,9 @@ func TestRecordCyberPolicyEvent_RespectsContentModerationScope(t *testing.T) {
 			config:     `{"enabled":false,"mode":"off","sample_rate":0,"all_groups":false,"group_ids":[7],"model_filter":{"type":"include","models":["gpt-5"]},"ban_threshold":1}`,
 			groupID:    &groupID,
 			model:      "gpt-5",
-			wantCalls:  []bool{false},
+			wantCalls:  nil,
 			wantLogs:   1,
-			wantBanned: true,
+			wantBanned: false,
 		},
 	}
 
@@ -363,7 +364,7 @@ func (r *banCountArgsTestRepo) snapshotCountCalls() []bool {
 	return out
 }
 
-func TestApplyFlaggedAccountSideEffects_PassesExcludeCyberFlag(t *testing.T) {
+func TestApplyFlaggedAccountSideEffects_AlwaysExcludesCyber(t *testing.T) {
 	repo := &banCountArgsTestRepo{}
 	svc := NewContentModerationService(
 		&contentModerationTestSettingRepo{values: map[string]string{}},
@@ -376,10 +377,11 @@ func TestApplyFlaggedAccountSideEffects_PassesExcludeCyberFlag(t *testing.T) {
 	svc.applyFlaggedAccountSideEffects(context.Background(), cfgExclude, &ContentModerationLog{Flagged: true, UserID: &userID})
 
 	cfgDefault := defaultContentModerationConfig() // 默认 false
+	cfgDefault.CyberPolicyExcludeFromBanCount = false
 	svc.applyFlaggedAccountSideEffects(context.Background(), cfgDefault, &ContentModerationLog{Flagged: true, UserID: &userID})
 
-	require.Equal(t, []bool{true, false}, repo.snapshotCountCalls(),
-		"applyFlaggedAccountSideEffects 必须把 cfg.CyberPolicyExcludeFromBanCount 透传给 COUNT 查询")
+	require.Equal(t, []bool{true, true}, repo.snapshotCountCalls(),
+		"ordinary moderation excludes Cyber events regardless of the deprecated flag")
 }
 
 func TestRecordCyberPolicyEvent_ExcludeFromBanCount_SkipsBanJudgment(t *testing.T) {
@@ -410,7 +412,7 @@ func TestRecordCyberPolicyEvent_ExcludeFromBanCount_SkipsBanJudgment(t *testing.
 	require.False(t, logs[0].AutoBanned)
 }
 
-func TestRecordCyberPolicyEvent_DefaultCountsTowardBan(t *testing.T) {
+func TestRecordCyberPolicyEvent_NeverFallsBackToLegacyAccountBan(t *testing.T) {
 	repo := &banCountArgsTestRepo{}
 	svc := NewContentModerationService(
 		&contentModerationTestSettingRepo{values: map[string]string{
@@ -428,9 +430,9 @@ func TestRecordCyberPolicyEvent_DefaultCountsTowardBan(t *testing.T) {
 		UpstreamStatus:  400,
 	})
 
-	require.Equal(t, []bool{false}, repo.snapshotCountCalls(),
-		"默认配置必须执行计数查询且不排除 cyber 行")
+	require.Empty(t, repo.snapshotCountCalls(),
+		"supplementary Cyber logging never falls back to a base-account ban")
 	logs := repo.snapshotLogs()
 	require.Len(t, logs, 1)
-	require.GreaterOrEqual(t, logs[0].ViolationCount, 1, "默认路径行为不变（现状回归）")
+	require.Zero(t, logs[0].ViolationCount, "a missing receipt must not invent a durable count")
 }
