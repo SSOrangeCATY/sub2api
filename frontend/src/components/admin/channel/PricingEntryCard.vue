@@ -113,7 +113,7 @@
           <!-- Default prices (fallback when no interval matches) -->
           <label class="mt-3 block text-xs font-medium text-gray-500 dark:text-gray-400">
             {{ t('admin.channels.form.defaultPrices') }}
-            <span class="ml-1 font-normal text-gray-400">$/MTok</span>
+            <span class="ml-1 font-normal text-gray-400">{{ entry.source_currency || 'USD' }}/MTok</span>
           </label>
           <div class="pricing-default-grid mt-1 grid gap-2">
             <div>
@@ -187,6 +187,7 @@
                 v-for="(iv, idx) in entry.intervals"
                 :key="idx"
                 :interval="iv"
+                :source-currency="entry.source_currency || 'USD'"
                 :platform="props.platform"
                 :mode="entry.billing_mode"
                 :enable-multipliers="enableTierMultipliers"
@@ -208,7 +209,7 @@
           <!-- Default per-request price -->
           <label class="mt-3 block text-xs font-medium text-gray-500 dark:text-gray-400">
             {{ t('admin.channels.form.defaultPerRequestPrice') }}
-            <span class="ml-1 font-normal text-gray-400">$</span>
+            <span class="ml-1 font-normal text-gray-400">{{ entry.source_currency || 'USD' }}</span>
           </label>
           <div class="mt-1 w-48">
             <input :value="entry.per_request_price" @input="emitField('per_request_price', ($event.target as HTMLInputElement).value)"
@@ -229,6 +230,7 @@
               v-for="(iv, idx) in entry.intervals"
               :key="idx"
               :interval="iv"
+              :source-currency="entry.source_currency || 'USD'"
               :mode="entry.billing_mode"
               @update="updateInterval(idx, $event)"
               @remove="removeInterval(idx)"
@@ -244,7 +246,7 @@
           <!-- Default image price (per-request, same as per_request mode) -->
           <label class="mt-3 block text-xs font-medium text-gray-500 dark:text-gray-400">
             {{ entry.billing_mode === 'video' ? t('admin.channels.form.defaultVideoPrice') : t('admin.channels.form.defaultImagePrice') }}
-            <span class="ml-1 font-normal text-gray-400">$</span>
+            <span class="ml-1 font-normal text-gray-400">{{ entry.source_currency || 'USD' }}</span>
           </label>
           <div class="mt-1 w-48">
             <input :value="entry.per_request_price" @input="emitField('per_request_price', ($event.target as HTMLInputElement).value)"
@@ -265,6 +267,7 @@
               v-for="(iv, idx) in entry.intervals"
               :key="idx"
               :interval="iv"
+              :source-currency="entry.source_currency || 'USD'"
               :mode="entry.billing_mode"
               @update="updateInterval(idx, $event)"
               @remove="removeInterval(idx)"
