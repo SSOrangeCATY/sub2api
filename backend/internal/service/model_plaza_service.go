@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 )
 
 // PlazaOfficialPricing 模型广场展示用的官方参考价（USD per token），与计费同源：
@@ -30,6 +31,8 @@ type PlazaModel struct {
 	LongContextBasis ContextPricingBasis
 	// TimePricing 计费会生效的分时倍率时段；无分时为 nil。
 	TimePricing *TimePricingSchedule
+	PriceQuote  *PlazaPriceQuote
+	PricingAsOf *time.Time
 }
 
 // PlazaGroup 模型广场中以分组为顶层的条目。
@@ -104,7 +107,7 @@ func NewModelPlazaService(
 //     组内模型按名称排序。
 //
 // 可见性过滤（专属分组）不在此层做，由 handler 按登录态裁剪。
-func (s *ModelPlazaService) ListGroups(ctx context.Context) ([]PlazaGroup, error) {
+func (s *ModelPlazaService) ListGroups(ctx context.Context, onlyGroupIDs ...int64) ([]PlazaGroup, error) {
 	channels, err := s.channelRepo.ListAll(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list channels: %w", err)
@@ -123,6 +126,18 @@ func (s *ModelPlazaService) ListGroups(ctx context.Context) ([]PlazaGroup, error
 	order := make([]int64, 0, len(groups))
 	for i := range groups {
 		g := &groups[i]
+		if len(onlyGroupIDs) > 0 {
+			included := false
+			for _, id := range onlyGroupIDs {
+				if id == g.ID {
+					included = true
+					break
+				}
+			}
+			if !included {
+				continue
+			}
+		}
 		byGroup[g.ID] = &PlazaGroup{
 			ID:                        g.ID,
 			Name:                      g.Name,
@@ -232,6 +247,18 @@ func (s *ModelPlazaService) ListGroups(ctx context.Context) ([]PlazaGroup, error
 // token 模型取计费阶梯表（单价与档位均由真实计费函数得出），
 // 图片/按次模型（或阶梯表不可用时）沿用渠道定价与分组图片档位价。
 func (s *ModelPlazaService) fillDisplayPricing(ctx context.Context, m *PlazaModel, g *Group) {
+	var pricingAt *time.Time
+	if s.resolver != nil && g != nil {
+		resolved := s.resolver.Resolve(WithResolvedTargetPlatform(ctx, m.Platform), PricingInput{Model: m.Name, Group: g, GroupID: &g.ID})
+		if resolved != nil && resolved.Source == PricingSourceLiteLLM {
+			at := time.Now()
+			pricingAt = &at
+		}
+		if resolved != nil && resolved.channelPricing != nil {
+			cp := resolved.channelPricing.Clone()
+			m.Pricing = &cp
+		}
+	}
 	if groupPricing := matchGroupModelPricing(g, m.Name); groupPricing != nil {
 		m.Pricing = groupPricing
 		// 分组模型级固定价就是实收价，不能再被分组图片兜底档位覆盖。
@@ -242,9 +269,10 @@ func (s *ModelPlazaService) fillDisplayPricing(ctx context.Context, m *PlazaMode
 	}
 	if s.billingService != nil && s.resolver != nil {
 		sched, err := s.billingService.ResolveContextPricingSchedule(ctx, s.resolver, ContextPricingScheduleInput{
-			Model:    m.Name,
-			Group:    g,
-			Platform: m.Platform,
+			Model:     m.Name,
+			Group:     g,
+			Platform:  m.Platform,
+			PricingAt: pricingAt,
 		})
 		if err == nil && sched != nil && len(sched.Tiers) > 0 {
 			m.Pricing = plazaPricingFromSchedule(m.Pricing, sched)
@@ -252,6 +280,7 @@ func (s *ModelPlazaService) fillDisplayPricing(ctx context.Context, m *PlazaMode
 				m.LongContextBasis = sched.Basis
 			}
 			m.TimePricing = sched.TimePricing
+			m.PricingAsOf = pricingAt
 			return
 		}
 	}
@@ -263,6 +292,7 @@ func (s *ModelPlazaService) fillDisplayPricing(ctx context.Context, m *PlazaMode
 func plazaPricingFromSchedule(raw *ChannelModelPricing, sched *ContextPricingSchedule) *ChannelModelPricing {
 	out := &ChannelModelPricing{BillingMode: BillingModeToken}
 	if raw != nil {
+		out.SourceCurrency = raw.SourceCurrency
 		out.ImageInputPrice = raw.ImageInputPrice
 		out.ImageOutputPrice = raw.ImageOutputPrice
 		out.PerRequestPrice = raw.PerRequestPrice

@@ -1,5 +1,6 @@
 <template>
-  <div class="relative inline-block">
+  <GroupPricePreview v-if="quoteGroups?.length" :groups="quoteGroups" :model-name="model.name" :label="model.name" />
+  <div v-else class="relative inline-block">
     <span
       ref="triggerEl"
       :class="[
@@ -184,6 +185,7 @@
 import { computed, nextTick, onBeforeUnmount, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import PricingRow from './PricingRow.vue'
+import GroupPricePreview from '@/components/modelPlaza/GroupPricePreview.vue'
 import { formatScaled, resolveIntervalPrices } from '@/utils/pricing'
 import {
   BILLING_MODE_TOKEN,
@@ -200,6 +202,7 @@ import { platformBadgeClass, platformBorderClass, platformBadgeLightClass } from
 
 const props = withDefaults(
   defineProps<{
+    quoteGroups?: Array<{ id: number; name: string }>
     purchasePricing?: boolean
     model: UserSupportedModel
     /** i18n 前缀：管理端传 `admin.availableChannels.pricing`，用户端传 `availableChannels.pricing`。 */

@@ -64,6 +64,11 @@ type ContextPricingScheduleInput struct {
 	// Platform 为请求的具体平台（composite 分组传模型所属平台），
 	// 决定渠道定价查找与平台旧规则的适用。
 	Platform string
+	// A procurement quote follows the selected account's upstream gate.
+	LongContextPricingEnabled *bool
+	// Procurement snapshots use the unified pipeline, including native
+	// time policies. A nil time preserves the standard-period sales sheet.
+	PricingAt *time.Time
 }
 
 var errContextPricingResolverRequired = errors.New("context pricing schedule: resolver is required")
@@ -100,6 +105,9 @@ func (s *BillingService) ResolveContextPricingSchedule(ctx context.Context, reso
 	if resolved == nil {
 		return nil, ErrModelPricingUnavailable
 	}
+	if in.LongContextPricingEnabled != nil {
+		resolved.longContextPricingEnabled = *in.LongContextPricingEnabled
+	}
 	if resolved.Mode != "" && resolved.Mode != BillingModeToken {
 		return nil, nil
 	}
@@ -113,6 +121,9 @@ func (s *BillingService) ResolveContextPricingSchedule(ctx context.Context, reso
 		Resolved:       resolved,
 	}
 	probe := func(tokens UsageTokens) (*CostBreakdown, error) {
+		if in.PricingAt != nil {
+			return s.CalculateCostUnified(CostInput{Ctx: ctx, Model: in.Model, Group: in.Group, Tokens: tokens, RateMultiplier: 1, PricingAt: *in.PricingAt, Resolver: resolver, Resolved: resolved})
+		}
 		r := req
 		r.Tokens = tokens
 		return s.CalculateTokenCostForRequest(r)
@@ -132,7 +143,11 @@ func (s *BillingService) ResolveContextPricingSchedule(ctx context.Context, reso
 	tiers = mergeEqualContextTiers(tiers)
 	applyContextTierLabels(tiers, plan)
 
-	return &ContextPricingSchedule{Basis: ContextPricingBasisWholeRequest, Tiers: tiers, TimePricing: resolvedTimePricingSchedule(resolved)}, nil
+	timePricing := resolvedTimePricingSchedule(resolved)
+	if in.PricingAt != nil {
+		timePricing = nil
+	}
+	return &ContextPricingSchedule{Basis: ContextPricingBasisWholeRequest, Tiers: tiers, TimePricing: timePricing}, nil
 }
 
 // resolvedTimePricingSchedule 列出计费会生效的分时倍率时段。

@@ -5,6 +5,7 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -23,6 +24,97 @@ func plazaGroups() []service.PlazaGroup {
 		{ID: 2, Name: "exclusive-a", Platform: "anthropic", IsExclusive: true, RateMultiplier: 0.5},
 		{ID: 3, Name: "public-subscription", Platform: "openai", SubscriptionType: "subscription", RateMultiplier: 1},
 		{ID: 4, Name: "exclusive-b", Platform: "openai", IsExclusive: true, RateMultiplier: 0.8},
+	}
+}
+
+type quoteEndpointUserRepo struct{ service.UserRepository }
+
+func (quoteEndpointUserRepo) GetByID(context.Context, int64) (*service.User, error) {
+	return &service.User{ID: 7, BillingIdentity: service.BillingIdentityStandard}, nil
+}
+
+type quoteEndpointGroupRepo struct {
+	service.GroupRepository
+	groups []service.Group
+}
+
+func (r quoteEndpointGroupRepo) ListActive(context.Context) ([]service.Group, error) {
+	return r.groups, nil
+}
+
+type quoteEndpointSubscriptionRepo struct {
+	service.UserSubscriptionRepository
+}
+
+func (quoteEndpointSubscriptionRepo) ListActiveByUserID(context.Context, int64) ([]service.UserSubscription, error) {
+	return nil, nil
+}
+
+type quoteEndpointRateRepo struct {
+	service.UserGroupRateRepository
+	err error
+}
+
+func (r quoteEndpointRateRepo) GetByUserID(context.Context, int64) (map[int64]float64, error) {
+	return nil, r.err
+}
+
+func TestModelPriceEndpoint_RejectsMissingAuthAndBadGroupBeforeAnyLookup(t *testing.T) {
+	for _, test := range []struct {
+		auth  bool
+		query string
+		code  int
+	}{{false, "1", 401}, {true, "0", 400}, {true, "garbage", 400}} {
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest(http.MethodGet, "/model-prices?group_id="+test.query, nil)
+		if test.auth {
+			c.Set(string(middleware.ContextKeyUser), middleware.AuthSubject{UserID: 7})
+		}
+		(&ModelPlazaHandler{}).Prices(c)
+		require.Equal(t, test.code, w.Code)
+	}
+}
+
+func TestModelPriceEndpoint_DeniesUnbindableGroupsBeforeLoadingAnyPricing(t *testing.T) {
+	groups := quoteEndpointGroupRepo{groups: []service.Group{{ID: 2, IsExclusive: true, Status: service.StatusActive}}}
+	keys := service.NewAPIKeyService(nil, quoteEndpointUserRepo{}, groups, quoteEndpointSubscriptionRepo{}, nil, nil, &config.Config{})
+	h := &ModelPlazaHandler{apiKeyService: keys}
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Set(string(middleware.ContextKeyUser), middleware.AuthSubject{UserID: 7})
+	c.Request = httptest.NewRequest(http.MethodGet, "/model-prices?group_id=2", nil)
+	h.Prices(c)
+	require.Equal(t, http.StatusForbidden, w.Code)
+}
+
+func TestModelPriceEndpoint_RateLookupFailureNeverPublishesDefaultSalesPrices(t *testing.T) {
+	groups := quoteEndpointGroupRepo{groups: []service.Group{{ID: 1, Status: service.StatusActive}}}
+	keys := service.NewAPIKeyService(nil, quoteEndpointUserRepo{}, groups, quoteEndpointSubscriptionRepo{}, quoteEndpointRateRepo{err: errors.New("rate storage unavailable")}, nil, &config.Config{})
+	h := &ModelPlazaHandler{apiKeyService: keys}
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Set(string(middleware.ContextKeyUser), middleware.AuthSubject{UserID: 7})
+	c.Request = httptest.NewRequest(http.MethodGet, "/model-prices?group_id=1", nil)
+	h.Prices(c)
+	require.Equal(t, http.StatusInternalServerError, w.Code)
+	require.NotContains(t, w.Body.String(), "\"pricing\":")
+}
+
+func TestModelPriceQuote_PublicDTOContainsCurrencyAndNeverSupplierIdentity(t *testing.T) {
+	input := 2e-6
+	q := &service.PlazaPriceQuote{Status: "quoted", Variants: []service.PlazaPriceVariant{{Pricing: &service.ChannelModelPricing{ID: 99, ChannelID: 8, Models: []string{"internal-model"}, SourceCurrency: "CNY", InputPrice: &input}}}}
+	data, err := json.Marshal(toModelPriceQuote(q))
+	require.NoError(t, err)
+	var decoded map[string]any
+	require.NoError(t, json.Unmarshal(data, &decoded))
+	variants := decoded["variants"].([]any)
+	p := variants[0].(map[string]any)["pricing"].(map[string]any)
+	require.Equal(t, "CNY", p["source_currency"])
+	require.Equal(t, "USD", p["settlement_currency"])
+	require.Equal(t, "nominal", p["unit_policy"])
+	for _, field := range []string{"id", "channel_id", "models", "account_id"} {
+		require.NotContains(t, p, field)
 	}
 }
 
@@ -286,6 +378,7 @@ func TestModelPlazaHandler_VaryKeepsCORSOrigin(t *testing.T) {
 		service.NewModelPlazaService(plazaVaryChannelRepo{}, plazaVaryGroupRepo{}, nil, nil, nil),
 		nil,
 		service.NewSettingService(plazaVarySettingRepo{}, &config.Config{}),
+		nil,
 	)
 	r := gin.New()
 	r.Use(middleware.CORS(config.CORSConfig{AllowedOrigins: []string{"https://a.example", "https://b.example"}}))
@@ -302,6 +395,7 @@ func TestModelPlazaHandler_VaryKeepsCORSOrigin(t *testing.T) {
 		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 		require.Equal(t, origin, w.Header().Get("Access-Control-Allow-Origin"))
 		// 共享缓存需同时按来源与语言区分，否则 A 来源的响应可能被复用给 B。
-		require.Equal(t, []string{"Origin", "Accept-Language"}, w.Header().Values("Vary"))
+		require.Equal(t, []string{"Origin", "Authorization", "Accept-Language"}, w.Header().Values("Vary"))
+		require.Equal(t, "private, no-store", w.Header().Get("Cache-Control"))
 	}
 }
