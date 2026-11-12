@@ -660,6 +660,16 @@ export default {
   // Model Plaza (public group/model pricing showcase)
   modelPlaza: {
     catalog: {
+      search: "Search",
+      searchHint: "Search models, groups or platforms",
+      searchGroups: "Search group names",
+      contextHint: "Context selects the pricing tier for this view and does not change account settings.",
+      activeFilters: "Selected filters",
+      removeFilter: "Remove filter: {filter}",
+      allGroups: "All groups / {count}",
+      modelCount: "{count} models",
+      noModels: "No models",
+      emptyGroup: "This group has no configured models to display. Contact an administrator to check its configuration.",
       findPrice: 'Find model prices',
       intro: 'Search models and compare available groups using the prices for your billing identity.',
       pricingFor: 'Billing identity',
@@ -696,6 +706,7 @@ export default {
       collapse: 'Hide details',
       routeRange: 'Configured route price range',
       unavailable: 'Price unavailable',
+      unavailableDirectHint: "No confirmed price is available. Refresh or contact an administrator to check routing and pricing.",
       unavailableHint: 'An effective quote could not be confirmed. Refresh or contact an administrator; sales prices are never substituted for procurement quotes.',
       priceSheet: 'Effective price sheet',
       standardPeriod: 'Standard-period prices',

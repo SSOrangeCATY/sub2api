@@ -66,6 +66,9 @@ type ContextPricingScheduleInput struct {
 	Platform string
 	// A procurement quote follows the selected account's upstream gate.
 	LongContextPricingEnabled *bool
+	// Account-specific subscription exemptions affect native model surcharges,
+	// while explicitly configured group intervals retain their normal rules.
+	DisableModelLongContextPricing bool
 	// Procurement snapshots use the unified pipeline, including native
 	// time policies. A nil time preserves the standard-period sales sheet.
 	PricingAt *time.Time
@@ -121,8 +124,12 @@ func (s *BillingService) ResolveContextPricingSchedule(ctx context.Context, reso
 		Resolved:       resolved,
 	}
 	probe := func(tokens UsageTokens) (*CostBreakdown, error) {
-		if in.PricingAt != nil {
-			return s.CalculateCostUnified(CostInput{Ctx: ctx, Model: in.Model, Group: in.Group, Tokens: tokens, RateMultiplier: 1, PricingAt: *in.PricingAt, Resolver: resolver, Resolved: resolved})
+		if in.PricingAt != nil || in.DisableModelLongContextPricing {
+			at := timezone.Now()
+			if in.PricingAt != nil {
+				at = *in.PricingAt
+			}
+			return s.CalculateCostUnified(CostInput{Ctx: ctx, Model: in.Model, Group: in.Group, Tokens: tokens, RateMultiplier: 1, PricingAt: at, Resolver: resolver, Resolved: resolved, DisableModelLongContextPricing: in.DisableModelLongContextPricing})
 		}
 		r := req
 		r.Tokens = tokens
@@ -144,7 +151,7 @@ func (s *BillingService) ResolveContextPricingSchedule(ctx context.Context, reso
 	applyContextTierLabels(tiers, plan)
 
 	timePricing := resolvedTimePricingSchedule(resolved)
-	if in.PricingAt != nil {
+	if in.PricingAt != nil || in.DisableModelLongContextPricing {
 		timePricing = nil
 	}
 	return &ContextPricingSchedule{Basis: ContextPricingBasisWholeRequest, Tiers: tiers, TimePricing: timePricing}, nil

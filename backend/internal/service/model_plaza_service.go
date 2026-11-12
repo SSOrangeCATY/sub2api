@@ -37,9 +37,8 @@ type PlazaModel struct {
 
 // PlazaGroup 模型广场中以分组为顶层的条目。
 //
-// 与 AvailableGroupRef 相比多了 Description 与 Models；Models 来自该分组关联渠道的
-// 支持模型（普通分组按分组平台隔离，Composite 分组展开关联渠道已配置的
-// 具体平台），与「可用渠道」页口径一致。
+// Models 优先来自关联渠道；未关联渠道的分组从账号公开映射及提供方目录发现。
+// 普通分组保持平台隔离；可见性仍由 handler 统一校验。
 type PlazaGroup struct {
 	ID                 int64
 	Name               string
@@ -75,6 +74,7 @@ type ModelPlazaService struct {
 	pricingService *PricingService
 	billingService *BillingService
 	resolver       *ModelPricingResolver
+	accountRepo    AccountRepository
 }
 
 // NewModelPlazaService 创建模型广场服务。
@@ -84,6 +84,7 @@ func NewModelPlazaService(
 	pricingService *PricingService,
 	billingService *BillingService,
 	resolver *ModelPricingResolver,
+	accountRepo AccountRepository,
 ) *ModelPlazaService {
 	return &ModelPlazaService{
 		channelRepo:    channelRepo,
@@ -91,6 +92,7 @@ func NewModelPlazaService(
 		pricingService: pricingService,
 		billingService: billingService,
 		resolver:       resolver,
+		accountRepo:    accountRepo,
 	}
 }
 
@@ -103,7 +105,7 @@ func NewModelPlazaService(
 //   - token 模型的单价与阶梯按实收口径合成（见 ResolveContextPricingSchedule），
 //     图片计费模型的档位价按实收口径合成（见 plazaImageDisplayPricing）；
 //   - 每个模型附带官方参考价（查不到为 nil）；
-//   - 只返回 Models 非空的分组；分组按 RateMultiplier 升序（同倍率按名称），
+//   - 保留空模型分组，由页面明确显示未配置状态；按 RateMultiplier 升序（同倍率按名称），
 //     组内模型按名称排序。
 //
 // 可见性过滤（专属分组）不在此层做，由 handler 按登录态裁剪。
@@ -167,6 +169,7 @@ func (s *ModelPlazaService) ListGroups(ctx context.Context, onlyGroupIDs ...int6
 	}
 	// modelIdx[groupID][platform+modelName] = index into byGroup[groupID].Models
 	modelIdx := make(map[int64]map[modelKey]int, len(groups))
+	channelBound := make(map[int64]bool)
 	for i := range channels {
 		ch := &channels[i]
 		if ch.Status != StatusActive {
@@ -181,6 +184,7 @@ func (s *ModelPlazaService) ListGroups(ctx context.Context, onlyGroupIDs ...int6
 			if !ok {
 				continue
 			}
+			channelBound[gid] = true
 			idx := modelIdx[gid]
 			if idx == nil {
 				idx = make(map[modelKey]int, len(supported))
@@ -212,14 +216,14 @@ func (s *ModelPlazaService) ListGroups(ctx context.Context, onlyGroupIDs ...int6
 			}
 		}
 	}
+	if err := s.fillNativeGroupModels(ctx, byGroup, groupEnt, channelBound); err != nil {
+		return nil, err
+	}
 
 	officialMemo := make(map[string]*PlazaOfficialPricing)
 	out := make([]PlazaGroup, 0, len(order))
 	for _, gid := range order {
 		pg := byGroup[gid]
-		if len(pg.Models) == 0 {
-			continue
-		}
 		sort.SliceStable(pg.Models, func(i, j int) bool {
 			if pg.Models[i].Name != pg.Models[j].Name {
 				return pg.Models[i].Name < pg.Models[j].Name

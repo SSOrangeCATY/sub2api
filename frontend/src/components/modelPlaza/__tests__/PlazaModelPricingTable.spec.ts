@@ -39,6 +39,18 @@ describe('effective model prices', () => {
     expect(wrapper.text()).not.toContain('$2.00')
   })
 
+  it('shows and expires customer route ranges without reusing a stale group-only card', async () => {
+    const m = model({ pricing: pricing({ input_price: 99e-6 }), price_quote: { kind: 'customer', status: 'quoted', quoted_at: new Date().toISOString(), variants: [{ pricing: pricing({ input_price: 2e-6 }) }, { pricing: pricing({ input_price: 4e-6 }) }] } })
+    const wrapper = table([m], { userRateMultiplier: .25 })
+    expect(wrapper.find('.price-summary').text()).toContain('$0.50 – $1.00')
+    expect(wrapper.find('.price-range-note').exists()).toBe(true)
+    await wrapper.find('.price-details-button').trigger('click')
+    await vi.advanceTimersByTimeAsync(105000)
+    expect(wrapper.find('.price-variant').exists()).toBe(false)
+    expect(wrapper.find('.price-summary').text()).not.toMatch(/\$\d/)
+    expect(wrapper.find('.price-unavailable-row').text()).not.toContain('进货价')
+  })
+
   it('does not substitute a sales card when the procurement quote is unavailable', () => {
     const wrapper = table([model()], { purchasePricing: true })
     expect(wrapper.find('.price-summary').text()).not.toMatch(/\$\d/)
