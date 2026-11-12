@@ -125,7 +125,9 @@ func (s *BillingService) ResolveContextPricingSchedule(ctx context.Context, reso
 	}
 	probe := func(tokens UsageTokens) (*CostBreakdown, error) {
 		if in.PricingAt != nil || in.DisableModelLongContextPricing {
-			at := timezone.Now()
+			// A long-context exemption changes tier policy, not the time
+			// contract. Zero keeps channel probes in the standard period.
+			var at time.Time
 			if in.PricingAt != nil {
 				at = *in.PricingAt
 			}
@@ -151,7 +153,7 @@ func (s *BillingService) ResolveContextPricingSchedule(ctx context.Context, reso
 	applyContextTierLabels(tiers, plan)
 
 	timePricing := resolvedTimePricingSchedule(resolved)
-	if in.PricingAt != nil || in.DisableModelLongContextPricing {
+	if in.PricingAt != nil {
 		timePricing = nil
 	}
 	return &ContextPricingSchedule{Basis: ContextPricingBasisWholeRequest, Tiers: tiers, TimePricing: timePricing}, nil

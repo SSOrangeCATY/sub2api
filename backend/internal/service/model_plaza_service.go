@@ -184,10 +184,10 @@ func (s *ModelPlazaService) ListGroups(ctx context.Context, onlyGroupIDs ...int6
 			if !ok {
 				continue
 			}
-			// A channel used only to calculate account procurement costs is not
-			// a public model catalog. Keep native account discovery active for
-			// it; sales model pricing/mapping/restriction remains authoritative.
-			if channelHasSalesCatalog(ch) {
+			// A partial price list is not an allowlist. Unrestricted channels
+			// also expose supported account models; explicit model restriction
+			// keeps the channel catalog authoritative.
+			if ch.RestrictModels {
 				channelBound[gid] = true
 			}
 			idx := modelIdx[gid]
