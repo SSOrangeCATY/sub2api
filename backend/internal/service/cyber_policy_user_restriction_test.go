@@ -68,7 +68,7 @@ func TestCyberPolicyUserRestrictionPolicyConfirmedEscalation(t *testing.T) {
 		{"later hits retain administrator release", 9, 3, 0, true, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			action, applies := cyberPolicyActionForCount(policy, tc.hits)
+			action, applies := UserRiskActionForCount(policy.Actions, tc.hits)
 			if applies != tc.applies || action.Threshold != tc.threshold || action.DurationHours != tc.hours || action.AdminRelease != tc.manual {
 				t.Fatalf("hits=%d: action=%+v applies=%t", tc.hits, action, applies)
 			}

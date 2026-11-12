@@ -2,7 +2,6 @@ package service
 
 import (
 	"crypto/rand"
-	"sort"
 	"time"
 
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
@@ -42,20 +41,6 @@ func validateUserRiskRules(windowDays int, actions []UserRiskActionRule) error {
 }
 
 func cyberPolicyEventID() string { return rand.Text() }
-
-func cyberPolicyActionForCount(policy CyberPolicyUserRestrictionPolicy, count int) (CyberPolicyUserRestrictionRule, bool) {
-	actions := append([]CyberPolicyUserRestrictionRule(nil), policy.Actions...)
-	sort.Slice(actions, func(i, j int) bool { return actions[i].Threshold < actions[j].Threshold })
-	selected := CyberPolicyUserRestrictionRule{}
-	found := false
-	for _, action := range actions {
-		if count < action.Threshold {
-			break
-		}
-		selected, found = action, true
-	}
-	return selected, found
-}
 
 func NewCyberPolicyUserRestrictionEventID() string {
 	return cyberPolicyEventID()

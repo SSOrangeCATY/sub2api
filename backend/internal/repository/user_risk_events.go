@@ -44,7 +44,7 @@ func userRiskAuditText(value string, limit int) string {
 		if count == limit {
 			break
 		}
-		result.WriteRune(char)
+		_, _ = result.WriteRune(char)
 		count++
 	}
 	return result.String()
@@ -215,19 +215,14 @@ func (r *userRiskStore) recordEvent(ctx context.Context, input service.UserRiskE
 		if active && state.scope != input.Policy.Scope {
 			return nil, infraerrors.Conflict("USER_RISK_SCOPE_CONFLICT", "现有限制需解除后才能改变该规则的适用范围")
 		}
-		selected := service.UserRiskActionRule{}
-		for _, rule := range input.Policy.Actions {
-			if rule.Threshold <= result.HitCount {
-				selected = rule
-			}
-		}
+		selected, ruleApplies := service.UserRiskActionForCount(input.Policy.Actions, result.HitCount)
 		action = "hit"
 		result.RestrictionVersion = state.version
 		if active && (state.manual || selected.Threshold <= state.threshold) {
 			preserved := userRiskStateDecision(admission.UserID, admission.PolicyKey, state, now)
 			preserved.EventID, preserved.HitCount = admission.EventID, result.HitCount
 			result = preserved
-		} else if selected.Threshold > 0 {
+		} else if ruleApplies {
 			var expiry any
 			// Escalation strengthens one continuous restriction interval;
 			// the action ledger records the later decision time separately.

@@ -164,3 +164,15 @@ type UserRiskPolicyRepository interface {
 	ListUserRiskActions(context.Context, UserRiskListFilter) (*UserRiskActionPage, error)
 	ExpireUserRiskRestrictions(context.Context, int) ([]int64, error)
 }
+
+// UserRiskActionForCount selects the highest applicable threshold from a
+// validated policy without modifying its shared rule snapshot.
+func UserRiskActionForCount(actions []UserRiskActionRule, count int) (UserRiskActionRule, bool) {
+	selected := UserRiskActionRule{}
+	for _, action := range actions {
+		if count >= action.Threshold && action.Threshold > selected.Threshold {
+			selected = action
+		}
+	}
+	return selected, selected.Threshold > 0
+}
