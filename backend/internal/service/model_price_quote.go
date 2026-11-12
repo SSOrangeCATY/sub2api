@@ -66,8 +66,15 @@ func (s *ModelPriceQuoteService) fillPrices(ctx context.Context, groups []PlazaG
 			continue
 		}
 		channel, channelErr := s.channels.GetChannelForGroup(ctx, g.ID)
-		if !purchase && channelErr == nil && channel != nil {
+		salesChannel := channelErr == nil && channelHasSalesCatalog(channel)
+		if !purchase && salesChannel {
 			continue
+		}
+		quoteChannel := channel
+		if !purchase && !salesChannel {
+			// Account stats rules describe supplier cost, never the public
+			// customer price card. Use the neutral billing catalog here.
+			quoteChannel = nil
 		}
 		platforms := make([]string, 0, len(g.Models))
 		platformSet := map[string]bool{}
@@ -100,7 +107,7 @@ func (s *ModelPriceQuoteService) fillPrices(ctx context.Context, groups []PlazaG
 			if err != nil || groupErr != nil || channelErr != nil || group == nil {
 				continue
 			}
-			q := snapshot.quoteModel(ctx, group, channel, m, accounts)
+			q := snapshot.quoteModel(ctx, group, quoteChannel, m, accounts)
 			q.Kind = m.PriceQuote.Kind
 			q.QuotedAt = at
 			m.PriceQuote = q
@@ -240,7 +247,8 @@ func (s *ModelPriceQuoteService) accountVariant(ctx context.Context, group *Grou
 		if resolved != nil {
 			m.Pricing = resolved.channelPricing
 		}
-		if channel == nil && resolved != nil && (resolved.Mode == "" || resolved.Mode == BillingModeToken) {
+		neutralAccountPolicy := channel == nil || (!channelHasSalesCatalog(channel) && channel.ApplyPricingToAccountStats)
+		if neutralAccountPolicy && resolved != nil && (resolved.Mode == "" || resolved.Mode == BillingModeToken) {
 			long := group.LongContextPricingEnabled
 			if gate := openAILongContextBillingGate(account); gate != nil && *gate {
 				long = true

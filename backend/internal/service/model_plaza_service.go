@@ -184,7 +184,12 @@ func (s *ModelPlazaService) ListGroups(ctx context.Context, onlyGroupIDs ...int6
 			if !ok {
 				continue
 			}
-			channelBound[gid] = true
+			// A channel used only to calculate account procurement costs is not
+			// a public model catalog. Keep native account discovery active for
+			// it; sales model pricing/mapping/restriction remains authoritative.
+			if channelHasSalesCatalog(ch) {
+				channelBound[gid] = true
+			}
 			idx := modelIdx[gid]
 			if idx == nil {
 				idx = make(map[modelKey]int, len(supported))
