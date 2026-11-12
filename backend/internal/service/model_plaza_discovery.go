@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/Wei-Shaw/sub2api/internal/domain"
@@ -11,8 +12,8 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/openai"
 )
 
-// Channel catalogs stay authoritative. Groups served directly by accounts use
-// configured public model IDs, with provider defaults for unmapped accounts.
+// Restricted channel catalogs stay authoritative. Other groups supplement
+// configured prices with public account model IDs and local provider defaults.
 // This reads one persistent candidate snapshot, never probes an upstream, and
 // never exports account IDs, mapping targets or credentials.
 func (s *ModelPlazaService) fillNativeGroupModels(ctx context.Context, groups map[int64]*PlazaGroup, entities map[int64]*Group, channelBound map[int64]bool) error {
@@ -31,6 +32,12 @@ func (s *ModelPlazaService) fillNativeGroupModels(ctx context.Context, groups ma
 		return fmt.Errorf("list native model catalog accounts: %w", err)
 	}
 	seen := map[int64]map[string]bool{}
+	for id, group := range groups {
+		seen[id] = map[string]bool{}
+		for _, model := range group.Models {
+			seen[id][model.Platform+"\x00"+strings.ToLower(model.Name)] = true
+		}
+	}
 	for i := range accounts {
 		a := &accounts[i]
 		if a.Status != StatusActive || !a.Schedulable {
@@ -52,16 +59,23 @@ func (s *ModelPlazaService) fillNativeGroupModels(ctx context.Context, groups ma
 				seen[gid] = map[string]bool{}
 			}
 			for _, name := range nativePlazaModelIDs(a, entities[gid]) {
+				upstream := name
+				if s.resolver != nil && s.resolver.channelService != nil {
+					mapping := s.resolver.channelService.ResolveChannelMapping(WithResolvedTargetPlatform(ctx, platform), gid, name)
+					if mapping.MappedModel != "" {
+						upstream = mapping.MappedModel
+					}
+				}
 				if a.Platform != platform {
 					// Public aliases need not contain a provider's name. Inspect
 					// the private target only to select its request platform.
-					target := mapAntigravityModel(a, name)
+					target := mapAntigravityModel(a, upstream)
 					if (platform == PlatformGemini && !isAntigravityGeminiModel(target)) || (platform == PlatformAnthropic && !strings.HasPrefix(strings.ToLower(target), "claude-")) {
 						continue
 					}
 				}
-				key := platform + "\x00" + name
-				if seen[gid][key] || !(&GatewayService{}).isModelSupportedByAccountWithContext(ctx, a, name) {
+				key := platform + "\x00" + strings.ToLower(name)
+				if seen[gid][key] || !(&GatewayService{}).isModelSupportedByAccountWithContext(ctx, a, upstream) {
 					continue
 				}
 				seen[gid][key] = true
@@ -119,5 +133,6 @@ func nativePlazaModelIDs(account *Account, group *Group) []string {
 	for name := range names {
 		out = append(out, name)
 	}
+	sort.Strings(out)
 	return out
 }

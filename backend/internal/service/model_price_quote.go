@@ -47,8 +47,8 @@ func (s *ModelPriceQuoteService) FillPurchasePrices(ctx context.Context, groups 
 	s.fillPrices(ctx, groups, true)
 }
 
-// FillDirectPrices preserves per-account customer tier policies for groups
-// without a channel. Their variants are still scaled by the user's group rate.
+// FillDirectPrices resolves customer cards after channel and account mapping.
+// Their variants are still scaled by the user's group rate.
 func (s *ModelPriceQuoteService) FillDirectPrices(ctx context.Context, groups []PlazaGroup) {
 	s.fillPrices(ctx, groups, false)
 }
@@ -66,16 +66,6 @@ func (s *ModelPriceQuoteService) fillPrices(ctx context.Context, groups []PlazaG
 			continue
 		}
 		channel, channelErr := s.channels.GetChannelForGroup(ctx, g.ID)
-		salesChannel := channelErr == nil && channelHasSalesCatalog(channel)
-		if !purchase && salesChannel {
-			continue
-		}
-		quoteChannel := channel
-		if !purchase && !salesChannel {
-			// Account stats rules describe supplier cost, never the public
-			// customer price card. Use the neutral billing catalog here.
-			quoteChannel = nil
-		}
 		platforms := make([]string, 0, len(g.Models))
 		platformSet := map[string]bool{}
 		for _, model := range g.Models {
@@ -107,7 +97,7 @@ func (s *ModelPriceQuoteService) fillPrices(ctx context.Context, groups []PlazaG
 			if err != nil || groupErr != nil || channelErr != nil || group == nil {
 				continue
 			}
-			q := snapshot.quoteModel(ctx, group, quoteChannel, m, accounts)
+			q := snapshot.quoteModelForBilling(ctx, group, channel, m, accounts, !purchase)
 			q.Kind = m.PriceQuote.Kind
 			q.QuotedAt = at
 			m.PriceQuote = q
@@ -118,6 +108,10 @@ func (s *ModelPriceQuoteService) fillPrices(ctx context.Context, groups []PlazaG
 func quoteUnitRate() *float64 { rate := 1.0; return &rate }
 
 func (s *ModelPriceQuoteService) quoteModel(ctx context.Context, group *Group, channel *Channel, model *PlazaModel, accounts []Account) *PlazaPriceQuote {
+	return s.quoteModelForBilling(ctx, group, channel, model, accounts, false)
+}
+
+func (s *ModelPriceQuoteService) quoteModelForBilling(ctx context.Context, group *Group, channel *Channel, model *PlazaModel, accounts []Account, customer bool) *PlazaPriceQuote {
 	q := &PlazaPriceQuote{Status: "unavailable", Reason: "no_candidates"}
 	if s.billing == nil || s.resolver == nil {
 		return q
@@ -159,7 +153,14 @@ func (s *ModelPriceQuoteService) quoteModel(ctx context.Context, group *Group, c
 		case "channel_mapped":
 			billingModel = upstream
 		}
-		variant := s.accountVariant(ctx, group, channel, a, mapped, billingModel)
+		var variant *PlazaPriceVariant
+		if customer {
+			// Routing and the customer billing model use the real channel,
+			// while supplier-only cost rules never enter a customer quote.
+			variant = s.accountVariant(ctx, group, nil, a, mapped, billingModel)
+		} else {
+			variant = s.accountVariant(ctx, group, channel, a, mapped, billingModel)
+		}
 		if variant == nil {
 			return &PlazaPriceQuote{Status: "unavailable", Reason: "pricing_unavailable"}
 		}
@@ -258,7 +259,14 @@ func (s *ModelPriceQuoteService) accountVariant(ctx context.Context, group *Grou
 			if s.now != nil {
 				at = s.now()
 			}
-			schedule, err := s.billing.ResolveContextPricingSchedule(ctx, s.resolver, ContextPricingScheduleInput{Model: billingModel, Group: group, Platform: platform, LongContextPricingEnabled: &long, DisableModelLongContextPricing: exempt, PricingAt: &at})
+			// Configured sales cards retain their standard-period prices and
+			// schedule. Native provider policies need a snapshot because they
+			// are applied by unified billing rather than a channel schedule.
+			var pricingAt *time.Time
+			if resolved.Source == PricingSourceLiteLLM {
+				pricingAt = &at
+			}
+			schedule, err := s.billing.ResolveContextPricingSchedule(ctx, s.resolver, ContextPricingScheduleInput{Model: billingModel, Group: group, Platform: platform, LongContextPricingEnabled: &long, DisableModelLongContextPricing: exempt, PricingAt: pricingAt})
 			if err != nil || schedule == nil || len(schedule.Tiers) == 0 {
 				return nil
 			}
@@ -291,6 +299,9 @@ func (s *ModelPriceQuoteService) accountVariant(ctx context.Context, group *Grou
 }
 
 func quoteAccountUpstreamModel(account *Account, model string) string {
+	if account.IsOpenAICompatible() {
+		return resolveOpenAIAccountUpstreamModelForRequest(account, model, false)
+	}
 	if account.Platform == PlatformAntigravity {
 		return mapAntigravityModel(account, model)
 	}
