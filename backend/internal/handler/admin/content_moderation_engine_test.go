@@ -25,6 +25,18 @@ func (r *moderationEngineSettings) Set(_ context.Context, _ string, value string
 	return nil
 }
 
+func (r *moderationEngineSettings) CompareAndSetContentModerationConfig(_ context.Context, value string, _ []int64, expected int64) (bool, error) {
+	current, err := service.ContentModerationConfigRevision(r.value)
+	if err != nil {
+		return false, err
+	}
+	if current != expected {
+		return false, nil
+	}
+	r.value = value
+	return true, nil
+}
+
 func TestContentModerationEngineHandlerRoundTrip(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	settings := &moderationEngineSettings{value: `{"api_keys":["legacy-secret"],"model":"omni-moderation-latest"}`}
@@ -33,7 +45,7 @@ func TestContentModerationEngineHandlerRoundTrip(t *testing.T) {
 	router := gin.New()
 	router.PUT("/config", h.UpdateConfig)
 	router.GET("/config", h.GetConfig)
-	body := `{"engine":"typesafe","engine_configs":{"typesafe":{"base_url":"https://api.typesafe.ai","model":"jev-latest","api_keys":["new-secret"],"thresholds":{"sexual":0.91}}}}`
+	body := `{"expected_revision":1,"engine":"typesafe","engine_configs":{"typesafe":{"base_url":"https://api.typesafe.ai","model":"jev-latest","api_keys":["new-secret"],"thresholds":{"sexual":0.91}}}}`
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPut, "/config", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")

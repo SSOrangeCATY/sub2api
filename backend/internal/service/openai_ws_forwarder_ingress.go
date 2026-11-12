@@ -1853,6 +1853,9 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 		if relayErr != nil {
 			lastTurnClean = false
 			if isOpenAIWSSessionPreempted(ctx) {
+				if hooks != nil && hooks.AfterTurn != nil {
+					hooks.AfterTurn(turn, result, errOpenAIWSSessionPreempted)
+				}
 				sessionLease.MarkBroken()
 				return errOpenAIWSSessionPreempted
 			}

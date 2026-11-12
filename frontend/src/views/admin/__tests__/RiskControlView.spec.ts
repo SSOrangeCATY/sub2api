@@ -76,6 +76,7 @@ vi.mock('vue-i18n', async () => {
 })
 
 const baseConfig = (): ContentModerationConfig => ({
+  revision: 1,
   enabled: true,
   mode: 'pre_block',
   base_url: 'https://api.openai.com',
@@ -211,6 +212,7 @@ describe('admin RiskControlView', () => {
     updateConfig.mockImplementation(async (payload: UpdateContentModerationConfig) => ({
       ...baseConfig(),
       ...payload,
+      revision: payload.expected_revision + 1,
       model_filter: payload.model_filter ?? baseConfig().model_filter,
       api_key_configured: false,
       api_key_masked: '',

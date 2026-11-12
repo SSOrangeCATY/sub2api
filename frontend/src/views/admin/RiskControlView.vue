@@ -1,11 +1,11 @@
 <template>
   <AppLayout>
-    <div class="space-y-6">
+    <div class="risk-control-workspace space-y-6">
       <div v-if="loading" class="flex items-center justify-center py-16">
         <div class="h-8 w-8 animate-spin rounded-full border-b-2 border-primary-600"></div>
       </div>
 
-      <template v-else>
+      <template v-else-if="riskConfigSnapshot">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">{{ t('admin.riskControl.title') }}</h1>
@@ -22,6 +22,16 @@
             </button>
           </div>
         </div>
+
+        <nav class="risk-workviews" data-test="risk-workspace-nav" :aria-label="t('admin.riskControl.riskWorkspace.navigation')">
+          <button v-for="view in riskViews" :key="view.id" type="button" class="ef-btn" :class="{ go: riskWorkView === view.id }"
+            :data-test="'risk-view-' + view.id" :aria-pressed="riskWorkView === view.id" @click="riskWorkView = view.id">
+            <span class="ef-field">// {{ view.english }}</span>
+            <span class="risk-view-label">{{ t('admin.riskControl.riskWorkspace.' + view.key) }}</span>
+          </button>
+        </nav>
+        <p v-if="riskLeaveBlocked" ref="riskLeaveNotice" class="ef-notice" role="alert" tabindex="-1">{{ t('admin.riskControl.userPolicy.unsavedLeave') }}</p>
+        <section v-show="riskWorkView === 'moderation'" class="space-y-6">
 
         <p class="text-sm text-gray-600 dark:text-gray-300" data-test="active-audit-engine">
           {{ t('admin.riskControl.activeEngine', { engine: engineLabel(status?.engine ?? savedEngine) }) }}
@@ -332,7 +342,7 @@
                       <div>{{ violationCountText(row) }}</div>
                       <div class="text-xs text-gray-400">
                         {{ row.email_sent ? t('admin.riskControl.emailSent') : t('admin.riskControl.emailNotSent') }}
-                        <span v-if="row.auto_banned"> / {{ t('admin.riskControl.autoBanned') }}</span>
+                        <span v-if="row.auto_banned"> / {{ row.action === 'cyber_policy' ? t('admin.riskControl.userRecords.restrictionApplied') : t('admin.riskControl.autoBanned') }}</span>
                       </div>
                       <button
                         v-if="canUnbanRow(row)"
@@ -377,7 +387,28 @@
             @update:pageSize="onPageSizeChange"
           />
         </div>
+        </section>
+        <UserRiskPolicySection
+          v-show="riskWorkView === 'restrictions'"
+          :config="riskConfigSnapshot"
+          :master-enabled="Boolean(status?.risk_control_enabled)"
+          :blocked="saving"
+          @saved="onUserPolicySaved"
+          @latest="acceptRiskSnapshot"
+          @edit-scope="openUserRiskScope"
+          @dirty="markUserPolicyDirty"
+          @busy="userPolicyBusy = $event"
+        />
+        <UserRiskRecords
+          :active="riskWorkView !== 'moderation'"
+          :mode="riskWorkView === 'history' ? 'history' : 'restrictions'"
+          :policy-revision="riskConfigSnapshot.revision"
+        />
       </template>
+      <div v-else class="ef-notice" role="alert">
+        <p>{{ t('admin.riskControl.loadFailed') }}</p>
+        <button type="button" class="ef-btn" @click="loadAll">{{ t('admin.riskControl.riskWorkspace.reload') }}</button>
+      </div>
 
       <BaseDialog :show="settingsOpen" :title="t('admin.riskControl.settingsTitle')" width="extra-wide" @close="settingsOpen = false">
         <div class="space-y-6">
@@ -907,13 +938,7 @@
                 </div>
                 <Toggle v-model="configForm.auto_ban_enabled" />
               </div>
-              <div class="flex items-center justify-between rounded-lg border border-gray-100 p-4 dark:border-dark-700 lg:col-span-2">
-                <div>
-                  <p class="text-sm font-medium text-gray-900 dark:text-white">{{ t('admin.riskControl.cyberPolicyExcludeBan') }}</p>
-                  <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('admin.riskControl.cyberPolicyExcludeBanHint') }}</p>
-                </div>
-                <Toggle v-model="configForm.cyber_policy_exclude_from_ban_count" />
-              </div>
+              <p class="ef-notice lg:col-span-2">{{ t('admin.riskControl.userRelease.policyLocation') }}</p>
               <div>
                 <label class="input-label">{{ t('admin.riskControl.banThreshold') }}</label>
                 <input v-model.number="configForm.ban_threshold" type="number" min="1" max="1000" class="input" />
@@ -1069,7 +1094,7 @@
         <template #footer>
           <div class="flex justify-end gap-2">
             <button type="button" class="btn btn-secondary" @click="settingsOpen = false">{{ t('common.cancel') }}</button>
-            <button type="button" class="btn btn-primary inline-flex items-center gap-2" :disabled="saving" @click="saveConfig">
+            <button type="button" class="btn btn-primary inline-flex items-center gap-2" :disabled="saving || userPolicyBusy" @click="saveConfig">
               <Icon v-if="saving" name="refresh" size="sm" class="animate-spin" />
               <Icon v-else name="check" size="sm" />
               {{ saving ? t('common.saving') : t('admin.riskControl.saveConfig') }}
@@ -1147,7 +1172,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, reactive, ref, toRaw } from 'vue'
+import { computed, inject, nextTick, onMounted, onUnmounted, reactive, ref, toRaw } from 'vue'
+import { onBeforeRouteLeave, routerKey } from 'vue-router'
+import UserRiskPolicySection from '@/components/admin/risk/UserRiskPolicySection.vue'
+import UserRiskRecords from '@/components/admin/risk/UserRiskRecords.vue'
 import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import BaseDialog from '@/components/common/BaseDialog.vue'
@@ -1237,6 +1265,54 @@ const apiKeyTesting = ref(false)
 const hashActionLoading = ref(false)
 const unbanningUserID = ref<number | null>(null)
 const settingsOpen = ref(false)
+const riskConfigSnapshot = ref(null as ContentModerationConfig | null)
+const riskWorkView = ref('moderation' as 'moderation' | 'restrictions' | 'history')
+const userPolicyDirty = ref(false)
+const userPolicyBusy = ref(false)
+const riskLeaveBlocked = ref(false)
+const riskLeaveNotice = ref(null as HTMLElement | null)
+const riskViews = [
+  { id: 'moderation', english: 'CONTENT MODERATION', key: 'moderation' },
+  { id: 'restrictions', english: 'USER RESTRICTIONS', key: 'restrictions' },
+  { id: 'history', english: 'ACTION HISTORY', key: 'history' },
+] as const
+const riskRouter = inject(routerKey, null)
+if (riskRouter) {
+  onBeforeRouteLeave(() => {
+    if (!userPolicyDirty.value) return true
+    riskWorkView.value = 'restrictions'
+    riskLeaveBlocked.value = true
+    void nextTick(() => riskLeaveNotice.value?.focus())
+    return false
+  })
+}
+function markUserPolicyDirty(value: boolean) {
+  userPolicyDirty.value = value
+  if (!value) riskLeaveBlocked.value = false
+}
+function acceptRiskSnapshot(config: ContentModerationConfig) {
+  const incoming = Number(config.revision ?? 0)
+  if (!riskConfigSnapshot.value || incoming >= Number(riskConfigSnapshot.value.revision ?? 0)) {
+    riskConfigSnapshot.value = config
+  }
+}
+function onUserPolicySaved(config: ContentModerationConfig, previousRevision: number) {
+  if (configRevision.value === previousRevision) configRevision.value = Number(config.revision)
+  acceptRiskSnapshot(config)
+  appStore.showSuccess(t('admin.riskControl.riskWorkspace.policySaved'))
+}
+function openUserRiskScope() {
+  settingsOpen.value = true
+  activeSettingsTab.value = 'scope'
+}
+function protectRiskDraftOnUnload(event: BeforeUnloadEvent) {
+  if (!userPolicyDirty.value) return
+  event.preventDefault()
+  event.returnValue = ''
+}
+onMounted(() => window.addEventListener('beforeunload', protectRiskDraftOnUnload))
+onUnmounted(() => window.removeEventListener('beforeunload', protectRiskDraftOnUnload))
+
 const activeSettingsTab = ref<SettingsTab>('basic')
 const groupSearch = ref('')
 const flaggedHashInput = ref('')
@@ -1252,6 +1328,7 @@ const moderationTestImages = ref<string[]>([])
 const moderationTestResult = ref<ContentModerationTestAuditResult | null>(null)
 const inputDetailRow = ref<ContentModerationLog | null>(null)
 const savedEngine = ref<ModerationEngine>('openai')
+const configRevision = ref(null as number | null)
 const engineOptions: SelectOption[] = [{ value: 'openai', label: 'OpenAI' }, { value: 'typesafe', label: 'TypeSafe AI' }]
 const engineLabel = (engine: ModerationEngine) => engine === 'typesafe' ? 'TypeSafe AI' : 'OpenAI'
 let statusTimer: number | null = null
@@ -1780,6 +1857,8 @@ const runtimeBadgeClass = computed(() => {
 })
 
 function applyConfig(config: ContentModerationConfig) {
+  acceptRiskSnapshot(config)
+  configRevision.value = Number.isSafeInteger(config.revision) && Number(config.revision) > 0 ? Number(config.revision) : null
   savedEngine.value = config.engine ?? 'openai'
   configForm.engine = savedEngine.value
   configForm.enabled = config.enabled
@@ -1876,6 +1955,11 @@ async function loadStatus(silent = true) {
 }
 
 async function saveConfig() {
+  if (userPolicyBusy.value) return
+  if (configRevision.value === null) {
+    appStore.showError(t('admin.riskControl.userPolicy.configVersionUnavailable'))
+    return
+  }
   saving.value = true
   try {
     const modelFilterPayload = buildModelFilterPayload()
@@ -1884,6 +1968,7 @@ async function saveConfig() {
       return
     }
     const payload: UpdateContentModerationConfig = {
+      expected_revision: configRevision.value,
       engine: configForm.engine,
       enabled: configForm.enabled,
       mode: configForm.mode,
@@ -1970,7 +2055,7 @@ async function loadLogs() {
 }
 
 function canUnbanRow(row: ContentModerationLog): boolean {
-  return Boolean(row.auto_banned && row.user_id && row.user_status === 'disabled')
+  return Boolean(row.action !== 'cyber_policy' && row.auto_banned && row.user_id && row.user_status === 'disabled')
 }
 
 function inputSummaryText(row: ContentModerationLog): string {
@@ -2470,3 +2555,25 @@ onUnmounted(() => {
   }
 })
 </script>
+
+<style scoped>
+.risk-control-workspace :deep(button) {
+  min-width: 44px;
+  min-height: 44px;
+}
+.risk-control-workspace :deep(input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"])),
+.risk-control-workspace :deep(select),
+.risk-control-workspace :deep(textarea) {
+  min-height: 44px;
+}
+.risk-control-workspace :deep(label:has(input[type="checkbox"])) {
+  min-height: 44px;
+}
+.risk-workviews { display: flex; flex-wrap: wrap; gap: .75rem; padding-bottom: 1rem; border-bottom: 1px solid var(--ef-rule); }
+.risk-workviews button { display: grid; gap: .35rem; min-height: 64px; min-width: 0; text-align: left; }
+.risk-workviews button[aria-pressed='true'] { background: var(--ef-signal); color: var(--ef-on-signal); }
+.risk-workviews button[aria-pressed='true'] .ef-field { color: inherit; }
+.risk-workviews .ef-field { font-size: .625rem; }
+.risk-view-label { font-family: var(--ef-font-ui); font-weight: 750; letter-spacing: normal; }
+@media (max-width: 767px) { .risk-workviews button { flex: 1 1 100%; } }
+</style>

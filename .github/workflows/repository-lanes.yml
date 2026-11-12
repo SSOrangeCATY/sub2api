@@ -60,6 +60,9 @@ jobs:
       - name: Account first output regression with race detector
         working-directory: backend
         run: go test -tags unit -race -count=1 ./internal/service -run '^TestAccountFirstOutput'
+      - name: User risk and gateway regression with race detector
+        working-directory: backend
+        run: go test -tags unit -race -count=1 ./internal/service ./internal/handler ./internal/server/middleware -run '^(TestUserRisk|TestApplyCyberUserPolicy|TestContentModerationRuntimeRevision|TestAPIKeyAuth|TestApiKeyAuthWithSubscriptionGoogle|TestQQ)'
   release-gate:
     name: Release gate
     if: always()

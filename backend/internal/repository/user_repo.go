@@ -317,6 +317,7 @@ func (r *userRepository) Update(ctx context.Context, userIn *service.User, field
 	}
 	if fields.Status {
 		updateOp = updateOp.SetStatus(userIn.Status)
+
 	}
 	if fields.BillingIdentity {
 		updateOp = updateOp.SetBillingIdentity(userIn.BillingIdentity)
