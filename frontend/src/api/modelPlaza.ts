@@ -45,6 +45,8 @@ export interface PlazaTimePricing {
 }
 
 export interface PlazaModel {
+	pricing_as_of?: string
+	price_quote?: ModelPriceQuote
   name: string
   platform: string
   /** 实收口径的展示定价：档位可提供绝对单价或相对基础价倍率；均为标准时段价。 */
@@ -54,6 +56,26 @@ export interface PlazaModel {
   long_context_basis?: PlazaLongContextBasis
   /** 仅配置了分时倍率的模型返回。 */
   time_pricing?: PlazaTimePricing
+}
+
+export interface ModelPriceVariant {
+	interval_price_mode?: 'absolute' | 'inherit'
+  pricing: UserSupportedModelPricing
+  time_pricing?: PlazaTimePricing
+  long_context_basis?: PlazaLongContextBasis
+  context_metric?: 'input' | 'total'
+}
+
+export interface ModelPriceQuote {
+	quoted_at?: string
+  status: 'quoted' | 'unavailable'
+  reason?: string
+  variants: ModelPriceVariant[]
+}
+
+export async function getGroupModelPrices(groupId: number, signal?: AbortSignal): Promise<ModelPlazaResponse> {
+  const { data } = await apiClient.get<ModelPlazaResponse>('/model-prices', { params: { group_id: groupId }, signal })
+  return data
 }
 
 export interface ModelPlazaGroup {

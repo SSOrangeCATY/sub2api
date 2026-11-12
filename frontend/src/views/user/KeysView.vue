@@ -196,6 +196,7 @@
                   />
                 </svg>
               </button>
+              <GroupPricePreview v-if="row.group" :groups="[{ id: row.group.id, name: row.group.name }]" />
             </div>
           </template>
 
@@ -598,6 +599,8 @@
             </template>
           </Select>
         </div>
+
+        <GroupPricePreview v-if="formData.group_id" :groups="[{ id: formData.group_id }]" />
 
         <!-- Custom Key Section (only for create) -->
         <div v-if="!showEditModal" class="space-y-3">
@@ -1245,6 +1248,7 @@ import BulkEditKeysModal from '@/components/keys/BulkEditKeysModal.vue'
 	import UseKeyModal from '@/components/keys/UseKeyModal.vue'
 	import EndpointPopover from '@/components/keys/EndpointPopover.vue'
 	import GroupBadge from '@/components/common/GroupBadge.vue'
+	import GroupPricePreview from '@/components/modelPlaza/GroupPricePreview.vue'
 	import GroupOptionItem from '@/components/common/GroupOptionItem.vue'
 import MonitorFallbackRoutes from '@/components/admin/group/MonitorFallbackRoutes.vue'
 	import type { ApiKey, Group, PublicSettings, SubscriptionType, GroupPlatform, UpdateApiKeyRequest } from '@/types'

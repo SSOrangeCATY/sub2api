@@ -40,6 +40,10 @@ export interface UserPricingInterval {
 }
 
 export interface UserSupportedModelPricing {
+	/** Original numeric denomination. Settlement remains nominal USD. */
+	source_currency?: string
+	settlement_currency?: string
+	unit_policy?: string
   billing_mode: BillingMode
   input_price: number | null
   output_price: number | null

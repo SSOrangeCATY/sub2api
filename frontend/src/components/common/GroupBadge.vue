@@ -12,7 +12,7 @@
     <span class="pt-group-name" :class="truncate ? 'truncate' : 'min-w-0 whitespace-normal [overflow-wrap:anywhere]'">{{ name }}</span>
     <!-- Right side label -->
     <span v-if="showLabel" class="pt-group-rate" :class="[labelClass, { 'pt-group-rate--warning': isSubscription && daysRemaining !== null && daysRemaining <= 7 }]">
-      <template v-if="purchasePricing">{{ t('modelPlaza.purchaseDynamic') }}</template>
+      <template v-if="purchasePricing">{{ t('modelPlaza.catalog.purchaseIdentity') }}</template>
       <template v-else-if="hasCustomRate">
         <!-- 原倍率删除线 + 专属倍率高亮 -->
         <span class="line-through opacity-50 mr-0.5">{{ rateMultiplier }}x</span>
