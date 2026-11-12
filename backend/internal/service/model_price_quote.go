@@ -97,7 +97,12 @@ func (s *ModelPriceQuoteService) fillPrices(ctx context.Context, groups []PlazaG
 			if err != nil || groupErr != nil || channelErr != nil || group == nil {
 				continue
 			}
-			q := snapshot.quoteModelForBilling(ctx, group, channel, m, accounts, !purchase)
+			var q *PlazaPriceQuote
+			if purchase {
+				q = snapshot.quoteModel(ctx, group, channel, m, accounts)
+			} else {
+				q = snapshot.quoteModelForBilling(ctx, group, channel, m, accounts, true)
+			}
 			q.Kind = m.PriceQuote.Kind
 			q.QuotedAt = at
 			m.PriceQuote = q
