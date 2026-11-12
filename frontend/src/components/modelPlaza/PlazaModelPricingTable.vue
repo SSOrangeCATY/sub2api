@@ -18,7 +18,7 @@
           <td class="price-model-cell">
             <strong>{{ entry.model.name }}</strong>
             <span class="price-model-meta"><span v-if="entry.group.name">{{ entry.group.name }} │ </span>{{ entry.model.platform }} │ {{ modeLabel(entry.model) }}</span>
-            <span v-if="purchasePricing && entry.model.price_quote?.variants.length && entry.model.price_quote.variants.length > 1" class="price-range-note">{{ t('modelPlaza.catalog.routeRange') }}</span>
+            <span v-if="usesQuote(entry.model) && entry.model.price_quote && entry.model.price_quote.variants.length > 1" class="price-range-note">{{ t('modelPlaza.catalog.routeRange') }}</span>
             <span v-if="quoteTime(entry.model)" class="price-model-meta">{{ t('modelPlaza.catalog.quotedAt', { time: new Date(quoteTime(entry.model)!).toLocaleTimeString() }) }}</span>
           </td>
           <template v-if="mode(entry.model) === 'token' || mode(entry.model) === 'mixed'">
@@ -41,13 +41,13 @@
           </td>
         </tr>
         <tr v-if="mode(entry.model) === 'mixed'" class="price-mixed-row"><td colspan="5"><span>{{ t('modelPlaza.catalog.mode.mixed') }} │ </span><span v-for="price in requestPrices(entry)" :key="price.key">{{ price.label }} {{ price.text }} {{ price.unit }} │ </span></td></tr>
-        <tr v-if="!entry.variants.length" class="price-unavailable-row"><td colspan="5">{{ t('modelPlaza.catalog.unavailableHint') }}</td></tr>
+        <tr v-if="!entry.variants.length" class="price-unavailable-row"><td colspan="5">{{ t(purchasePricing ? 'modelPlaza.catalog.unavailableHint' : 'modelPlaza.catalog.unavailableDirectHint') }}</td></tr>
         <tr v-if="expanded.has(entry.key)" :id="detailId(entry.key)" class="price-detail-row">
           <td colspan="5">
             <div class="price-details">
               <p v-if="purchasePricing">{{ t('modelPlaza.catalog.purchaseHelp') }}</p>
               <section v-for="(variant, index) in entry.baseVariants" :key="index" class="price-variant">
-                <h4>{{ t('modelPlaza.catalog.priceSheet') }} <span v-if="entry.baseVariants.length > 1">/ {{ index + 1 }}</span> <span>{{ variant.pricing.source_currency || 'USD' }} │ {{ t('modelPlaza.catalog.mode.' + variant.pricing.billing_mode) }} │ {{ t((purchasePricing || entry.model.pricing_as_of) && !variant.time_pricing ? 'modelPlaza.catalog.snapshotPeriod' : 'modelPlaza.catalog.standardPeriod') }}</span></h4>
+                <h4>{{ t('modelPlaza.catalog.priceSheet') }} <span v-if="entry.baseVariants.length > 1">/ {{ index + 1 }}</span> <span>{{ variant.pricing.source_currency || 'USD' }} │ {{ t('modelPlaza.catalog.mode.' + variant.pricing.billing_mode) }} │ {{ t(quoteTime(entry.model) && !variant.time_pricing ? 'modelPlaza.catalog.snapshotPeriod' : 'modelPlaza.catalog.standardPeriod') }}</span></h4>
                 <p v-if="variant.pricing.intervals.length && variant.pricing.billing_mode === 'token'">{{ t(variant.context_metric === 'total' ? 'modelPlaza.catalog.totalContext' : 'modelPlaza.table.tierHint') }}</p>
                 <div class="price-tier-list">
                   <section v-for="(tier, tierIndex) in tiers(variant)" :key="tierIndex" class="price-tier">
@@ -138,7 +138,8 @@ const rows = computed(() => (props.entries ?? props.models.map(model => ({ model
   baseVariants: fresh(entry.model) ? pricingVariants(entry.model, entry.group, !!props.purchasePricing) : []
 })))
 type Row = (typeof rows.value)[number]
-function quoteTime(model: PlazaModel) { return props.purchasePricing ? model.price_quote?.quoted_at : model.pricing_as_of }
+function usesQuote(model: PlazaModel) { return props.purchasePricing || model.price_quote?.kind === 'customer' }
+function quoteTime(model: PlazaModel) { return usesQuote(model) ? model.price_quote?.quoted_at : model.pricing_as_of }
 function fresh(model: PlazaModel) { const at = quoteTime(model); return !at || now.value.getTime() - new Date(at).getTime() <= 90000 }
 function reasoningFactors(variant: ModelPriceVariant) {
   return Object.fromEntries(REASONING_EFFORT_LEVELS.flatMap(effort => {
@@ -150,8 +151,8 @@ const currencies = computed(() => [...new Set(rows.value.flatMap(row => row.vari
 function toggle(key: string) { const next = new Set(expanded.value); if (!next.delete(key)) next.add(key); expanded.value = next }
 function detailId(key: string) { return id + '-' + encodeURIComponent(key) }
 function mode(model: PlazaModel) {
-  const modes = new Set(props.purchasePricing ? model.price_quote?.variants.map(v => v.pricing.billing_mode) : [model.pricing?.billing_mode])
-  return modes.size > 1 ? 'mixed' : (props.purchasePricing ? model.price_quote?.variants[0]?.pricing.billing_mode : model.pricing?.billing_mode) || model.pricing?.billing_mode || 'token'
+  const modes = new Set(usesQuote(model) ? model.price_quote?.variants.map(v => v.pricing.billing_mode) : [model.pricing?.billing_mode])
+  return modes.size > 1 ? 'mixed' : (usesQuote(model) ? model.price_quote?.variants[0]?.pricing.billing_mode : model.pricing?.billing_mode) || model.pricing?.billing_mode || 'token'
 }
 function modeLabel(model: PlazaModel) { return t('modelPlaza.catalog.mode.' + mode(model)) }
 function perUnit(model: PlazaModel) { return t('modelPlaza.catalog.per.' + mode(model)) }

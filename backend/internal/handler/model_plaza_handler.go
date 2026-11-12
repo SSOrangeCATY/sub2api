@@ -82,6 +82,7 @@ type modelPlazaModel struct {
 }
 
 type modelPriceQuote struct {
+	Kind     string              `json:"kind,omitempty"`
 	QuotedAt time.Time           `json:"quoted_at"`
 	Status   string              `json:"status"`
 	Reason   string              `json:"reason,omitempty"`
@@ -175,6 +176,8 @@ func (h *ModelPlazaHandler) Get(c *gin.Context) {
 	visible := filterPlazaVisibleGroups(groups, allowedGroups, restrictPublicGroups)
 	if identity == service.BillingIdentityPurchase && h.quoteService != nil {
 		h.quoteService.FillPurchasePrices(c.Request.Context(), visible)
+	} else if h.quoteService != nil {
+		h.quoteService.FillDirectPrices(c.Request.Context(), visible)
 	}
 	c.Header("Cache-Control", "private, no-store")
 	c.Writer.Header().Add("Vary", "Authorization")
@@ -243,6 +246,8 @@ func (h *ModelPlazaHandler) Prices(c *gin.Context) {
 	}
 	if identity == service.BillingIdentityPurchase && h.quoteService != nil {
 		h.quoteService.FillPurchasePrices(c.Request.Context(), visible)
+	} else if h.quoteService != nil {
+		h.quoteService.FillDirectPrices(c.Request.Context(), visible)
 	}
 	c.Header("Cache-Control", "private, no-store")
 	c.Writer.Header().Add("Vary", "Authorization")
@@ -330,7 +335,7 @@ func toModelPriceQuote(q *service.PlazaPriceQuote) *modelPriceQuote {
 	if q == nil {
 		return nil
 	}
-	result := &modelPriceQuote{Status: q.Status, Reason: q.Reason, QuotedAt: q.QuotedAt, Variants: make([]modelPriceVariant, 0, len(q.Variants))}
+	result := &modelPriceQuote{Kind: q.Kind, Status: q.Status, Reason: q.Reason, QuotedAt: q.QuotedAt, Variants: make([]modelPriceVariant, 0, len(q.Variants))}
 	for _, v := range q.Variants {
 		result.Variants = append(result.Variants, modelPriceVariant{Pricing: toUserPricing(v.Pricing), TimePricing: toModelPlazaTimePricing(v.TimePricing), LongContextBasis: string(v.LongContextBasis), ContextMetric: v.ContextMetric, IntervalPriceMode: v.IntervalPriceMode})
 	}

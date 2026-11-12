@@ -25,7 +25,7 @@ import { getModelPlaza, type ModelPlazaResponse } from '@/api/modelPlaza'
 import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'
 
-useBodySurface(['pt-product-surface', 'pt-group-surface'])
+useBodySurface(['pt-product-surface', 'pt-group-surface', 'pt-price-catalog-surface'])
 
 const route = useRoute()
 const initialGroup = typeof route.query.group === 'string' ? route.query.group : undefined

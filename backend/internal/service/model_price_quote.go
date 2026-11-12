@@ -13,6 +13,7 @@ import (
 // supplier credentials or internal rule IDs. Variants represent configured
 // candidate routes; availability and actual selection can change per request.
 type PlazaPriceQuote struct {
+	Kind     string // customer (before user/group rates) or account_cost (final)
 	QuotedAt time.Time
 	Status   string
 	Reason   string
@@ -43,6 +44,16 @@ func NewModelPriceQuoteService(accounts AccountRepository, channels *ChannelServ
 // It deliberately keeps transiently unavailable configured routes in the
 // range: a price display must not promise the cheapest currently idle route.
 func (s *ModelPriceQuoteService) FillPurchasePrices(ctx context.Context, groups []PlazaGroup) {
+	s.fillPrices(ctx, groups, true)
+}
+
+// FillDirectPrices preserves per-account customer tier policies for groups
+// without a channel. Their variants are still scaled by the user's group rate.
+func (s *ModelPriceQuoteService) FillDirectPrices(ctx context.Context, groups []PlazaGroup) {
+	s.fillPrices(ctx, groups, false)
+}
+
+func (s *ModelPriceQuoteService) fillPrices(ctx context.Context, groups []PlazaGroup, purchase bool) {
 	at := time.Now()
 	if s.now != nil {
 		at = s.now()
@@ -51,6 +62,13 @@ func (s *ModelPriceQuoteService) FillPurchasePrices(ctx context.Context, groups 
 	snapshot.now = func() time.Time { return at }
 	for gi := range groups {
 		g := &groups[gi]
+		if len(g.Models) == 0 {
+			continue
+		}
+		channel, channelErr := s.channels.GetChannelForGroup(ctx, g.ID)
+		if !purchase && channelErr == nil && channel != nil {
+			continue
+		}
 		platforms := make([]string, 0, len(g.Models))
 		platformSet := map[string]bool{}
 		for _, model := range g.Models {
@@ -64,19 +82,33 @@ func (s *ModelPriceQuoteService) FillPurchasePrices(ctx context.Context, groups 
 		}
 		accounts, err := s.accounts.ListModelAvailabilityCandidates(ctx, &g.ID, platforms, false)
 		group, groupErr := s.channels.groupRepo.GetByID(ctx, g.ID)
-		channel, channelErr := s.channels.GetChannelForGroup(ctx, g.ID)
+		if !purchase {
+			// Copy the snapshot rather than changing persistent account rates.
+			accounts = append([]Account(nil), accounts...)
+			for i := range accounts {
+				accounts[i].RateMultiplier = quoteUnitRate()
+			}
+		}
 		for mi := range g.Models {
 			m := &g.Models[mi]
 			m.PriceQuote = &PlazaPriceQuote{Status: "unavailable", Reason: "pricing_unavailable"}
+			if purchase {
+				m.PriceQuote.Kind = "account_cost"
+			} else {
+				m.PriceQuote.Kind = "customer"
+			}
 			if err != nil || groupErr != nil || channelErr != nil || group == nil {
 				continue
 			}
 			q := snapshot.quoteModel(ctx, group, channel, m, accounts)
+			q.Kind = m.PriceQuote.Kind
 			q.QuotedAt = at
 			m.PriceQuote = q
 		}
 	}
 }
+
+func quoteUnitRate() *float64 { rate := 1.0; return &rate }
 
 func (s *ModelPriceQuoteService) quoteModel(ctx context.Context, group *Group, channel *Channel, model *PlazaModel, accounts []Account) *PlazaPriceQuote {
 	q := &PlazaPriceQuote{Status: "unavailable", Reason: "no_candidates"}
@@ -208,8 +240,26 @@ func (s *ModelPriceQuoteService) accountVariant(ctx context.Context, group *Grou
 		if resolved != nil {
 			m.Pricing = resolved.channelPricing
 		}
-		plaza := &ModelPlazaService{billingService: s.billing, resolver: s.resolver}
-		plaza.fillDisplayPricing(ctx, &m, group)
+		if channel == nil && resolved != nil && (resolved.Mode == "" || resolved.Mode == BillingModeToken) {
+			long := group.LongContextPricingEnabled
+			if gate := openAILongContextBillingGate(account); gate != nil && *gate {
+				long = true
+			}
+			exempt := openAISubscriptionLongContextExempt(account, &OpenAIForwardResult{Model: upstream, UpstreamModel: upstream})
+			at := time.Now()
+			if s.now != nil {
+				at = s.now()
+			}
+			schedule, err := s.billing.ResolveContextPricingSchedule(ctx, s.resolver, ContextPricingScheduleInput{Model: billingModel, Group: group, Platform: platform, LongContextPricingEnabled: &long, DisableModelLongContextPricing: exempt, PricingAt: &at})
+			if err != nil || schedule == nil || len(schedule.Tiers) == 0 {
+				return nil
+			}
+			m.Pricing = plazaPricingFromSchedule(m.Pricing, schedule)
+			m.LongContextBasis, m.TimePricing = schedule.Basis, schedule.TimePricing
+		} else {
+			plaza := &ModelPlazaService{billingService: s.billing, resolver: s.resolver}
+			plaza.fillDisplayPricing(ctx, &m, group)
+		}
 		pricing = m.Pricing
 		variant.LongContextBasis, variant.TimePricing = m.LongContextBasis, m.TimePricing
 	}

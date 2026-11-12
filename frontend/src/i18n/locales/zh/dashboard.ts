@@ -665,6 +665,16 @@ export default {
   // Model Plaza (public group/model pricing showcase)
   modelPlaza: {
 	 catalog: {
+      search: "搜索",
+      searchHint: "搜索模型、分组或平台",
+      searchGroups: "搜索分组名称",
+      contextHint: "上下文仅用于查看对应计价档位，不会更改账号设置。",
+      activeFilters: "已选条件",
+      removeFilter: "移除条件：{filter}",
+      allGroups: "全部分组 / {count}",
+      modelCount: "{count} 个模型",
+      noModels: "暂无模型",
+      emptyGroup: "该分组暂未配置可展示的模型，请联系管理员核对配置。",
       findPrice: '查询模型价格',
       intro: '搜索模型并比较可用分组，直接查看当前身份的实付单价。',
       pricingFor: '当前计费身份',
@@ -701,6 +711,7 @@ export default {
       collapse: '收起详情',
       routeRange: '候选线路价格区间',
       unavailable: '暂不能确认价格',
+      unavailableDirectHint: "暂无可确认的实付报价，请刷新或联系管理员核对线路与定价配置。",
       unavailableHint: '暂无可确认的实付报价。请刷新或联系管理员核对；此处不会使用销售价代替进货价。',
       priceSheet: '实付价目',
       standardPeriod: '标准时段价',
