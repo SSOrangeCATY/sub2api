@@ -15,6 +15,23 @@ beforeEach(() => {
 afterEach(() => { vi.restoreAllMocks(); localStorage.clear() })
 
 describe('admin settings fetch retry', () => {
+  it('waits for the active settings read so post-save callers can refresh afterward', async () => {
+    let finish!: (value: object) => void
+    mocks.getSettings.mockReturnValueOnce(new Promise(resolve => { finish = resolve }))
+    const store = useAdminSettingsStore()
+    const first = store.fetch()
+    const during = store.fetch(true)
+    const settled = vi.fn()
+    void during.then(settled)
+    await Promise.resolve()
+    expect(settled).not.toHaveBeenCalled()
+    expect(mocks.getSettings).toHaveBeenCalledOnce()
+    finish({ ops_monitoring_enabled: true })
+    await Promise.all([first, during])
+    expect(store.loading).toBe(false)
+    await store.fetch(true)
+    expect(mocks.getSettings).toHaveBeenCalledTimes(2)
+  })
   it.each(['settings', 'payment'])('retries a failed initial %s request without forcing a refresh', async (source) => {
     const request = source === 'settings' ? mocks.getSettings : mocks.getConfig
     request.mockRejectedValueOnce(new Error('Temporarily unavailable'))
