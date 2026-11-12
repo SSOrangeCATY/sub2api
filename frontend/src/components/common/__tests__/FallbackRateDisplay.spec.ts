@@ -28,7 +28,7 @@ for (const [name, component] of [['badge', GroupBadge], ['option', GroupOptionIt
       await wrapper.setProps({ fallbackRateMultiplier: null })
       expect(wrapper.text()).toContain('0.3x')
       await wrapper.setProps({ purchasePricing: true })
-      expect(wrapper.text()).toContain('modelPlaza.purchaseDynamic')
+      expect(wrapper.text()).toContain('modelPlaza.catalog.purchaseIdentity')
       expect(wrapper.text()).not.toContain('0.3x')
     })
   })

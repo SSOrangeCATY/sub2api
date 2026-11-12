@@ -27,7 +27,7 @@
       <div class="flex shrink-0 flex-col items-end gap-1">
         <!-- Rate pill (platform color) -->
         <span v-if="purchasePricing || isFallback || rateMultiplier !== undefined" :class="['pt-group-option-rate inline-flex items-center whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold', ratePillClass]">
-          <template v-if="purchasePricing">{{ t('modelPlaza.purchaseDynamic') }}</template>
+          <template v-if="purchasePricing">{{ t('modelPlaza.catalog.purchaseIdentity') }}</template>
           <template v-else-if="isFallback">{{ fallbackRateMultiplier != null || fallbackEffectiveRateMultiplier != null ? (fallbackRateMultiplier ?? fallbackEffectiveRateMultiplier) + 'x' : t('admin.groups.monitorFallback.followTarget') }}</template>
           <template v-else-if="hasCustomRate">
             <span class="mr-1 line-through opacity-50">{{ rateMultiplier }}x</span>

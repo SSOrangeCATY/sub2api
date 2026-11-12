@@ -1,6 +1,8 @@
 .PHONY: build build-backend build-frontend test test-backend test-frontend test-frontend-critical
 
 FRONTEND_CRITICAL_VITEST := \
+	src/components/modelPlaza \
+	src/utils/__tests__/modelPriceQuote.spec.ts \
 	src/components/admin/risk \
 	src/views/admin/__tests__/RiskControlView.spec.ts \
 	src/views/user/__tests__/WelfareView.spec.ts \

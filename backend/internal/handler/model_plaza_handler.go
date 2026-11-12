@@ -1,7 +1,8 @@
 package handler
 
 import (
-	"log/slog"
+	"strconv"
+	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
 	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
@@ -21,6 +22,7 @@ type ModelPlazaHandler struct {
 	plazaService   *service.ModelPlazaService
 	apiKeyService  *service.APIKeyService
 	settingService *service.SettingService
+	quoteService   *service.ModelPriceQuoteService
 }
 
 // NewModelPlazaHandler 创建模型广场 handler。
@@ -28,11 +30,13 @@ func NewModelPlazaHandler(
 	plazaService *service.ModelPlazaService,
 	apiKeyService *service.APIKeyService,
 	settingService *service.SettingService,
+	quoteService *service.ModelPriceQuoteService,
 ) *ModelPlazaHandler {
 	return &ModelPlazaHandler{
 		plazaService:   plazaService,
 		apiKeyService:  apiKeyService,
 		settingService: settingService,
+		quoteService:   quoteService,
 	}
 }
 
@@ -65,6 +69,8 @@ type modelPlazaTimePricing struct {
 
 // modelPlazaModel 广场模型条目：实收口径展示定价（白名单形态）+ 官方参考价。
 type modelPlazaModel struct {
+	PricingAsOf     *time.Time                 `json:"pricing_as_of,omitempty"`
+	PriceQuote      *modelPriceQuote           `json:"price_quote,omitempty"`
 	Name            string                     `json:"name"`
 	Platform        string                     `json:"platform"`
 	Pricing         *userSupportedModelPricing `json:"pricing"`
@@ -73,6 +79,21 @@ type modelPlazaModel struct {
 	LongContextBasis string `json:"long_context_basis,omitempty"`
 	// TimePricing 分时倍率时段，落在时段内的请求整单乘倍率；无分时省略。
 	TimePricing *modelPlazaTimePricing `json:"time_pricing,omitempty"`
+}
+
+type modelPriceQuote struct {
+	QuotedAt time.Time           `json:"quoted_at"`
+	Status   string              `json:"status"`
+	Reason   string              `json:"reason,omitempty"`
+	Variants []modelPriceVariant `json:"variants"`
+}
+
+type modelPriceVariant struct {
+	IntervalPriceMode string                     `json:"interval_price_mode,omitempty"`
+	Pricing           *userSupportedModelPricing `json:"pricing"`
+	TimePricing       *modelPlazaTimePricing     `json:"time_pricing,omitempty"`
+	LongContextBasis  string                     `json:"long_context_basis,omitempty"`
+	ContextMetric     string                     `json:"context_metric,omitempty"`
 }
 
 // modelPlazaGroup 广场分组条目（白名单字段）。
@@ -146,13 +167,17 @@ func (h *ModelPlazaHandler) Get(c *gin.Context) {
 		}
 		userRates, err = h.apiKeyService.GetUserGroupRates(c.Request.Context(), subject.UserID)
 		if err != nil {
-			// 专属倍率仅是展示增强，失败降级为分组默认倍率。
-			slog.Warn("model_plaza_user_rates_failed", "error", err, "user_id", subject.UserID)
-			userRates = nil
+			response.ErrorFrom(c, err)
+			return
 		}
 	}
 
 	visible := filterPlazaVisibleGroups(groups, allowedGroups, restrictPublicGroups)
+	if identity == service.BillingIdentityPurchase && h.quoteService != nil {
+		h.quoteService.FillPurchasePrices(c.Request.Context(), visible)
+	}
+	c.Header("Cache-Control", "private, no-store")
+	c.Writer.Header().Add("Vary", "Authorization")
 
 	// 广场可匿名访问，分组文案随请求语言变化，提示中间缓存按语言区分。
 	// 追加而非覆盖：CORS 中间件已为具体来源写入 Vary: Origin。
@@ -163,6 +188,66 @@ func (h *ModelPlazaHandler) Get(c *gin.Context) {
 		Description:     rt.Description,
 		Groups:          out,
 	})
+}
+
+// Prices is also used by API-key and channel views. It does not depend on the
+// public plaza switch, and authorizes a bindable group before loading prices.
+func (h *ModelPlazaHandler) Prices(c *gin.Context) {
+	subject, authed := middleware.GetAuthSubjectFromContext(c)
+	if !authed {
+		response.Unauthorized(c, "Authentication required")
+		return
+	}
+	groupID, err := strconv.ParseInt(c.Query("group_id"), 10, 64)
+	if err != nil || groupID <= 0 {
+		response.BadRequest(c, "group_id must be a positive integer")
+		return
+	}
+	available, err := h.apiKeyService.GetAvailableGroups(c.Request.Context(), subject.UserID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	allowed := false
+	for _, g := range available {
+		if g.ID == groupID {
+			allowed = true
+			break
+		}
+	}
+	if !allowed {
+		response.Forbidden(c, "Group is not available")
+		return
+	}
+	_, _, identity, err := h.apiKeyService.GetUserGroupVisibilityWithIdentity(c.Request.Context(), subject.UserID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	rates, err := h.apiKeyService.GetUserGroupRates(c.Request.Context(), subject.UserID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	groups, err := h.plazaService.ListGroups(c.Request.Context(), groupID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	visible := make([]service.PlazaGroup, 0, 1)
+	for _, g := range groups {
+		if g.ID == groupID {
+			visible = append(visible, g)
+			break
+		}
+	}
+	if identity == service.BillingIdentityPurchase && h.quoteService != nil {
+		h.quoteService.FillPurchasePrices(c.Request.Context(), visible)
+	}
+	c.Header("Cache-Control", "private, no-store")
+	c.Writer.Header().Add("Vary", "Authorization")
+	c.Writer.Header().Add("Vary", "Accept-Language")
+	response.Success(c, modelPlazaResponse{BillingIdentity: identity, Groups: toLocalizedModelPlazaGroups(visible, rates, c.GetHeader("Accept-Language"))})
 }
 
 // filterPlazaVisibleGroups 按登录态裁剪分组可见性。
@@ -206,6 +291,8 @@ func toModelPlazaGroupDTO(g *service.PlazaGroup, userRates map[int64]float64) mo
 	for i := range g.Models {
 		m := &g.Models[i]
 		models = append(models, modelPlazaModel{
+			PricingAsOf:      m.PricingAsOf,
+			PriceQuote:       toModelPriceQuote(m.PriceQuote),
 			Name:             m.Name,
 			Platform:         m.Platform,
 			Pricing:          toUserPricing(m.Pricing),
@@ -237,6 +324,17 @@ func toModelPlazaGroupDTO(g *service.PlazaGroup, userRates map[int64]float64) mo
 		dto.UserRateMultiplier = &rate
 	}
 	return dto
+}
+
+func toModelPriceQuote(q *service.PlazaPriceQuote) *modelPriceQuote {
+	if q == nil {
+		return nil
+	}
+	result := &modelPriceQuote{Status: q.Status, Reason: q.Reason, QuotedAt: q.QuotedAt, Variants: make([]modelPriceVariant, 0, len(q.Variants))}
+	for _, v := range q.Variants {
+		result.Variants = append(result.Variants, modelPriceVariant{Pricing: toUserPricing(v.Pricing), TimePricing: toModelPlazaTimePricing(v.TimePricing), LongContextBasis: string(v.LongContextBasis), ContextMetric: v.ContextMetric, IntervalPriceMode: v.IntervalPriceMode})
+	}
+	return result
 }
 
 // toModelPlazaTimePricing 转换分时倍率；nil 透传（JSON 省略）。
