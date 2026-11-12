@@ -1412,6 +1412,9 @@ func (s *BillingService) HasIdentifiedTokenPricing(model string) bool {
 	if model == "" {
 		return false
 	}
+	if isGPT62PricingModel(model) {
+		return true
+	}
 	if s.pricingService != nil {
 		// 仅有图片价的条目不能用于 token 计费，口径与 GetModelPricing 保持一致。
 		if pricing := s.pricingService.GetIdentifiedModelPricing(model); pricing != nil && !pricing.TokenPricingAbsent {

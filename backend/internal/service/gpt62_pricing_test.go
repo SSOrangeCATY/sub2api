@@ -37,6 +37,7 @@ func TestGPT62DefaultPricingDoesNotUseOldModelRates(t *testing.T) {
 				for _, name := range []string{model, "models/" + model, model + "-20261112"} {
 					p, err := billing.GetModelPricing(name)
 					require.NoError(t, err, name)
+					require.True(t, billing.HasIdentifiedTokenPricing(name), name)
 					require.InDelta(t, 5e-6, p.InputPricePerToken, 1e-15, name)
 					require.InDelta(t, 30e-6, p.OutputPricePerToken, 1e-15, name)
 					require.InDelta(t, .5e-6, p.CacheReadPricePerToken, 1e-15, name)
@@ -116,5 +117,27 @@ func TestGPT62PricingPreservesExplicitCatalogAndOperatorOverrides(t *testing.T) 
 func TestGPT62PricingDoesNotClaimUnspecifiedModels(t *testing.T) {
 	for _, model := range []string{"gpt-6.1-astra", "gpt-6.2-luna", "gpt-6.20-astra", "gpt-6.2-astraish", "gpt-6.2-astra-pro-max"} {
 		require.False(t, isGPT62PricingModel(model), model)
+	}
+}
+
+func TestGPT62ResponseModelBillingRecognizesExactFallbackDuringDegradation(t *testing.T) {
+	for _, withCatalog := range []bool{false, true} {
+		t.Run(boolLabel(withCatalog), func(t *testing.T) {
+			var catalog *PricingService
+			if withCatalog {
+				catalog = gpt62PricingCatalog(t, false)
+			}
+			logs := &openAIRecordUsageLogRepoStub{inserted: true}
+			s := newOpenAIRecordUsageServiceWithBillingRepoForTest(logs, &openAIRecordUsageBillingRepoStub{result: &UsageBillingApplyResult{Applied: true}}, &openAIRecordUsageUserRepoStub{}, &openAIRecordUsageSubRepoStub{}, nil)
+			s.billingService = NewBillingService(&config.Config{}, catalog)
+			key := openAIRecordUsageAPIKeyWithGroup(s, 1, true)
+			key.GroupID = &key.Group.ID
+			key.Group.RateMultiplier = .5
+			err := s.RecordUsage(context.Background(), &OpenAIRecordUsageInput{Result: &OpenAIForwardResult{Model: "gpt-6-astra", UpstreamModel: "gpt-6-astra", UpstreamResponseModel: "gpt-6.2-astra", Usage: OpenAIUsage{InputTokens: 3500, CacheReadInputTokens: 2000, CacheCreationInputTokens: 500, OutputTokens: 3000}}, APIKey: key, User: &User{ID: 1}, Account: &Account{ID: 1, Platform: PlatformOpenAI, Type: AccountTypeAPIKey}, ChannelUsageFields: ChannelUsageFields{OriginalModel: "gpt-6-astra", BillingModelSource: BillingModelSourceResponse}})
+			require.NoError(t, err)
+			require.NotNil(t, logs.lastLog)
+			require.InDelta(t, .096, logs.lastLog.TotalCost, 1e-12)
+			require.InDelta(t, .048, logs.lastLog.ActualCost, 1e-12)
+		})
 	}
 }
