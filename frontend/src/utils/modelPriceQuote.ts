@@ -26,12 +26,16 @@ export function scalePricing(pricing: UserSupportedModelPricing, rate: number): 
 
 export function pricingVariants(model: PlazaModel, group: QuoteGroup, purchase: boolean): ModelPriceVariant[] {
   if (purchase) return model.price_quote?.status === 'quoted' ? model.price_quote.variants : []
-  if (!model.pricing) return []
-  let rate = group.user_rate_multiplier ?? group.rate_multiplier
-  if (model.pricing.billing_mode === 'image' && group.image_rate_independent) rate = group.image_rate_multiplier ?? 1
-  if (model.pricing.billing_mode === 'video' && group.video_rate_independent) rate = Math.max(0, group.video_rate_multiplier ?? 1)
-  if (!Number.isFinite(rate) || rate < 0) return []
-  return [{ pricing: scalePricing(model.pricing, rate), time_pricing: model.time_pricing, long_context_basis: model.long_context_basis, context_metric: 'input' }]
+  const variants: ModelPriceVariant[] = model.price_quote?.kind === 'customer'
+    ? (model.price_quote.status === 'quoted' ? model.price_quote.variants : [])
+    : model.pricing ? [{ pricing: model.pricing, time_pricing: model.time_pricing, long_context_basis: model.long_context_basis, context_metric: 'input' }] : []
+  return variants.flatMap(variant => {
+    let rate = group.user_rate_multiplier ?? group.rate_multiplier
+    if (variant.pricing.billing_mode === 'image' && group.image_rate_independent) rate = group.image_rate_multiplier ?? 1
+    if (variant.pricing.billing_mode === 'video' && group.video_rate_independent) rate = Math.max(0, group.video_rate_multiplier ?? 1)
+    if (!Number.isFinite(rate) || rate < 0) return []
+    return [{ ...variant, pricing: scalePricing(variant.pricing, rate) }]
+  })
 }
 
 const clockSeconds = (value: string) => {

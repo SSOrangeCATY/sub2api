@@ -67,6 +67,8 @@ export interface ModelPriceVariant {
 }
 
 export interface ModelPriceQuote {
+	/** Customer variants precede group/user rates; account_cost is final. */
+	kind?: 'customer' | 'account_cost'
 	quoted_at?: string
   status: 'quoted' | 'unavailable'
   reason?: string

@@ -7,6 +7,13 @@ describe('price quotation semantics', () => {
     expect(priceRanges([{ pricing: pricing({ source_currency: 'CNY' }) }], 'input_price')[0].text).toBe('¥2.00')
     expect(priceRanges([{ pricing: pricing() }], 'input_price')[0].text).toBe('$2.00')
   })
+  it('scales all customer route variants once and preserves an unavailable native quote', () => {
+    const m = model({ price_quote: { kind: 'customer', status: 'quoted', variants: [{ pricing: pricing({ input_price: 2e-6 }) }, { pricing: pricing({ input_price: 4e-6 }) }] } })
+    const quotes = pricingVariants(m, group({ user_rate_multiplier: .25 }), false)
+    expect(priceRanges(quotes, 'input_price')[0].text).toBe('$0.50 – $1.00')
+    expect(m.price_quote!.variants[0].pricing.input_price).toBe(2e-6)
+    expect(pricingVariants(model({ price_quote: { kind: 'customer', status: 'unavailable', variants: [] } }), group(), false)).toEqual([])
+  })
   it('never folds different denominations into a single range', () => {
     const ranges = priceRanges([{ pricing: pricing({ source_currency: 'CNY' }) }, { pricing: pricing({ source_currency: 'USD', input_price: 100e-6 }) }], 'input_price')
     expect(ranges).toHaveLength(2)
