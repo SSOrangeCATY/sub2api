@@ -140,6 +140,7 @@ func ContentModerationCategories() []string {
 }
 
 type ContentModerationConfig struct {
+	Revision int64                          `json:"revision"`
 	Engine   string                         `json:"engine,omitempty"`
 	TypeSafe *ContentModerationEngineConfig `json:"typesafe,omitempty"`
 	Enabled  bool                           `json:"enabled"`
@@ -171,13 +172,23 @@ type ContentModerationConfig struct {
 	BlockedKeywords      []string                     `json:"blocked_keywords"`
 	KeywordBlockingMode  string                       `json:"keyword_blocking_mode"`
 	ModelFilter          ContentModerationModelFilter `json:"model_filter"`
-	// CyberPolicyExcludeFromBanCount 为 true 时，cyber_policy 命中不参与自动封号计数：
-	// 当次不判定封号，且历史 cyber 行在 CountFlaggedByUserSince 中被排除。
-	// 默认 false（计入，与历史行为一致；旧配置 JSON 无此字段时反序列化为 false）。
-	CyberPolicyExcludeFromBanCount bool `json:"cyber_policy_exclude_from_ban_count"`
+	// Deprecated: retained for compatibility with historical configuration.
+	// Ordinary moderation always excludes Cyber events; their independent
+	// user-risk policy owns counting and access restrictions.
+	CyberPolicyExcludeFromBanCount bool                             `json:"cyber_policy_exclude_from_ban_count"`
+	CyberPolicyUserRestriction     CyberPolicyUserRestrictionPolicy `json:"cyber_policy_user_restriction"`
+}
+
+type CyberPolicyUserRestrictionRule = UserRiskActionRule
+
+type CyberPolicyUserRestrictionPolicy struct {
+	Enabled    bool                             `json:"enabled"`
+	WindowDays int                              `json:"window_days"`
+	Actions    []CyberPolicyUserRestrictionRule `json:"actions"`
 }
 
 type ContentModerationConfigView struct {
+	Revision                       int64                                   `json:"revision"`
 	Engine                         string                                  `json:"engine"`
 	EngineConfigs                  map[string]*ContentModerationConfigView `json:"engine_configs,omitempty"`
 	Enabled                        bool                                    `json:"enabled"`
@@ -212,6 +223,7 @@ type ContentModerationConfigView struct {
 	KeywordBlockingMode            string                                  `json:"keyword_blocking_mode"`
 	ModelFilter                    ContentModerationModelFilter            `json:"model_filter"`
 	CyberPolicyExcludeFromBanCount bool                                    `json:"cyber_policy_exclude_from_ban_count"`
+	CyberPolicyUserRestriction     CyberPolicyUserRestrictionPolicy        `json:"cyber_policy_user_restriction"`
 }
 
 type ContentModerationAPIKeyStatus struct {
@@ -274,41 +286,43 @@ type ContentModerationTestAuditResult struct {
 }
 
 type UpdateContentModerationConfigInput struct {
-	Engine        *string                                       `json:"engine"`
-	EngineConfigs map[string]UpdateContentModerationEngineInput `json:"engine_configs"`
-	Enabled       *bool                                         `json:"enabled"`
-	Mode          *string                                       `json:"mode"`
-	BaseURL       *string                                       `json:"base_url"`
-	Model         *string                                       `json:"model"`
+	ExpectedRevision *int64                                        `json:"expected_revision"`
+	Engine           *string                                       `json:"engine"`
+	EngineConfigs    map[string]UpdateContentModerationEngineInput `json:"engine_configs"`
+	Enabled          *bool                                         `json:"enabled"`
+	Mode             *string                                       `json:"mode"`
+	BaseURL          *string                                       `json:"base_url"`
+	Model            *string                                       `json:"model"`
 	// ProxyID nil 表示不修改；<=0 表示清除代理（恢复直连）；>0 表示指定代理。
-	ProxyID                        *int64                        `json:"proxy_id"`
-	APIKey                         *string                       `json:"api_key"`
-	APIKeys                        *[]string                     `json:"api_keys"`
-	APIKeysMode                    string                        `json:"api_keys_mode"`
-	DeleteAPIKeyHashes             *[]string                     `json:"delete_api_key_hashes"`
-	ClearAPIKey                    bool                          `json:"clear_api_key"`
-	TimeoutMS                      *int                          `json:"timeout_ms"`
-	SampleRate                     *int                          `json:"sample_rate"`
-	AllGroups                      *bool                         `json:"all_groups"`
-	GroupIDs                       *[]int64                      `json:"group_ids"`
-	RecordNonHits                  *bool                         `json:"record_non_hits"`
-	Thresholds                     *map[string]float64           `json:"thresholds"`
-	WorkerCount                    *int                          `json:"worker_count"`
-	QueueSize                      *int                          `json:"queue_size"`
-	BlockStatus                    *int                          `json:"block_status"`
-	BlockMessage                   *string                       `json:"block_message"`
-	EmailOnHit                     *bool                         `json:"email_on_hit"`
-	AutoBanEnabled                 *bool                         `json:"auto_ban_enabled"`
-	BanThreshold                   *int                          `json:"ban_threshold"`
-	ViolationWindowHours           *int                          `json:"violation_window_hours"`
-	RetryCount                     *int                          `json:"retry_count"`
-	HitRetentionDays               *int                          `json:"hit_retention_days"`
-	NonHitRetentionDays            *int                          `json:"non_hit_retention_days"`
-	PreHashCheckEnabled            *bool                         `json:"pre_hash_check_enabled"`
-	BlockedKeywords                *[]string                     `json:"blocked_keywords"`
-	KeywordBlockingMode            *string                       `json:"keyword_blocking_mode"`
-	ModelFilter                    *ContentModerationModelFilter `json:"model_filter"`
-	CyberPolicyExcludeFromBanCount *bool                         `json:"cyber_policy_exclude_from_ban_count"`
+	ProxyID                        *int64                            `json:"proxy_id"`
+	APIKey                         *string                           `json:"api_key"`
+	APIKeys                        *[]string                         `json:"api_keys"`
+	APIKeysMode                    string                            `json:"api_keys_mode"`
+	DeleteAPIKeyHashes             *[]string                         `json:"delete_api_key_hashes"`
+	ClearAPIKey                    bool                              `json:"clear_api_key"`
+	TimeoutMS                      *int                              `json:"timeout_ms"`
+	SampleRate                     *int                              `json:"sample_rate"`
+	AllGroups                      *bool                             `json:"all_groups"`
+	GroupIDs                       *[]int64                          `json:"group_ids"`
+	RecordNonHits                  *bool                             `json:"record_non_hits"`
+	Thresholds                     *map[string]float64               `json:"thresholds"`
+	WorkerCount                    *int                              `json:"worker_count"`
+	QueueSize                      *int                              `json:"queue_size"`
+	BlockStatus                    *int                              `json:"block_status"`
+	BlockMessage                   *string                           `json:"block_message"`
+	EmailOnHit                     *bool                             `json:"email_on_hit"`
+	AutoBanEnabled                 *bool                             `json:"auto_ban_enabled"`
+	BanThreshold                   *int                              `json:"ban_threshold"`
+	ViolationWindowHours           *int                              `json:"violation_window_hours"`
+	RetryCount                     *int                              `json:"retry_count"`
+	HitRetentionDays               *int                              `json:"hit_retention_days"`
+	NonHitRetentionDays            *int                              `json:"non_hit_retention_days"`
+	PreHashCheckEnabled            *bool                             `json:"pre_hash_check_enabled"`
+	BlockedKeywords                *[]string                         `json:"blocked_keywords"`
+	KeywordBlockingMode            *string                           `json:"keyword_blocking_mode"`
+	ModelFilter                    *ContentModerationModelFilter     `json:"model_filter"`
+	CyberPolicyExcludeFromBanCount *bool                             `json:"cyber_policy_exclude_from_ban_count"`
+	CyberPolicyUserRestriction     *CyberPolicyUserRestrictionPolicy `json:"cyber_policy_user_restriction"`
 }
 
 type ContentModerationModelFilter struct {
@@ -511,6 +525,7 @@ type ContentModerationHashCache interface {
 }
 
 type ContentModerationService struct {
+	userRiskRepo             UserRiskPolicyRepository
 	settingRepo              SettingRepository
 	repo                     ContentModerationRepository
 	hashCache                ContentModerationHashCache
@@ -608,11 +623,13 @@ func NewContentModerationService(
 		asyncQueue:           make(chan contentModerationTask, maxContentModerationQueueSize),
 		keyHealth:            make(map[string]*contentModerationKeyHealth),
 	}
+	svc.userRiskRepo, _ = repo.(UserRiskPolicyRepository)
 	if settingRepo != nil && repo != nil {
 		for i := 0; i < svc.workerCount; i++ {
 			go svc.worker(i)
 		}
 		go svc.cleanupWorker()
+		go svc.cyberPolicyRestrictionExpiryWorker()
 	}
 	return svc
 }
@@ -630,6 +647,13 @@ func (s *ContentModerationService) UpdateConfig(ctx context.Context, input Updat
 	if err != nil {
 		return nil, err
 	}
+	if input.ExpectedRevision != nil && *input.ExpectedRevision != cfg.Revision {
+		return nil, infraerrors.Conflict("CONTENT_MODERATION_CONFIG_CONFLICT", "配置已被其他管理员修改，请重新读取后再保存；当前草稿尚未保存")
+	}
+	if input.CyberPolicyUserRestriction != nil && input.ExpectedRevision == nil {
+		return nil, infraerrors.BadRequest("CONTENT_MODERATION_REVISION_REQUIRED", "保存用户限制规则需要提供已读取的配置版本")
+	}
+	expectedRevision := cfg.Revision
 	if input.Engine != nil {
 		if !validModerationEngine(*input.Engine) {
 			return nil, infraerrors.BadRequest("INVALID_CONTENT_MODERATION_ENGINE", "内容审计引擎无效")
@@ -699,6 +723,10 @@ func (s *ContentModerationService) UpdateConfig(ctx context.Context, input Updat
 	if input.CyberPolicyExcludeFromBanCount != nil {
 		cfg.CyberPolicyExcludeFromBanCount = *input.CyberPolicyExcludeFromBanCount
 	}
+	if input.CyberPolicyUserRestriction != nil {
+		cfg.CyberPolicyUserRestriction = *input.CyberPolicyUserRestriction
+		cfg.CyberPolicyUserRestriction.Actions = append([]CyberPolicyUserRestrictionRule(nil), input.CyberPolicyUserRestriction.Actions...)
+	}
 	// Legacy flat updates target the selected engine; explicit profiles preserve both drafts.
 	if err := s.updateEngineProfile(ctx, cfg, cfg.Engine, UpdateContentModerationEngineInput{
 		BaseURL: input.BaseURL, Model: input.Model, ProxyID: input.ProxyID, APIKey: input.APIKey,
@@ -716,12 +744,26 @@ func (s *ContentModerationService) UpdateConfig(ctx context.Context, input Updat
 		return nil, err
 	}
 	cfg.normalize()
+	cfg.Revision = expectedRevision + 1
 	raw, err := json.Marshal(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("marshal content moderation config: %w", err)
 	}
 	var saveErr error
 	if writer, ok := s.settingRepo.(interface {
+		CompareAndSetContentModerationConfig(context.Context, string, []int64, int64) (bool, error)
+	}); ok {
+		var saved bool
+		saved, saveErr = writer.CompareAndSetContentModerationConfig(ctx, string(raw), cfg.GroupIDs, expectedRevision)
+		if saveErr == nil && !saved {
+			return nil, infraerrors.Conflict("CONTENT_MODERATION_CONFIG_CONFLICT", "配置已被其他管理员修改，请重新读取后再保存；当前草稿尚未保存")
+		}
+		if errors.Is(saveErr, ErrGroupNotFound) {
+			return nil, infraerrors.BadRequest("INVALID_CONTENT_MODERATION_GROUP", "审计分组不存在")
+		}
+	} else if input.ExpectedRevision != nil {
+		return nil, infraerrors.InternalServer("CONTENT_MODERATION_VERSIONED_STORE_UNAVAILABLE", "配置版本校验暂不可用，请稍后重试")
+	} else if writer, ok := s.settingRepo.(interface {
 		SetContentModerationConfig(context.Context, string, []int64) error
 	}); ok {
 		saveErr = writer.SetContentModerationConfig(ctx, string(raw), cfg.GroupIDs)
@@ -1367,7 +1409,7 @@ func (s *ContentModerationService) UnbanUser(ctx context.Context, userID int64) 
 	}
 	return &ContentModerationUnbanUserResult{
 		UserID: userID,
-		Status: StatusActive,
+		Status: user.Status,
 	}, nil
 }
 
@@ -1491,6 +1533,32 @@ func (s *ContentModerationService) cleanupWorker() {
 	}
 }
 
+func (s *ContentModerationService) cyberPolicyRestrictionExpiryWorker() {
+	ticker := time.NewTicker(time.Minute)
+	defer ticker.Stop()
+	for range ticker.C {
+		if s == nil || s.userRiskRepo == nil {
+			continue
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		userIDs, err := s.userRiskRepo.ExpireUserRiskRestrictions(ctx, 100)
+		if err != nil {
+			cancel()
+			slog.Warn("content_moderation.cyber_expiry_failed", "error", err)
+			continue
+		}
+		for _, userID := range userIDs {
+			if s.authCacheInvalidator != nil {
+				s.authCacheInvalidator.InvalidateAuthCacheByUserID(ctx, userID)
+			}
+		}
+		cancel()
+		if len(userIDs) > 0 {
+			slog.Info("content_moderation.cyber_expired", "count", len(userIDs))
+		}
+	}
+}
+
 func (s *ContentModerationService) runCleanupOnce() {
 	if s == nil || s.repo == nil || s.settingRepo == nil {
 		return
@@ -1539,6 +1607,9 @@ func parseContentModerationConfig(raw string) (*ContentModerationConfig, error) 
 		return nil, infraerrors.BadRequest("INVALID_CONTENT_MODERATION_CONFIG", "内容审计配置不是有效 JSON")
 	}
 	cfg.normalize()
+	if cfg.Revision < 1 {
+		return nil, infraerrors.BadRequest("INVALID_CONTENT_MODERATION_REVISION", "配置版本必须为正整数")
+	}
 	if !validModerationEngine(cfg.Engine) {
 		return nil, infraerrors.BadRequest("INVALID_CONTENT_MODERATION_ENGINE", "内容审计引擎无效")
 	}
@@ -1623,6 +1694,9 @@ func (s *ContentModerationService) refreshRuntimeSnapshot(ctx context.Context) (
 			configDigest:       configDigest,
 			loadedAt:           time.Now(),
 		}
+		if current := s.runtimeSnapshot.Load(); current != nil && current.config != nil && current.config.Revision > snapshot.config.Revision {
+			return current, nil
+		}
 		s.runtimeSnapshot.Store(snapshot)
 		s.runtimeRefreshRetryAt.Store(0)
 		return snapshot, nil
@@ -1639,6 +1713,9 @@ func (s *ContentModerationService) refreshRuntimeSnapshot(ctx context.Context) (
 		keywordMatcher:     newContentModerationKeywordMatcher(cfg.BlockedKeywords),
 		configDigest:       configDigest,
 		loadedAt:           time.Now(),
+	}
+	if current := s.runtimeSnapshot.Load(); current != nil && current.config != nil && current.config.Revision > snapshot.config.Revision {
+		return current, nil
 	}
 	s.runtimeSnapshot.Store(snapshot)
 	s.runtimeRefreshRetryAt.Store(0)
@@ -1659,10 +1736,24 @@ func (s *ContentModerationService) replaceRuntimeConfig(cfg *ContentModerationCo
 	keywordMatcher := newContentModerationKeywordMatcher(cfg.BlockedKeywords)
 	configDigest := sha256.Sum256(raw)
 
+	refreshNeeded := false
 	s.runtimeRefreshMu.Lock()
-	defer s.runtimeRefreshMu.Unlock()
+	defer func() {
+		s.runtimeRefreshMu.Unlock()
+		if refreshNeeded {
+			s.triggerRuntimeSnapshotRefresh()
+		}
+	}()
 	current := s.runtimeSnapshot.Load()
 	if current == nil {
+		return
+	}
+	if current.config != nil && current.config.Revision > config.Revision {
+		return
+	}
+	if current.config != nil && current.config.Revision == config.Revision && current.configDigest != configDigest {
+		s.runtimeRefreshRetryAt.Store(0)
+		refreshNeeded = true
 		return
 	}
 	s.runtimeSnapshot.Store(&contentModerationRuntimeSnapshot{
@@ -1719,6 +1810,9 @@ func (s *ContentModerationService) validateConfig(ctx context.Context, cfg *Cont
 	}
 	if cfg.ModelFilter.Type != ContentModerationModelFilterAll && len(cfg.ModelFilter.Models) == 0 {
 		return infraerrors.BadRequest("INVALID_CONTENT_MODERATION_MODEL_FILTER", "指定或排除模型时至少需要配置 1 个模型")
+	}
+	if err := ValidateCyberPolicyUserRestriction(cfg.CyberPolicyUserRestriction); err != nil {
+		return err
 	}
 	if !cfg.AllGroups && len(cfg.GroupIDs) > 0 && s.groupRepo != nil {
 		for _, groupID := range cfg.GroupIDs {
@@ -1975,7 +2069,7 @@ func (s *ContentModerationService) applyFlaggedAccountSideEffects(ctx context.Co
 	count := 1
 	if s.repo != nil && cfg.ViolationWindowHours > 0 {
 		since := time.Now().Add(-time.Duration(cfg.ViolationWindowHours) * time.Hour)
-		if n, err := s.repo.CountFlaggedByUserSince(ctx, *log.UserID, since, cfg.CyberPolicyExcludeFromBanCount); err == nil {
+		if n, err := s.repo.CountFlaggedByUserSince(ctx, *log.UserID, since, true); err == nil {
 			count = n + 1
 		}
 	}
@@ -2138,6 +2232,7 @@ func (s *ContentModerationService) siteName(ctx context.Context) string {
 
 func defaultContentModerationConfig() *ContentModerationConfig {
 	return &ContentModerationConfig{
+		Revision:             1,
 		Enabled:              false,
 		Mode:                 ContentModerationModePreBlock,
 		BaseURL:              defaultContentModerationBaseURL,
@@ -2167,6 +2262,10 @@ func defaultContentModerationConfig() *ContentModerationConfig {
 			Models: []string{},
 		},
 		CyberPolicyExcludeFromBanCount: false,
+		CyberPolicyUserRestriction: CyberPolicyUserRestrictionPolicy{
+			Enabled: true, WindowDays: 7,
+			Actions: []CyberPolicyUserRestrictionRule{{Threshold: 2, DurationHours: 24}, {Threshold: 3, AdminRelease: true}},
+		},
 	}
 }
 
@@ -2187,10 +2286,14 @@ func cloneContentModerationConfig(cfg *ContentModerationConfig) *ContentModerati
 		Type:   cfg.ModelFilter.Type,
 		Models: append([]string(nil), cfg.ModelFilter.Models...),
 	}
+	clone.CyberPolicyUserRestriction.Actions = append([]CyberPolicyUserRestrictionRule(nil), cfg.CyberPolicyUserRestriction.Actions...)
 	return &clone
 }
 
 func (cfg *ContentModerationConfig) normalize() {
+	if cfg.Revision == 0 {
+		cfg.Revision = 1
+	}
 	cfg.Engine = moderationEngine(cfg.Engine)
 	if cfg.APIKey != "" {
 		cfg.APIKeys = normalizeModerationAPIKeys(append(cfg.APIKeys, cfg.APIKey))
@@ -2471,6 +2574,7 @@ func (s *ContentModerationService) configView(cfg *ContentModerationConfig) *Con
 		apiKeyMasked = masks[0]
 	}
 	return &ContentModerationConfigView{
+		Revision:                       cfg.Revision,
 		Engine:                         cfg.Engine,
 		Enabled:                        cfg.Enabled,
 		Mode:                           cfg.Mode,
@@ -2504,6 +2608,7 @@ func (s *ContentModerationService) configView(cfg *ContentModerationConfig) *Con
 		KeywordBlockingMode:            cfg.KeywordBlockingMode,
 		ModelFilter:                    cloneContentModerationModelFilter(cfg.ModelFilter),
 		CyberPolicyExcludeFromBanCount: cfg.CyberPolicyExcludeFromBanCount,
+		CyberPolicyUserRestriction:     cfg.CyberPolicyUserRestriction,
 	}
 }
 
@@ -3037,6 +3142,7 @@ func maskSecretTail(secret string) string {
 
 // CyberPolicyRecordInput 是一次 cyber_policy 硬阻断的风控记录入参。
 type CyberPolicyRecordInput struct {
+	Decision        *UserRiskDecision
 	LogOnly         bool // Trusted platform user: retain evidence without penalties or notifications.
 	RequestID       string
 	UserID          int64
@@ -3052,13 +3158,17 @@ type CyberPolicyRecordInput struct {
 	UpstreamStatus  int
 	UpstreamInTok   int
 	UpstreamOutTok  int
+	EventID         string
 }
 
-// RecordCyberPolicyEvent 把一次 cyber_policy 硬阻断写入风控中心日志、计入违规计数、
-// 并给用户发邮件。当前请求已由 gateway 透传给用户；本方法仅做事后记录/通知/计数。
+// RecordCyberPolicyEvent 根据已提交的用户限制决策补充风控日志和邮件。
+// 处罚与计数由独立账本同步提交；此方法不再修改账户状态或重新计算处罚。
 // 受 risk_control_enabled 总开关和内容审核 group/model scope 约束，
 // 不受内容审核 Enabled/Mode/sample 约束。
 func (s *ContentModerationService) RecordCyberPolicyEvent(ctx context.Context, in CyberPolicyRecordInput) {
+	if in.Decision != nil && in.Decision.Duplicate {
+		return
+	}
 	if s == nil || s.repo == nil {
 		return
 	}
@@ -3109,14 +3219,24 @@ func (s *ContentModerationService) RecordCyberPolicyEvent(ctx context.Context, i
 		Error:           trimRunes(redactContentModerationSecrets(errBody), maxModerationExcerptRunes*4),
 		CreatedAt:       time.Now(),
 	}
-	// 开关开时 cyber_policy 不参与封号计数：当次不判定（此处跳过），
-	// 历史行由 CountFlaggedByUserSince 的 excludeCyberPolicy 排除。
-	autoBanned := false
+	// User penalties have already committed through the independent ledger.
+	// Supplementary moderation logs and email must never re-run punishment.
+	if in.Decision != nil {
+		log.ViolationCount = in.Decision.HitCount
+		log.AutoBanned = in.Decision.Restricted
+		in.LogOnly = in.Decision.IgnoredReason != ""
+		if in.Decision.NewlyApplied && in.Decision.Restricted {
+			notice := "API 调用已暂停，需联系管理员解除。"
+			if !in.Decision.AdminRelease && in.Decision.ExpiresAt != nil {
+				notice = "API 调用已暂停至 " + in.Decision.ExpiresAt.UTC().Format(time.RFC3339) + "，到期后自动恢复 API 访问。"
+			}
+			// Keep the restriction deadline or release instructions even when the
+			// upstream error alone fills the bounded notification excerpt.
+			log.Error = trimRunes(notice+string(rune(10))+log.Error, maxModerationExcerptRunes*4)
+		}
+	}
 	if in.LogOnly {
 		log.Mode = ContentModerationModeCyberLogOnly
-	}
-	if !in.LogOnly && !cfg.CyberPolicyExcludeFromBanCount {
-		autoBanned = s.applyFlaggedAccountSideEffects(ctx, cfg, log)
 	}
 	log.EmailSent = false
 	logPersisted := true
@@ -3131,13 +3251,7 @@ func (s *ContentModerationService) RecordCyberPolicyEvent(ctx context.Context, i
 		} else {
 			emailSent = true
 		}
-		if autoBanned {
-			if err := s.sendAccountDisabledEmail(ctx, cfg, log); err != nil {
-				slog.Warn("content_moderation.cyber_ban_email_failed", "user_id", in.UserID, "error", err)
-			} else {
-				emailSent = true
-			}
-		}
+
 	}
 	if logPersisted && emailSent {
 		if err := s.repo.UpdateLogEmailSent(ctx, log.ID, true); err != nil {

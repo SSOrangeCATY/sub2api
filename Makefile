@@ -1,6 +1,8 @@
 .PHONY: build build-backend build-frontend test test-backend test-frontend test-frontend-critical
 
 FRONTEND_CRITICAL_VITEST := \
+	src/components/admin/risk \
+	src/views/admin/__tests__/RiskControlView.spec.ts \
 	src/views/user/__tests__/WelfareView.spec.ts \
 	src/views/user/__tests__/ChannelStatusV2View.refresh.spec.ts \
 	src/views/admin/__tests__/BackupView.spec.ts \

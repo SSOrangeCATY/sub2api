@@ -72,6 +72,9 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 				abortWithGoogleError(c, 503, "API key authentication is temporarily unavailable")
 				return
 			}
+			if abortIfAPIKeyLookupClientGone(c, err) {
+				return
+			}
 			abortWithGoogleError(c, 500, "Failed to validate API key")
 			return
 		}
@@ -109,11 +112,21 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 			abortWithGoogleError(c, 401, "User associated with API key not found")
 			return
 		}
+
 		if !apiKey.User.IsActive() {
 			MarkIngressRejected(c, IngressRejectUserInactive)
 			abortWithGoogleError(c, 401, "User account is not active")
 			return
 		}
+
+		admission, err := apiKeyService.BeginUserRiskRequest(c.Request.Context(), apiKey.User.ID)
+		if err != nil {
+			MarkIngressRejected(c, IngressRejectUserInactive)
+			abortWithGoogleError(c, infraerrors.Code(err), infraerrors.Message(err))
+			return
+		}
+		c.Set(service.UserRiskAdmissionKey, admission)
+
 		if err := apiKeyService.CheckQQAPIAccess(c.Request.Context(), apiKey.User.ID); err != nil {
 			abortWithGoogleError(c, infraerrors.Code(err), infraerrors.Message(err))
 			return

@@ -4,9 +4,11 @@ package middleware
 
 import (
 	"context"
+	"crypto/rand"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
@@ -19,6 +21,11 @@ type qqGateUserRepo struct {
 	service.UserRepository
 	err   error
 	calls []int64
+}
+
+func (r *qqGateUserRepo) BeginUserRiskRequest(_ context.Context, userID int64, policy, scope string) (service.UserRiskAdmission, error) {
+	return service.UserRiskAdmission{UserID: userID, PolicyKey: policy, Scope: scope,
+		EventID: rand.Text(), Generation: 1, AdmittedAt: time.Now()}, nil
 }
 
 func (r *qqGateUserRepo) CheckQQAPIAccess(_ context.Context, uid int64) error {

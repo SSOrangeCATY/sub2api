@@ -97,12 +97,12 @@ describe('Ops SLA-scoped error charts', () => {
       global: globalStubs,
     })
 
-    const doughnut = wrapper.findComponent({ name: 'Doughnut' })
-    expect(doughnut.exists()).toBe(true)
-    expect(doughnut.props('data')).toMatchObject({
-      labels: ['admin.ops.client'],
-      datasets: [{ data: [2] }],
-    })
+    const bars = wrapper.findAll('.ef-dist li')
+    expect(bars).toHaveLength(1)
+    expect(bars[0].find('.ef-dist-name').text()).toBe('admin.ops.client')
+    expect(bars[0].find('.ef-dist-val').text()).toBe('2')
+    expect(bars[0].find('.ef-dist-pct').text()).toBe('100.0%')
+    expect(bars[0].find('.ef-dist-track').attributes('style')).toContain('--p: 1')
   })
 
   it('错误分布图在只有业务限制错误时显示为空态', () => {
@@ -117,7 +117,7 @@ describe('Ops SLA-scoped error charts', () => {
       global: globalStubs,
     })
 
-    expect(wrapper.findComponent({ name: 'Doughnut' }).exists()).toBe(false)
+    expect(wrapper.findAll('.ef-dist li')).toHaveLength(0)
     expect(wrapper.find('.empty-state-stub').exists()).toBe(true)
   })
 

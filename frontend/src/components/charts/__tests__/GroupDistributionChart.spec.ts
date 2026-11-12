@@ -27,13 +27,6 @@ vi.mock('vue-i18n', async () => {
   }
 })
 
-vi.mock('vue-chartjs', () => ({
-  Doughnut: {
-    props: ['data'],
-    template: '<div class="chart-data">{{ JSON.stringify(data) }}</div>',
-  },
-}))
-
 describe('GroupDistributionChart', () => {
   const groupStats = [
     {
@@ -66,21 +59,16 @@ describe('GroupDistributionChart', () => {
       },
     })
 
-    const chartData = JSON.parse(wrapper.find('.chart-data').text())
-    expect(chartData.labels).toEqual(['group-a', 'group-b'])
-    expect(chartData.datasets[0].data).toEqual([1200, 600])
+    const bars = wrapper.findAll('.ef-dist li')
+    expect(bars.map((bar) => bar.find('.ef-dist-name').text())).toEqual(['group-a', 'group-b'])
+    expect(bars.map((bar) => bar.find('.ef-dist-val').text())).toEqual(['1.20K', '600'])
+    expect(bars.map((bar) => bar.find('.ef-dist-pct').text())).toEqual(['66.7%', '33.3%'])
+    expect(bars[0].find('.ef-dist-track').attributes('style')).toContain('--p: 1')
 
     const rows = wrapper.findAll('tbody tr')
     expect(rows[0].text()).toContain('group-a')
     expect(rows[1].text()).toContain('group-b')
 
-    const options = (wrapper.vm as any).$?.setupState.doughnutOptions
-    const label = options.plugins.tooltip.callbacks.label({
-      label: 'group-a',
-      raw: 1200,
-      dataset: { data: [1200, 600] },
-    })
-    expect(label).toBe('group-a: 1.20K (66.7%)')
   })
 
   it('uses actual_cost and reorders rows in actual cost mode', () => {
@@ -96,21 +84,16 @@ describe('GroupDistributionChart', () => {
       },
     })
 
-    const chartData = JSON.parse(wrapper.find('.chart-data').text())
-    expect(chartData.labels).toEqual(['group-b', 'group-a'])
-    expect(chartData.datasets[0].data).toEqual([0.9, 0.1])
+    const bars = wrapper.findAll('.ef-dist li')
+    expect(bars.map((bar) => bar.find('.ef-dist-name').text())).toEqual(['group-b', 'group-a'])
+    expect(bars.map((bar) => bar.find('.ef-dist-val').text())).toEqual(['0.900', '0.100'])
+    expect(bars.map((bar) => bar.find('.ef-dist-pct').text())).toEqual(['90.0%', '10.0%'])
+    expect(bars[0].find('.ef-dist-track').attributes('style')).toContain('--p: 1')
 
     const rows = wrapper.findAll('tbody tr')
     expect(rows[0].text()).toContain('group-b')
     expect(rows[1].text()).toContain('group-a')
 
-    const options = (wrapper.vm as any).$?.setupState.doughnutOptions
-    const label = options.plugins.tooltip.callbacks.label({
-      label: 'group-b',
-      raw: 0.9,
-      dataset: { data: [0.9, 0.1] },
-    })
-    expect(label).toBe('group-b: $0.900 (90.0%)')
   })
 
   it('can hide account cost for user usage stats without account_cost', () => {

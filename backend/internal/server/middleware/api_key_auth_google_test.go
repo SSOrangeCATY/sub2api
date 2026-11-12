@@ -28,7 +28,7 @@ func TestGoogleAPIKeyAuthRejectsOversizedCredentialsBeforeLookup(t *testing.T) {
 		return nil, service.ErrAPIKeyNotFound
 	}}
 	cfg := &config.Config{RunMode: config.RunModeSimple}
-	svc := service.NewAPIKeyService(repo, nil, nil, nil, nil, nil, cfg)
+	svc := newAPIKeyServiceWithRiskTestRepo(repo, nil, nil, nil, nil, nil, cfg)
 	r := gin.New()
 	var reason IngressRejectReason
 	var rejected bool
@@ -54,7 +54,7 @@ func TestGoogleAPIKeyAuthMarksLookupBulkheadRejection(t *testing.T) {
 		return nil, service.ErrAPIKeyAuthOverloaded
 	}}
 	cfg := &config.Config{RunMode: config.RunModeSimple}
-	svc := service.NewAPIKeyService(repo, nil, nil, nil, nil, nil, cfg)
+	svc := newAPIKeyServiceWithRiskTestRepo(repo, nil, nil, nil, nil, nil, cfg)
 	r := gin.New()
 	var reason IngressRejectReason
 	var rejected bool
@@ -274,7 +274,7 @@ type googleErrorResponse struct {
 }
 
 func newTestAPIKeyService(repo service.APIKeyRepository) *service.APIKeyService {
-	return service.NewAPIKeyService(
+	return newAPIKeyServiceWithRiskTestRepo(
 		repo,
 		nil, // userRepo (unused in GetByKey)
 		nil, // groupRepo
@@ -360,7 +360,7 @@ func TestApiKeyAuthWithSubscriptionGoogleSetsGroupContext(t *testing.T) {
 	}
 	apiKey.GroupID = &group.ID
 
-	apiKeyService := service.NewAPIKeyService(
+	apiKeyService := newAPIKeyServiceWithRiskTestRepo(
 		fakeAPIKeyRepo{
 			getByKey: func(ctx context.Context, key string) (*service.APIKey, error) {
 				if key != apiKey.Key {

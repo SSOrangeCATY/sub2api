@@ -25,6 +25,16 @@ Helper checks:
 
 ```bash
 python -m pip install -r .github/release-tools/requirements-release.txt
-python -m unittest discover -s .github/release-tools -p 'test_release_matrix.py'
+python -m unittest discover -s .github/release-tools -p 'test_*.py'
 bash -n .github/release-tools/release-images.sh
 ```
+
+## Production image identity
+
+The production build records the digest returned by its own build step in an immutable artifact named with the full commit and run attempt. The resolver checks the successful production workflow, repository, commit, attempt, artifact metadata and ZIP digest before returning an image reference by digest.
+
+Resolve the selected production build with:
+
+    python .github/release-tools/production_identity.py resolve --repository OWNER/REPO --sha FULL_40_CHARACTER_SHA --run-id RUN_ID --output verified-build-identity.json
+
+Deployment must use the returned image reference and separately verify its OCI revision and linux/amd64 platform. A mutable SHA tag or an unrelated successful run is insufficient proof. Retain the artifact ID, artifact digest and run attempt in deployment records.
