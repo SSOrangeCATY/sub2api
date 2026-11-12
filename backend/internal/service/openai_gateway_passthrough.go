@@ -2340,7 +2340,8 @@ func (s *OpenAIGatewayService) handleNonStreamingResponsePassthrough(
 	// The ChatGPT OAuth upstream may omit Content-Type while still sending SSE,
 	// so OAuth accounts also fall back to the body framing (same rule as
 	// handleNonStreamingResponse).
-	if isEventStreamResponse(resp.Header) || (account != nil && account.Type == AccountTypeOAuth && bodyHasSSEFraming(body)) {
+	mislabeledJSON := isEventStreamResponseWithJSONBody(resp.Header, body)
+	if (isEventStreamResponse(resp.Header) && !mislabeledJSON) || (account != nil && account.Type == AccountTypeOAuth && bodyHasSSEFraming(body)) {
 		return s.handlePassthroughSSEToJSON(resp, c, account, body, originalModel, mappedModel)
 	}
 
@@ -2363,6 +2364,10 @@ func (s *OpenAIGatewayService) handleNonStreamingResponsePassthrough(
 	contentType := resp.Header.Get("Content-Type")
 	if contentType == "" {
 		contentType = "application/json"
+	}
+	if mislabeledJSON {
+		contentType = "application/json; charset=utf-8"
+		c.Writer.Header().Set("Content-Type", contentType)
 	}
 	if originalModel != "" && mappedModel != "" && originalModel != mappedModel {
 		body = s.replaceModelInResponseBody(body, mappedModel, originalModel)
