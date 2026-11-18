@@ -52,7 +52,7 @@ func resolveAccountStatsCost(
 	platform := channelService.GetGroupPlatform(ctx, groupID)
 
 	// 优先级 1：自定义规则（始终尝试）
-	if cost := tryCustomRules(channel, accountID, groupID, platform, upstreamModel, tokens, requestCount, reasoningEffort); cost != nil {
+	if cost := tryCustomRules(channel, accountID, groupID, platform, upstreamModel, tokens, requestCount, pricingAt, reasoningEffort); cost != nil {
 		return cost
 	}
 
@@ -113,6 +113,7 @@ func tryModelFilePricing(billingService *BillingService, model string, tokens Us
 func tryCustomRules(
 	channel *Channel, accountID, groupID int64,
 	platform, model string, tokens UsageTokens, requestCount int,
+	pricingAt time.Time,
 	reasoningEfforts ...string,
 ) *float64 {
 	reasoningEffort := ""
@@ -131,6 +132,7 @@ func tryCustomRules(
 		cost := calculateStatsCost(pricing, tokens, requestCount)
 		if cost != nil {
 			*cost *= reasoningEffortBillingMultiplier(reasoningEffort, pricing.ReasoningEffortMultipliers)
+			*cost *= pricing.TimePricing.MultiplierAt(pricingAt)
 		}
 		return cost
 	}

@@ -67,7 +67,7 @@ func (r *channelRepository) batchLoadAccountStatsModelPricing(ctx context.Contex
 
 	rows, err := r.db.QueryContext(ctx,
 		`SELECT id, rule_id, platform, models, billing_mode, input_price, output_price,
-		        cache_write_price, cache_write_1h_price, cache_write_12h_price, cache_read_price, reasoning_effort_multipliers, image_output_price, per_request_price, created_at, updated_at, source_currency
+		        cache_write_price, cache_write_1h_price, cache_write_12h_price, cache_read_price, reasoning_effort_multipliers, image_output_price, per_request_price, created_at, updated_at, source_currency, time_pricing
 		 FROM channel_account_stats_model_pricing WHERE rule_id = ANY($1) ORDER BY rule_id, id`,
 		pq.Array(ruleIDs),
 	)
@@ -81,11 +81,11 @@ func (r *channelRepository) batchLoadAccountStatsModelPricing(ctx context.Contex
 		var p service.ChannelModelPricing
 		var ruleID int64
 		var modelsJSON []byte
-		var reasoningEffortMultipliersJSON []byte
+		var reasoningEffortMultipliersJSON, timePricingJSON []byte
 		if err := rows.Scan(
 			&p.ID, &ruleID, &p.Platform, &modelsJSON, &p.BillingMode,
 			&p.InputPrice, &p.OutputPrice, &p.CacheWritePrice, &p.CacheWrite1hPrice, &p.CacheWrite12hPrice, &p.CacheReadPrice,
-			&reasoningEffortMultipliersJSON, &p.ImageOutputPrice, &p.PerRequestPrice, &p.CreatedAt, &p.UpdatedAt, &p.SourceCurrency,
+			&reasoningEffortMultipliersJSON, &p.ImageOutputPrice, &p.PerRequestPrice, &p.CreatedAt, &p.UpdatedAt, &p.SourceCurrency, &timePricingJSON,
 		); err != nil {
 			return nil, fmt.Errorf("scan account stats model pricing: %w", err)
 		}
@@ -97,6 +97,10 @@ func (r *channelRepository) batchLoadAccountStatsModelPricing(ctx context.Contex
 			return nil, err
 		}
 		p.ReasoningEffortMultipliers = multipliers
+		p.TimePricing, err = unmarshalChannelTimePricing(timePricingJSON)
+		if err != nil {
+			return nil, err
+		}
 		pricingMap[ruleID] = append(pricingMap[ruleID], p)
 	}
 	if err := rows.Err(); err != nil {
@@ -182,17 +186,21 @@ func createAccountStatsModelPricingTx(ctx context.Context, tx *sql.Tx, ruleID in
 	if err != nil {
 		return err
 	}
+	timePricingJSON, err := marshalChannelTimePricing(pricing.TimePricing)
+	if err != nil {
+		return err
+	}
 	billingMode := pricing.BillingMode
 	if billingMode == "" {
 		billingMode = service.BillingModeToken
 	}
 	platform := pricing.Platform
 	err = tx.QueryRowContext(ctx,
-		`INSERT INTO channel_account_stats_model_pricing (rule_id, platform, models, billing_mode, input_price, output_price, cache_write_price, cache_write_1h_price, cache_write_12h_price, cache_read_price, reasoning_effort_multipliers, image_output_price, per_request_price, source_currency)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING id, created_at, updated_at`,
+		`INSERT INTO channel_account_stats_model_pricing (rule_id, platform, models, billing_mode, input_price, output_price, cache_write_price, cache_write_1h_price, cache_write_12h_price, cache_read_price, reasoning_effort_multipliers, image_output_price, per_request_price, source_currency, time_pricing)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING id, created_at, updated_at`,
 		ruleID, platform, modelsJSON, billingMode,
 		pricing.InputPrice, pricing.OutputPrice, pricing.CacheWritePrice, pricing.CacheWrite1hPrice, pricing.CacheWrite12hPrice, pricing.CacheReadPrice,
-		reasoningEffortMultipliersJSON, pricing.ImageOutputPrice, pricing.PerRequestPrice, pricing.SourceCurrency,
+		reasoningEffortMultipliersJSON, pricing.ImageOutputPrice, pricing.PerRequestPrice, pricing.SourceCurrency, timePricingJSON,
 	).Scan(&pricing.ID, &pricing.CreatedAt, &pricing.UpdatedAt)
 	if err != nil {
 		return fmt.Errorf("insert account stats model pricing: %w", err)

@@ -202,6 +202,7 @@ func (s *ModelPriceQuoteService) accountVariant(ctx context.Context, group *Grou
 				pricing = &cp
 				variant.ContextMetric = "total"
 				variant.IntervalPriceMode = "absolute"
+				variant.TimePricing = resolvedTimePricingSchedule(&ResolvedPricing{Source: PricingSourceChannel, channelPricing: pricing})
 				// Account-cost token intervals replace the flat card; they do
 				// not inherit its missing fields or use sales multipliers.
 				if pricing.BillingMode == BillingModeImage || pricing.BillingMode == BillingModeVideo || pricing.BillingMode == BillingModePerRequest {
