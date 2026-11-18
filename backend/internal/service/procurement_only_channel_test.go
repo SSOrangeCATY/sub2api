@@ -5,6 +5,7 @@ package service
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/stretchr/testify/require"
@@ -75,7 +76,7 @@ func TestProcurementOnlyChannel_RecordUsageChangesOnlyMatchedAccountCost(t *test
 	}
 	other := *ch
 	other.AccountStatsPricingRules[0].AccountIDs = []int64{999}
-	require.Nil(t, tryCustomRules(&other, 101, 201, PlatformOpenAI, "gpt-6.2-astra", UsageTokens{InputTokens: 100}, 1), "an account-specific rule must not act as a group-wide rule")
+	require.Nil(t, tryCustomRules(&other, 101, 201, PlatformOpenAI, "gpt-6.2-astra", UsageTokens{InputTokens: 100}, 1, time.Time{}), "an account-specific rule must not act as a group-wide rule")
 }
 
 func TestProcurementOnlyChannel_PreservesEveryNonTargetModelAmount(t *testing.T) {
@@ -126,7 +127,7 @@ func TestProcurementOnlyChannel_CostCardIsMutableAndAccountScoped(t *testing.T) 
 			require.Equal(t, "quoted", q.Status)
 			require.InDelta(t, 4e-6, *q.Variants[0].Pricing.InputPrice, 1e-15)
 		}
-		value := tryCustomRules(ch, 101, 201, PlatformOpenAI, name, UsageTokens{InputTokens: 1000, CacheReadTokens: 2000, OutputTokens: 3000}, 1)
+		value := tryCustomRules(ch, 101, 201, PlatformOpenAI, name, UsageTokens{InputTokens: 1000, CacheReadTokens: 2000, OutputTokens: 3000}, 1, time.Time{})
 		require.NotNil(t, value)
 		require.InDelta(t, .096, *value, 1e-12)
 	}

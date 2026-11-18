@@ -580,6 +580,7 @@
                       :key="pIdx"
                       :entry="entry"
                       :platform="section.platform"
+                      enable-time-pricing
                       @update="rule.pricing.splice(pIdx, 1, $event)"
                       @remove="removeRulePricingEntry(sIdx, ruleIndex, pIdx)"
                     />
@@ -1117,7 +1118,7 @@ function accountStatsRulesToAPI(): AccountStatsPricingRule[] {
             image_output_price: mTokToPerToken(p.image_output_price),
             per_request_price: p.per_request_price != null && p.per_request_price !== '' ? Number(p.per_request_price) : null,
             intervals: formIntervalsToAPI(p.intervals || []),
-            time_pricing: null
+            time_pricing: formTimePricingToAPI(p.time_pricing)
           }))
       })
     }
@@ -1462,7 +1463,7 @@ function distributeRulesToPlatforms(apiRules: AccountStatsPricingRule[]) {
         image_output_price: perTokenToMTok(p.image_output_price),
         per_request_price: p.per_request_price,
         intervals: apiIntervalsToForm(p.intervals || []),
-        time_pricing: createDefaultTimePricingForm()
+        time_pricing: apiTimePricingToForm(p.time_pricing)
       } as PricingFormEntry))
     }
     section.account_stats_pricing_rules.push(formRule)
@@ -1612,7 +1613,8 @@ async function handleSubmit() {
 
   // 校验时间段定价，并切换到对应平台便于修正
   for (const section of form.platforms.filter(s => s.enabled)) {
-    for (const entry of section.model_pricing) {
+    const accountPricing = section.account_stats_pricing_rules.flatMap(rule => rule.pricing)
+    for (const entry of [...section.model_pricing, ...accountPricing]) {
       const timePricingError = validateTimePricing(entry.time_pricing, t)
       if (timePricingError) {
         const platformLabel = t('admin.groups.platforms.' + section.platform, catalogPlatformLabel(section.platform))
