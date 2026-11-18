@@ -382,7 +382,7 @@ func TestTryCustomRules_FirstMatchWins(t *testing.T) {
 		},
 	}
 	tokens := UsageTokens{InputTokens: 100, OutputTokens: 50}
-	result := tryCustomRules(channel, 999, 1, "", "claude-opus-4", tokens, 1)
+	result := tryCustomRules(channel, 999, 1, "", "claude-opus-4", tokens, 1, time.Time{})
 	require.NotNil(t, result)
 	// 应使用第一条规则的价格：100*0.01 + 50*0.02 = 2.0
 	require.InDelta(t, 2.0, *result, 1e-12)
@@ -406,7 +406,7 @@ func TestTryCustomRules_SkipsNonMatchingRules(t *testing.T) {
 		},
 	}
 	tokens := UsageTokens{InputTokens: 100}
-	result := tryCustomRules(channel, 999, 1, "", "claude-opus-4", tokens, 1)
+	result := tryCustomRules(channel, 999, 1, "", "claude-opus-4", tokens, 1, time.Time{})
 	require.NotNil(t, result)
 	// 跳过规则1（账号不匹配），使用规则2：100*0.05 = 5.0
 	require.InDelta(t, 5.0, *result, 1e-12)
@@ -424,7 +424,7 @@ func TestTryCustomRules_NoMatch_ReturnsNil(t *testing.T) {
 		},
 	}
 	tokens := UsageTokens{InputTokens: 100}
-	result := tryCustomRules(channel, 999, 2, "", "claude-opus-4", tokens, 1)
+	result := tryCustomRules(channel, 999, 2, "", "claude-opus-4", tokens, 1, time.Time{})
 	require.Nil(t, result) // 账号和分组都不匹配
 }
 
@@ -446,7 +446,7 @@ func TestTryCustomRules_RuleMatchesButModelNot_ContinuesToNext(t *testing.T) {
 		},
 	}
 	tokens := UsageTokens{InputTokens: 100}
-	result := tryCustomRules(channel, 999, 1, "", "claude-opus-4", tokens, 1)
+	result := tryCustomRules(channel, 999, 1, "", "claude-opus-4", tokens, 1, time.Time{})
 	require.NotNil(t, result)
 	require.InDelta(t, 5.0, *result, 1e-12) // 使用规则2
 }
@@ -1134,6 +1134,46 @@ func TestOpenAIGatewayServiceRecordUsage_AccountStatsLongContextFollowsAccountGa
 			require.InDelta(t, tt.wantTotalCost, usageRepo.lastLog.TotalCost, 1e-10)
 			require.NotNil(t, usageRepo.lastLog.AccountStatsCost)
 			require.InDelta(t, tt.wantAccountCost, *usageRepo.lastLog.AccountStatsCost, 1e-10)
+		})
+	}
+}
+
+func TestResolveAccountStatsCost_UsesSupplierTimePricing(t *testing.T) {
+	const groupID, accountID = 5, 10
+	inputPrice, outputPrice, cachePrice := 1e-6, 4e-6, .02e-6
+	channel := &Channel{ID: 1, Status: StatusActive, AccountStatsPricingRules: []AccountStatsPricingRule{{
+		AccountIDs: []int64{accountID},
+		Pricing: []ChannelModelPricing{{
+			Platform: PlatformOpenAI, Models: []string{"deepseek-flash"}, BillingMode: BillingModeToken,
+			InputPrice: &inputPrice, OutputPrice: &outputPrice, CacheReadPrice: &cachePrice,
+			TimePricing: &ChannelTimePricing{Timezone: "Asia/Shanghai", WeekdaysOnly: true, Periods: []ChannelTimePricingPeriod{
+				{StartTime: "09:00", EndTime: "12:00", Multiplier: 2},
+				{StartTime: "14:00", EndTime: "18:00", Multiplier: 2},
+			}},
+		}},
+	}}}
+	service := newTestChannelServiceForStats(t, channel, groupID, PlatformOpenAI)
+	tokens := UsageTokens{InputTokens: 1000, OutputTokens: 500, CacheReadTokens: 1000}
+	const normal = .00302
+	for _, tt := range []struct {
+		name, utc string
+		want      float64
+	}{
+		{"before peak", "2026-11-18T00:59:59Z", normal},
+		{"first peak start", "2026-11-18T01:00:00Z", 2 * normal},
+		{"first peak end", "2026-11-18T04:00:00Z", normal},
+		{"second peak start", "2026-11-18T06:00:00Z", 2 * normal},
+		{"second peak end", "2026-11-18T10:00:00Z", normal},
+		{"weekend", "2026-11-21T01:00:00Z", normal},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			at, err := time.Parse(time.RFC3339, tt.utc)
+			require.NoError(t, err)
+			cost := resolveAccountStatsCost(context.Background(), service, nil, accountID, groupID, "deepseek-flash", tokens, 1, .000453, "", at, false)
+			require.NotNil(t, cost)
+			require.InDelta(t, tt.want, *cost, 1e-12)
+			other := resolveAccountStatsCost(context.Background(), service, nil, accountID+1, groupID, "deepseek-flash", tokens, 1, .000453, "", at, false)
+			require.Nil(t, other)
 		})
 	}
 }

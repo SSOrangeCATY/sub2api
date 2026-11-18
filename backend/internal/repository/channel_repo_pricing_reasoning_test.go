@@ -142,14 +142,16 @@ func TestAccountStatsReasoningEffortMultipliersRoundTrip(t *testing.T) {
 	pricing := &service.ChannelModelPricing{
 		SourceCurrency: "CNY", Platform: "anthropic", Models: []string{"custom-model"},
 		ReasoningEffortMultipliers: map[string]float64{"medium": 0.5, "high": 2},
+		TimePricing:                &service.ChannelTimePricing{Timezone: "Asia/Shanghai", WeekdaysOnly: true, Periods: []service.ChannelTimePricingPeriod{{StartTime: "09:00", EndTime: "12:00", Multiplier: 2}}},
 	}
 	stored := &capturedReasoningMultipliersJSON{}
+	storedTime := &capturedReasoningMultipliersJSON{}
 	mock.ExpectBegin()
 	tx, err := repo.db.BeginTx(ctx, nil)
 	require.NoError(t, err)
 	mock.ExpectQuery(`INSERT INTO channel_account_stats_model_pricing .*reasoning_effort_multipliers`).
 		WithArgs(int64(9), "anthropic", []byte(`["custom-model"]`), service.BillingModeToken,
-			nil, nil, nil, nil, nil, nil, stored, nil, nil, "CNY").
+			nil, nil, nil, nil, nil, nil, stored, nil, nil, "CNY", storedTime).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "created_at", "updated_at"}).AddRow(int64(11), time.Time{}, time.Time{}))
 	require.NoError(t, createAccountStatsModelPricingTx(ctx, tx, 9, pricing))
 	mock.ExpectCommit()
@@ -159,12 +161,12 @@ func TestAccountStatsReasoningEffortMultipliersRoundTrip(t *testing.T) {
 	columns := []string{
 		"id", "rule_id", "platform", "models", "billing_mode", "input_price", "output_price",
 		"cache_write_price", "cache_write_1h_price", "cache_write_12h_price", "cache_read_price", "reasoning_effort_multipliers",
-		"image_output_price", "per_request_price", "created_at", "updated_at", "source_currency",
+		"image_output_price", "per_request_price", "created_at", "updated_at", "source_currency", "time_pricing",
 	}
 	mock.ExpectQuery(`(?s)SELECT .*reasoning_effort_multipliers.*FROM channel_account_stats_model_pricing`).
 		WithArgs(pq.Array([]int64{9})).WillReturnRows(sqlmock.NewRows(columns).AddRow(
 		int64(11), int64(9), "anthropic", `["custom-model"]`, service.BillingModeToken,
-		nil, nil, nil, nil, nil, nil, stored.value, nil, nil, time.Time{}, time.Time{}, "CNY",
+		nil, nil, nil, nil, nil, nil, stored.value, nil, nil, time.Time{}, time.Time{}, "CNY", storedTime.value,
 	))
 	mock.ExpectQuery(`(?s)SELECT .*FROM channel_account_stats_pricing_intervals`).
 		WithArgs(pq.Array([]int64{11})).WillReturnRows(sqlmock.NewRows([]string{"id"}))
@@ -172,6 +174,7 @@ func TestAccountStatsReasoningEffortMultipliersRoundTrip(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, loaded[9], 1)
 	require.Equal(t, "CNY", loaded[9][0].SourceCurrency)
+	require.Equal(t, pricing.TimePricing, loaded[9][0].TimePricing)
 	require.Equal(t, pricing.ReasoningEffortMultipliers, loaded[9][0].ReasoningEffortMultipliers)
 	require.NoError(t, mock.ExpectationsWereMet())
 }
